@@ -438,7 +438,7 @@ function NotificationRow({ notification }: { notification: GitHubNotification })
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge label={notification.subject.type} tone="default" />
             <Badge label={formatReason(notification.reason)} tone="gray" />
-            {notification.unread ? <Badge label="Unread" tone="green" /> : null}
+            <Badge label={notification.unread ? 'Unread' : 'Read'} tone={notification.unread ? 'green' : 'gray'} />
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' |
 export type GitHubNotification = {
   id: string;
   unread: boolean;
+  last_read_at?: string | null;
   updated_at: string;
   reason: string;
   repository: {
@@ -128,8 +129,26 @@ export async function testGitHubConnection(token: string): Promise<GitHubConnect
 }
 
 export async function getGitHubNotifications(token: string): Promise<GitHubNotification[]> {
-  const response = await fetchGitHub('https://api.github.com/notifications', token);
-  return (await response.json()) as GitHubNotification[];
+  const notifications: GitHubNotification[] = [];
+  let page = 1;
+
+  while (true) {
+    const response = await fetchGitHub(
+      `https://api.github.com/notifications?all=true&per_page=50&page=${page}`,
+      token
+    );
+    const pageNotifications = (await response.json()) as GitHubNotification[];
+
+    notifications.push(...pageNotifications);
+
+    if (pageNotifications.length < 50) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return notifications;
 }
 
 export async function getMyOpenPRs(username: string, token: string): Promise<GitHubSearchResponse> {
