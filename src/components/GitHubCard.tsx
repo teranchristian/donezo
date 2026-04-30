@@ -4,7 +4,9 @@ import {
   GitHubDashboardData,
   GitHubNotification,
   GitHubPullRequestItem,
-  enrichGitHubPullRequests
+  enrichGitHubPullRequests,
+  getGitHubPullRequestState,
+  type GitHubPullRequestState
 } from '../lib/githubApi';
 import {
   getStoredGitHubOwnerFilter,
@@ -64,6 +66,9 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
   const [enrichedPullRequestsByUrl, setEnrichedPullRequestsByUrl] = useState<
     Record<string, GitHubPullRequestItem>
   >({});
+  const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
+    Record<string, GitHubPullRequestState>
+  >({});
   const resolvedPullRequests = data.pullRequests.map(
     (pullRequest) => enrichedPullRequestsByUrl[pullRequest.url] ?? pullRequest
   );
@@ -91,6 +96,14 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
     .filter((pullRequest) => !pullRequest.detailsLoaded);
   const visiblePullRequestKey = visiblePullRequestsToEnrich
     .map((pullRequest) => `${pullRequest.url}:${pullRequest.updatedAt}`)
+    .join('|');
+  const visiblePullRequestNotifications = filteredItems
+    .filter((item): item is Extract<GitHubViewItem, { kind: 'notification' }> => item.kind === 'notification')
+    .map((item) => item.value)
+    .filter((notification) => notification.subject.type === 'PullRequest')
+    .filter((notification) => !notificationPullRequestStates[notification.id]);
+  const visibleNotificationPullRequestKey = visiblePullRequestNotifications
+    .map((notification) => notification.id)
     .join('|');
   const isFilterApplied = organizationFilter !== 'all' || sortOrder !== 'recently-updated';
 
@@ -151,6 +164,20 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
   }, [data.pullRequests]);
 
   useEffect(() => {
+    const activeNotificationIds = new Set((data.notifications ?? []).map((notification) => notification.id));
+
+    setNotificationPullRequestStates((currentEntries) => {
+      const nextEntries = Object.fromEntries(
+        Object.entries(currentEntries).filter(([id]) => activeNotificationIds.has(id))
+      );
+
+      return Object.keys(nextEntries).length === Object.keys(currentEntries).length
+        ? currentEntries
+        : nextEntries;
+    });
+  }, [data.notifications]);
+
+  useEffect(() => {
     if (!token.trim() || visiblePullRequestsToEnrich.length === 0) {
       return;
     }
@@ -177,6 +204,54 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
       isCancelled = true;
     };
   }, [token, visiblePullRequestKey]);
+
+  useEffect(() => {
+    if (!token.trim() || visiblePullRequestNotifications.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    Promise.all(
+      visiblePullRequestNotifications.map(async (notification) => {
+        const pullRequestIdentity = getPullRequestIdentityFromNotification(notification);
+        if (!pullRequestIdentity) {
+          return null;
+        }
+
+        try {
+          const state = await getGitHubPullRequestState({
+            ...pullRequestIdentity,
+            token
+          });
+
+          return { id: notification.id, state };
+        } catch {
+          return { id: notification.id, state: 'closed' as const };
+        }
+      })
+    ).then((results) => {
+      if (isCancelled) {
+        return;
+      }
+
+      setNotificationPullRequestStates((currentEntries) => {
+        const nextEntries = { ...currentEntries };
+
+        for (const result of results) {
+          if (result) {
+            nextEntries[result.id] = result.state;
+          }
+        }
+
+        return nextEntries;
+      });
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [token, visibleNotificationPullRequestKey]);
 
   return (
     <CardShell className="flex h-full min-w-0 flex-col overflow-hidden">
@@ -318,7 +393,11 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
               <div className="space-y-3">
                 {filteredItems.map((item) =>
                   item.kind === 'notification' ? (
-                    <NotificationRow key={item.key} notification={item.value} />
+                    <NotificationRow
+                      key={item.key}
+                      notification={item.value}
+                      pullRequestState={notificationPullRequestStates[item.value.id]}
+                    />
                   ) : (
                     <PullRequestRow key={item.key} pullRequest={item.value} />
                   )
@@ -407,7 +486,10 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
+          <div className="flex items-center gap-2">
+            <GitHubItemIcon kind="pull-request" />
+            <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
+          </div>
           <p className="mt-1 text-sm text-stone-400">{pullRequest.repositoryName}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge label={pullRequest.source === 'authored' ? 'Mine' : 'Review'} tone="default" />
@@ -423,7 +505,15 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
   );
 }
 
-function NotificationRow({ notification }: { notification: GitHubNotification }) {
+function NotificationRow({
+  notification,
+  pullRequestState
+}: {
+  notification: GitHubNotification;
+  pullRequestState?: GitHubPullRequestState;
+}) {
+  const iconKind = getNotificationIconKind(notification.subject.type);
+
   return (
     <a
       href={getNotificationUrl(notification)}
@@ -433,7 +523,13 @@ function NotificationRow({ notification }: { notification: GitHubNotification })
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-stone-100">{notification.subject.title}</p>
+          <div className="flex items-center gap-2">
+            <GitHubItemIcon
+              kind={iconKind}
+              state={iconKind === 'pull-request' ? pullRequestState : undefined}
+            />
+            <p className="truncate text-sm font-medium text-stone-100">{notification.subject.title}</p>
+          </div>
           <p className="mt-1 text-sm text-stone-400">{notification.repository.full_name}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge label={notification.subject.type} tone="default" />
@@ -447,6 +543,90 @@ function NotificationRow({ notification }: { notification: GitHubNotification })
         {new Date(notification.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
       </p>
     </a>
+  );
+}
+
+function GitHubItemIcon({
+  kind,
+  state
+}: {
+  kind: 'pull-request' | 'issue' | 'commit' | 'discussion'
+  state?: GitHubPullRequestState
+}) {
+  if (kind === 'issue') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-emerald-400"
+        fill="currentColor"
+      >
+        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14Zm0-11.75a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm1 8.5v-5h-2v5h2Z" />
+      </svg>
+    );
+  }
+
+  if (kind === 'commit') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-amber-400"
+        fill="currentColor"
+      >
+        <path d="M6.5 1.75a6.25 6.25 0 0 1 3 11.73v.77a.75.75 0 0 1-1.5 0v-.33a6.26 6.26 0 0 1-2-12.17v-.5a.75.75 0 0 1 1.5 0v.5c.33-.05.66-.07 1-.07Zm0 1.5a4.75 4.75 0 1 0 0 9.5 4.75 4.75 0 0 0 0-9.5Z" />
+      </svg>
+    );
+  }
+
+  if (kind === 'discussion') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-sky-400"
+        fill="currentColor"
+      >
+        <path d="M1.75 3A2.25 2.25 0 0 1 4 0.75h8A2.25 2.25 0 0 1 14.25 3v5A2.25 2.25 0 0 1 12 10.25H8.56L5.53 13.1A.75.75 0 0 1 4.25 12.55v-2.3H4A2.25 2.25 0 0 1 1.75 8V3ZM4 2.25a.75.75 0 0 0-.75.75v5c0 .414.336.75.75.75H5a.75.75 0 0 1 .75.75v1.32l2.03-1.91a.75.75 0 0 1 .52-.16H12a.75.75 0 0 0 .75-.75V3a.75.75 0 0 0-.75-.75H4Z" />
+      </svg>
+    );
+  }
+
+  if (kind === 'pull-request' && state === 'closed') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-rose-400"
+        fill="currentColor"
+      >
+        <path d="M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 5.5a.75.75 0 0 1 .75.75v3.378a2.251 2.251 0 1 1-1.5 0V7.25a.75.75 0 0 1 .75-.75Zm-2.03-5.273a.75.75 0 0 1 1.06 0l.97.97.97-.97a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.97.97.97.97a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-.97-.97-.97.97a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l.97-.97-.97-.97a.75.75 0 0 1 0-1.06ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z" />
+      </svg>
+    );
+  }
+
+  if (kind === 'pull-request' && state === 'merged') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-violet-400"
+        fill="currentColor"
+      >
+        <path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className="h-4 w-4 flex-none text-emerald-400"
+      fill="currentColor"
+    >
+      <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
+    </svg>
   );
 }
 
@@ -648,6 +828,41 @@ function formatCount(value: number, isLoading: boolean) {
 
 function formatReason(reason: string) {
   return reason.replace(/-/g, ' ');
+}
+
+function getNotificationIconKind(subjectType: string): 'pull-request' | 'issue' | 'commit' | 'discussion' {
+  if (subjectType === 'Issue') {
+    return 'issue';
+  }
+
+  if (subjectType === 'Commit') {
+    return 'commit';
+  }
+
+  if (subjectType === 'Discussion') {
+    return 'discussion';
+  }
+
+  return 'pull-request';
+}
+
+function getPullRequestIdentityFromNotification(notification: GitHubNotification) {
+  if (!notification.subject.url) {
+    return null;
+  }
+
+  const apiPath = notification.subject.url.replace('https://api.github.com/repos/', '');
+  const [owner, repo, resource, pullNumber] = apiPath.split('/');
+
+  if (resource !== 'pulls' || !owner || !repo || !pullNumber) {
+    return null;
+  }
+
+  return {
+    owner,
+    repo,
+    pullNumber: Number(pullNumber)
+  };
 }
 
 function getNotificationUrl(notification: GitHubNotification) {

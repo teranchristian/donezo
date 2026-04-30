@@ -1,4 +1,5 @@
 export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
+export type GitHubPullRequestState = 'open' | 'merged' | 'closed';
 
 export type GitHubNotification = {
   id: string;
@@ -59,6 +60,8 @@ type GitHubSearchResponse = {
 
 type GitHubPullRequestDetail = {
   number: number;
+  state: 'open' | 'closed';
+  merged: boolean;
   head: {
     sha: string;
   };
@@ -321,6 +324,26 @@ export async function enrichGitHubPullRequests(
     STATUS_CONCURRENCY,
     async (pullRequest) => enrichPullRequest(pullRequest, token)
   );
+}
+
+export async function getGitHubPullRequestState(options: {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  token: string;
+}): Promise<GitHubPullRequestState> {
+  const detail = await getPullRequestDetail(
+    options.owner,
+    options.repo,
+    options.pullNumber,
+    options.token
+  );
+
+  if (detail.merged) {
+    return 'merged';
+  }
+
+  return detail.state === 'open' ? 'open' : 'closed';
 }
 
 async function enrichPullRequest(
