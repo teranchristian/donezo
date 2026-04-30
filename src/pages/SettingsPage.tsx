@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
 import { InfoBanner } from '../components/InfoBanner';
-import { GitHubConnectionStatus } from '../lib/github';
+import { GitHubConnectionStatus } from '../lib/githubApi';
 import { DashboardSettings } from '../lib/storage';
 
 type SettingsPageProps = {

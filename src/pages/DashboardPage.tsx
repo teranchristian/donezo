@@ -4,15 +4,24 @@ import { HeaderMenu } from '../components/HeaderMenu';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard } from '../components/SummaryCard';
-import { GitHubConnectionStatus } from '../lib/github';
+import { GitHubDashboardData } from '../lib/githubApi';
 import { DashboardSettings } from '../lib/storage';
 
 type DashboardPageProps = {
   settings: DashboardSettings;
-  gitHubStatus: GitHubConnectionStatus;
+  gitHubData: GitHubDashboardData;
+  gitHubSummary: string;
+  isGitHubLoading: boolean;
+  onRefreshGitHub: () => void;
 };
 
-export function DashboardPage({ settings, gitHubStatus }: DashboardPageProps) {
+export function DashboardPage({
+  settings,
+  gitHubData,
+  gitHubSummary,
+  isGitHubLoading,
+  onRefreshGitHub
+}: DashboardPageProps) {
   return (
     <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
@@ -21,16 +30,18 @@ export function DashboardPage({ settings, gitHubStatus }: DashboardPageProps) {
           <HeaderMenu />
         </div>
 
-        <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid gap-6">
-            <SummaryCard />
+            <SummaryCard summary={gitHubSummary} />
 
-            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
               <NotesCard />
               <div className="grid gap-6">
                 <GitHubCard
-                  status={gitHubStatus}
+                  data={gitHubData}
                   username={settings.integrations.github.username}
+                  isLoading={isGitHubLoading}
+                  onRefresh={onRefreshGitHub}
                 />
                 <PlaceholderCard
                   title="Jira"

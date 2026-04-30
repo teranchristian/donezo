@@ -28,6 +28,33 @@ body {
   color: #f3f0ea;
 }
 
+.dashboard-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.28) rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dashboard-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 999px;
+}
+
+.dashboard-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+.dashboard-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 button,
 input {
   font: inherit;

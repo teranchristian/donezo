@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { testGitHubConnection, type GitHubConnectionStatus } from './lib/github';
+import {
+  getEmptyGitHubDashboardData,
+  loadGitHubDashboardData,
+  testGitHubConnection,
+  type GitHubConnectionStatus,
+  type GitHubDashboardData
+} from './lib/githubApi';
 import {
   getDefaultSettings,
   getStoredSettings,
@@ -13,7 +19,8 @@ import { SettingsPage } from './pages/SettingsPage';
 export default function App() {
   const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
-  const [savedGitHubStatus, setSavedGitHubStatus] = useState<GitHubConnectionStatus>('not-connected');
+  const [gitHubData, setGitHubData] = useState<GitHubDashboardData>(getEmptyGitHubDashboardData());
+  const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [settingsTestStatus, setSettingsTestStatus] = useState<GitHubConnectionStatus>('not-connected');
   const [isTestingSettings, setIsTestingSettings] = useState(false);
 
@@ -39,29 +46,26 @@ export default function App() {
       return;
     }
 
-    const savedToken = settings.integrations.github.token.trim();
-    if (!savedToken) {
-      setSavedGitHubStatus('not-connected');
-      setSettingsTestStatus('not-connected');
-      return;
-    }
-
     let active = true;
-    setSavedGitHubStatus('testing');
+    setIsGitHubLoading(true);
 
-    testGitHubConnection(savedToken).then((status) => {
+    loadGitHubDashboardData({
+      username: settings.integrations.github.username,
+      token: settings.integrations.github.token
+    }).then((data) => {
       if (!active) {
         return;
       }
 
-      setSavedGitHubStatus(status);
-      setSettingsTestStatus(status);
+      setGitHubData(data);
+      setSettingsTestStatus(data.connectionStatus);
+      setIsGitHubLoading(false);
     });
 
     return () => {
       active = false;
     };
-  }, [isLoadingSettings, settings.integrations.github.token]);
+  }, [isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
 
   async function handleSaveSettings(nextSettings: DashboardSettings) {
     await saveStoredSettings(nextSettings);
@@ -79,11 +83,35 @@ export default function App() {
     return status;
   }
 
+  async function handleRefreshGitHub() {
+    setIsGitHubLoading(true);
+
+    const data = await loadGitHubDashboardData({
+      username: settings.integrations.github.username,
+      token: settings.integrations.github.token,
+      forceRefresh: true
+    });
+
+    setGitHubData(data);
+    setSettingsTestStatus(data.connectionStatus);
+    setIsGitHubLoading(false);
+  }
+
+  const gitHubSummary = getGitHubSummary(gitHubData, isGitHubLoading);
+
   return (
     <Routes>
       <Route
         path="/"
-        element={<DashboardPage settings={settings} gitHubStatus={savedGitHubStatus} />}
+        element={
+          <DashboardPage
+            settings={settings}
+            gitHubData={gitHubData}
+            gitHubSummary={gitHubSummary}
+            isGitHubLoading={isGitHubLoading}
+            onRefreshGitHub={() => void handleRefreshGitHub()}
+          />
+        }
       />
       <Route
         path="/settings"
@@ -100,4 +128,28 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+function getGitHubSummary(data: GitHubDashboardData, isLoading: boolean) {
+  if (isLoading) {
+    return 'Today: loading GitHub activity...';
+  }
+
+  if (data.connectionStatus === 'not-connected') {
+    return 'Today: connect GitHub to load notifications and pull requests.';
+  }
+
+  if (data.connectionStatus === 'invalid') {
+    return 'Today: GitHub token is invalid. Update it in Settings.';
+  }
+
+  if (data.connectionStatus === 'error') {
+    return 'Today: GitHub data is temporarily unavailable.';
+  }
+
+  if (data.missingUsername) {
+    return 'Today: GitHub is connected, but your username is missing in Settings.';
+  }
+
+  return `Today: ${data.notificationsCount} GitHub notifications, ${data.openPrsCount} open PRs, ${data.reviewRequestedCount} waiting for review.`;
 }
