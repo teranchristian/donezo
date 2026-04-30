@@ -2,6 +2,18 @@ export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' |
 
 export type GitHubNotification = {
   id: string;
+  unread: boolean;
+  updated_at: string;
+  reason: string;
+  repository: {
+    full_name: string;
+  };
+  subject: {
+    title: string;
+    type: string;
+    url: string | null;
+    latest_comment_url?: string | null;
+  };
 };
 
 export type GitHubPullRequestItem = {
@@ -24,6 +36,7 @@ export type GitHubDashboardData = {
   notificationsCount: number;
   openPrsCount: number;
   reviewRequestedCount: number;
+  notifications: GitHubNotification[];
   pullRequests: GitHubPullRequestItem[];
   errorMessage: string | null;
   missingUsername: boolean;
@@ -87,6 +100,7 @@ export function getEmptyGitHubDashboardData(
     notificationsCount: 0,
     openPrsCount: 0,
     reviewRequestedCount: 0,
+    notifications: [],
     pullRequests: [],
     errorMessage: null,
     missingUsername: false,
@@ -196,6 +210,7 @@ export async function loadGitHubDashboardData(options: {
       notificationsCount: notifications.length,
       openPrsCount: myOpenPrs.total_count,
       reviewRequestedCount: reviewRequestedPrs.total_count,
+      notifications,
       pullRequests,
       errorMessage: null,
       missingUsername: false,

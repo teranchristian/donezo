@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import {
   GitHubConnectionStatus,
   GitHubDashboardData,
+  GitHubNotification,
   GitHubPullRequestItem
 } from '../lib/githubApi';
 import { CardShell } from './CardShell';
@@ -43,9 +45,22 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
 
 export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
-  const myOpenPRs = data.pullRequests;
-  const totalPRs = data.openPrsCount;
+  const [activeGitHubView, setActiveGitHubView] = useState<
+    'notifications' | 'my-prs' | 'needs-review'
+  >('my-prs');
+  const myOpenPRs = data.pullRequests.filter((pullRequest) => pullRequest.source === 'authored');
+  const reviewRequestedPRs = data.pullRequests.filter(
+    (pullRequest) => pullRequest.source === 'review-requested'
+  );
+  const notifications = data.notifications ?? [];
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
+  const currentView = getGitHubViewContent(
+    activeGitHubView,
+    data,
+    notifications,
+    myOpenPRs,
+    reviewRequestedPRs
+  );
 
   return (
     <CardShell className="flex h-full min-w-0 flex-col overflow-hidden">
@@ -80,16 +95,22 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
             label="Notifications"
             value={formatCount(data.notificationsCount, isLoading)}
             isLoading={isLoading}
+            isActive={activeGitHubView === 'notifications'}
+            onClick={() => setActiveGitHubView('notifications')}
           />
           <Stat
             label="My Open PRs"
             value={formatCount(data.openPrsCount, isLoading)}
             isLoading={isLoading}
+            isActive={activeGitHubView === 'my-prs'}
+            onClick={() => setActiveGitHubView('my-prs')}
           />
           <Stat
             label="Needs Review"
             value={formatCount(data.reviewRequestedCount, isLoading)}
             isLoading={isLoading}
+            isActive={activeGitHubView === 'needs-review'}
+            onClick={() => setActiveGitHubView('needs-review')}
           />
         </div>
 
@@ -109,31 +130,29 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">Pull Requests</p>
-            {!isLoading && totalPRs > 0 ? (
-              <p className="text-xs text-stone-500">{totalPRs} open PRs</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{currentView.title}</p>
+            {!isLoading && currentView.count > 0 ? (
+              <p className="text-xs text-stone-500">{currentView.countLabel}</p>
             ) : null}
           </div>
           <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
-                  <PullRequestSkeleton key={index} />
+                  <ListItemSkeleton key={index} />
                 ))}
               </div>
-            ) : myOpenPRs.length === 0 ? (
+            ) : currentView.items.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-5 text-sm text-stone-500">
-                {getEmptyListMessage(data)}
+                {currentView.emptyMessage}
               </div>
             ) : (
               <div className="space-y-3">
-                {myOpenPRs.map((pullRequest) => (
-                  <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
-                ))}
+                {currentView.items.map((item) => item)}
               </div>
             )}
           </div>
-          {!isLoading && totalPRs > 0 && username.trim() ? (
+          {!isLoading && activeGitHubView === 'my-prs' && data.openPrsCount > 0 && username.trim() ? (
             <div className="mt-3 text-right">
               <a
                 href={viewAllUrl}
@@ -151,16 +170,36 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
   );
 }
 
-function Stat({ label, value, isLoading }: { label: string; value: string; isLoading: boolean }) {
+function Stat({
+  label,
+  value,
+  isLoading,
+  isActive,
+  onClick
+}: {
+  label: string;
+  value: string;
+  isLoading: boolean;
+  isActive: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="min-h-[92px] rounded-2xl border border-white/5 bg-black/10 px-4 py-3">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-[92px] rounded-2xl border px-4 py-3 text-left transition cursor-pointer ${
+        isActive
+          ? 'border-white/20 bg-white/10'
+          : 'border-white/5 bg-black/10 hover:border-white/10 hover:bg-black/20'
+      }`}
+    >
       <p className="text-xs uppercase tracking-[0.16em] text-textSoft">{label}</p>
       {isLoading ? (
         <div className="mt-3 h-8 w-12 animate-pulse rounded-lg bg-white/10" />
       ) : (
         <p className="mt-2 text-2xl text-stone-100">{value}</p>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -190,6 +229,33 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
   );
 }
 
+function NotificationRow({ notification }: { notification: GitHubNotification }) {
+  return (
+    <a
+      href={getNotificationUrl(notification)}
+      target="_blank"
+      rel="noreferrer"
+      className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-3 transition hover:border-white/15 hover:bg-black/20"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-stone-100">{notification.subject.title}</p>
+          <p className="mt-1 text-sm text-stone-400">{notification.repository.full_name}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge label={notification.subject.type} tone="default" />
+            <Badge label={formatReason(notification.reason)} tone="gray" />
+            {notification.unread ? <Badge label="Unread" tone="green" /> : null}
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-textSoft">
+        Updated{' '}
+        {new Date(notification.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+      </p>
+    </a>
+  );
+}
+
 function Badge({
   label,
   tone
@@ -214,7 +280,7 @@ function Badge({
   );
 }
 
-function PullRequestSkeleton() {
+function ListItemSkeleton() {
   return (
     <div className="rounded-2xl border border-white/5 bg-black/10 px-4 py-3">
       <div className="flex items-start justify-between gap-4">
@@ -229,12 +295,78 @@ function PullRequestSkeleton() {
   );
 }
 
+function getGitHubViewContent(
+  activeGitHubView: 'notifications' | 'my-prs' | 'needs-review',
+  data: GitHubDashboardData,
+  notifications: GitHubNotification[],
+  myOpenPRs: GitHubPullRequestItem[],
+  reviewRequestedPRs: GitHubPullRequestItem[]
+) {
+  if (activeGitHubView === 'notifications') {
+    return {
+      title: 'Notifications',
+      count: data.notificationsCount,
+      countLabel: `${data.notificationsCount} notifications`,
+      emptyMessage:
+        data.connectionStatus === 'connected'
+          ? 'No notifications right now.'
+          : getEmptyListMessage(data),
+      items: notifications.map((notification) => (
+        <NotificationRow key={notification.id} notification={notification} />
+      ))
+    };
+  }
+
+  if (activeGitHubView === 'needs-review') {
+    return {
+      title: 'Needs Review',
+      count: data.reviewRequestedCount,
+      countLabel: `${data.reviewRequestedCount} review requests`,
+      emptyMessage: data.connectionStatus === 'connected' ? 'No pull requests need your review.' : getEmptyListMessage(data),
+      items: reviewRequestedPRs.map((pullRequest) => (
+        <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+      ))
+    };
+  }
+
+  return {
+    title: 'Pull Requests',
+    count: data.openPrsCount,
+    countLabel: `${data.openPrsCount} open PRs`,
+    emptyMessage: getEmptyListMessage(data),
+    items: myOpenPRs.map((pullRequest) => (
+      <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+    ))
+  };
+}
+
 function formatCount(value: number, isLoading: boolean) {
   if (isLoading) {
     return '...';
   }
 
   return String(value);
+}
+
+function formatReason(reason: string) {
+  return reason.replace(/-/g, ' ');
+}
+
+function getNotificationUrl(notification: GitHubNotification) {
+  if (notification.subject.url) {
+    const apiPath = notification.subject.url.replace('https://api.github.com/repos/', '');
+    const [owner, repo, resource, id] = apiPath.split('/');
+
+    if (resource === 'pulls') {
+      return `https://github.com/${owner}/${repo}/pull/${id}`;
+    }
+
+    if (resource === 'issues') {
+      return `https://github.com/${owner}/${repo}/issues/${id}`;
+    }
+  }
+
+  return `https://github.com/${notification.repository.full_name}`;
 }
 
 function getReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
