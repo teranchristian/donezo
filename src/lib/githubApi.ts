@@ -8,9 +8,15 @@ export type GitHubPullRequestItem = {
   id: number;
   title: string;
   repositoryName: string;
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  headSha: string;
   updatedAt: string;
   url: string;
   source: 'authored' | 'review-requested';
+  reviewStatus: 'approved' | 'changes-requested' | 'waiting-review';
+  ciStatus: 'passing' | 'failing' | 'pending' | 'unknown';
 };
 
 export type GitHubDashboardData = {
@@ -28,11 +34,39 @@ type GitHubSearchResponse = {
   items: Array<{
     id: number;
     title: string;
+    number: number;
     updated_at: string;
     html_url: string;
     repository_url: string;
   }>;
   total_count: number;
+};
+
+type GitHubPullRequestDetail = {
+  number: number;
+  head: {
+    sha: string;
+  };
+  base: {
+    repo: {
+      name: string;
+      owner: {
+        login: string;
+      };
+    };
+  };
+};
+
+type GitHubReview = {
+  state: string;
+  submitted_at?: string;
+};
+
+type GitHubCheckRunsResponse = {
+  check_runs: Array<{
+    status: string;
+    conclusion: string | null;
+  }>;
 };
 
 type CachedGitHubDashboardData = {
@@ -43,6 +77,7 @@ type CachedGitHubDashboardData = {
 
 const CACHE_KEY = 'github-dashboard-cache';
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const STATUS_CONCURRENCY = 3;
 
 export function getEmptyGitHubDashboardData(
   connectionStatus: GitHubConnectionStatus = 'not-connected'
@@ -151,12 +186,17 @@ export async function loadGitHubDashboardData(options: {
       getReviewRequestedPRs(username, token)
     ]);
 
+    const pullRequests = await enrichPullRequests(
+      mergePullRequestSeeds(myOpenPrs.items, reviewRequestedPrs.items),
+      token
+    );
+
     const data: GitHubDashboardData = {
       connectionStatus: 'connected',
       notificationsCount: notifications.length,
       openPrsCount: myOpenPrs.total_count,
       reviewRequestedCount: reviewRequestedPrs.total_count,
-      pullRequests: mergePullRequests(myOpenPrs.items, reviewRequestedPrs.items),
+      pullRequests,
       errorMessage: null,
       missingUsername: false,
       lastUpdatedAt: Date.now()
@@ -194,15 +234,7 @@ async function fetchGitHub(url: string, token: string) {
   return response;
 }
 
-function mergePullRequests(
-  myItems: GitHubSearchResponse['items'],
-  reviewItems: GitHubSearchResponse['items']
-) {
-  const items = [
-    ...myItems.map((item) => mapPullRequest(item, 'authored')),
-    ...reviewItems.map((item) => mapPullRequest(item, 'review-requested'))
-  ];
-
+function mergePullRequests(items: GitHubPullRequestItem[]) {
   const deduped = new Map<string, GitHubPullRequestItem>();
   for (const item of items) {
     const existing = deduped.get(item.url);
@@ -215,18 +247,186 @@ function mergePullRequests(
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 }
 
-function mapPullRequest(
+function mergePullRequestSeeds(
+  myItems: GitHubSearchResponse['items'],
+  reviewItems: GitHubSearchResponse['items']
+) {
+  return mergePullRequests([
+    ...myItems.map((item) => mapPullRequestSeed(item, 'authored')),
+    ...reviewItems.map((item) => mapPullRequestSeed(item, 'review-requested'))
+  ]);
+}
+
+function mapPullRequestSeed(
   item: GitHubSearchResponse['items'][number],
   source: GitHubPullRequestItem['source']
 ): GitHubPullRequestItem {
+  const { owner, repo } = parseRepository(item.repository_url);
+
   return {
     id: item.id,
     title: item.title,
-    repositoryName: item.repository_url.replace('https://api.github.com/repos/', ''),
+    repositoryName: `${owner}/${repo}`,
+    owner,
+    repo,
+    pullNumber: item.number,
+    headSha: '',
     updatedAt: item.updated_at,
     url: item.html_url,
-    source
+    source,
+    reviewStatus: 'waiting-review',
+    ciStatus: 'unknown'
   };
+}
+
+async function enrichPullRequests(pullRequests: GitHubPullRequestItem[], token: string) {
+  return runWithConcurrency(
+    pullRequests,
+    STATUS_CONCURRENCY,
+    async (pullRequest) => enrichPullRequest(pullRequest, token)
+  );
+}
+
+async function enrichPullRequest(
+  pullRequest: GitHubPullRequestItem,
+  token: string
+): Promise<GitHubPullRequestItem> {
+  try {
+    const detail = await getPullRequestDetail(
+      pullRequest.owner,
+      pullRequest.repo,
+      pullRequest.pullNumber,
+      token
+    );
+
+    const owner = detail.base.repo.owner.login;
+    const repo = detail.base.repo.name;
+    const headSha = detail.head.sha;
+
+    const [reviews, checkRuns] = await Promise.all([
+      getPullRequestReviews(owner, repo, pullRequest.pullNumber, token).catch(() => []),
+      getCommitCheckRuns(owner, repo, headSha, token).catch(() => [])
+    ]);
+
+    return {
+      ...pullRequest,
+      owner,
+      repo,
+      repositoryName: `${owner}/${repo}`,
+      headSha,
+      reviewStatus: getReviewStatus(reviews),
+      ciStatus: getCiStatus(checkRuns)
+    };
+  } catch {
+    return {
+      ...pullRequest,
+      reviewStatus: 'waiting-review',
+      ciStatus: 'unknown'
+    };
+  }
+}
+
+async function getPullRequestDetail(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  token: string
+) {
+  const response = await fetchGitHub(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
+    token
+  );
+  return (await response.json()) as GitHubPullRequestDetail;
+}
+
+async function getPullRequestReviews(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  token: string
+) {
+  const response = await fetchGitHub(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
+    token
+  );
+  return (await response.json()) as GitHubReview[];
+}
+
+async function getCommitCheckRuns(owner: string, repo: string, headSha: string, token: string) {
+  const response = await fetchGitHub(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${headSha}/check-runs`,
+    token
+  );
+  const result = (await response.json()) as GitHubCheckRunsResponse;
+  return result.check_runs ?? [];
+}
+
+function getReviewStatus(reviews: GitHubReview[]): GitHubPullRequestItem['reviewStatus'] {
+  if (reviews.length === 0) {
+    return 'waiting-review';
+  }
+
+  const sorted = [...reviews].sort((left, right) => {
+    const leftTime = left.submitted_at ? new Date(left.submitted_at).getTime() : 0;
+    const rightTime = right.submitted_at ? new Date(right.submitted_at).getTime() : 0;
+    return rightTime - leftTime;
+  });
+
+  for (const review of sorted) {
+    if (review.state === 'CHANGES_REQUESTED') {
+      return 'changes-requested';
+    }
+
+    if (review.state === 'APPROVED') {
+      return 'approved';
+    }
+
+    if (review.state === 'COMMENTED') {
+      return 'waiting-review';
+    }
+  }
+
+  return 'waiting-review';
+}
+
+function getCiStatus(
+  checkRuns: GitHubCheckRunsResponse['check_runs']
+): GitHubPullRequestItem['ciStatus'] {
+  if (checkRuns.length === 0) {
+    return 'unknown';
+  }
+
+  if (
+    checkRuns.some((checkRun) =>
+      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(checkRun.conclusion ?? '')
+    )
+  ) {
+    return 'failing';
+  }
+
+  if (
+    checkRuns.some((checkRun) =>
+      ['queued', 'in_progress', 'waiting', 'requested', 'pending'].includes(checkRun.status)
+    )
+  ) {
+    return 'pending';
+  }
+
+  if (
+    checkRuns.every((checkRun) =>
+      ['success', 'neutral', 'skipped'].includes(checkRun.conclusion ?? '')
+    )
+  ) {
+    return 'passing';
+  }
+
+  return 'unknown';
+}
+
+function parseRepository(repositoryUrl: string) {
+  const normalized = repositoryUrl.replace('https://api.github.com/repos/', '');
+  const [owner, repo] = normalized.split('/');
+  return { owner, repo };
 }
 
 async function getCachedGitHubDashboardData(cacheToken: string) {
@@ -262,6 +462,26 @@ function createCacheToken(username: string, token: string) {
   }
 
   return `${username}:${(hash >>> 0).toString(16)}`;
+}
+
+async function runWithConcurrency<TInput, TResult>(
+  items: TInput[],
+  concurrency: number,
+  mapper: (item: TInput) => Promise<TResult>
+) {
+  const results: TResult[] = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const currentIndex = cursor;
+      cursor += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
 }
 
 function hasChromeStorage() {

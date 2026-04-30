@@ -173,18 +173,44 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
       className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-3 transition hover:border-white/15 hover:bg-black/20"
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
           <p className="mt-1 text-sm text-stone-400">{pullRequest.repositoryName}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge label={pullRequest.source === 'authored' ? 'Mine' : 'Review'} tone="default" />
+            <Badge label={getReviewStatusLabel(pullRequest.reviewStatus)} tone={getReviewTone(pullRequest.reviewStatus)} />
+            <Badge label={getCiStatusLabel(pullRequest.ciStatus)} tone={getCiTone(pullRequest.ciStatus)} />
+          </div>
         </div>
-        <span className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[0.65rem] uppercase tracking-[0.18em] text-stone-300">
-          {pullRequest.source === 'authored' ? 'Mine' : 'Review'}
-        </span>
       </div>
       <p className="mt-3 text-xs uppercase tracking-[0.2em] text-textSoft">
         Updated {new Date(pullRequest.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
       </p>
     </a>
+  );
+}
+
+function Badge({
+  label,
+  tone
+}: {
+  label: string;
+  tone: 'default' | 'green' | 'red' | 'yellow' | 'gray';
+}) {
+  const toneClass = {
+    default: 'border-white/10 bg-white/5 text-stone-300',
+    green: 'border-emerald-300/20 bg-emerald-200/10 text-emerald-100',
+    red: 'border-rose-300/20 bg-rose-200/10 text-rose-100',
+    yellow: 'border-amber-300/20 bg-amber-200/10 text-amber-100',
+    gray: 'border-white/10 bg-white/5 text-stone-400'
+  }[tone];
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-1 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -209,6 +235,66 @@ function formatCount(value: number, isLoading: boolean) {
   }
 
   return String(value);
+}
+
+function getReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
+  if (reviewStatus === 'approved') {
+    return 'Approved';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'Changes requested';
+  }
+
+  return 'Waiting review';
+}
+
+function getReviewTone(
+  reviewStatus: GitHubPullRequestItem['reviewStatus']
+): 'green' | 'red' | 'gray' {
+  if (reviewStatus === 'approved') {
+    return 'green';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'red';
+  }
+
+  return 'gray';
+}
+
+function getCiStatusLabel(ciStatus: GitHubPullRequestItem['ciStatus']) {
+  if (ciStatus === 'passing') {
+    return 'Passing';
+  }
+
+  if (ciStatus === 'failing') {
+    return 'Failing';
+  }
+
+  if (ciStatus === 'pending') {
+    return 'Pending';
+  }
+
+  return 'Unknown';
+}
+
+function getCiTone(
+  ciStatus: GitHubPullRequestItem['ciStatus']
+): 'green' | 'red' | 'yellow' | 'gray' {
+  if (ciStatus === 'passing') {
+    return 'green';
+  }
+
+  if (ciStatus === 'failing') {
+    return 'red';
+  }
+
+  if (ciStatus === 'pending') {
+    return 'yellow';
+  }
+
+  return 'gray';
 }
 
 function getGitHubMessage(
