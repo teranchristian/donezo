@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   GitHubConnectionStatus,
   GitHubDashboardData,
   GitHubNotification,
   GitHubPullRequestItem
 } from '../lib/githubApi';
+import {
+  getStoredGitHubOwnerFilter,
+  getStoredGitHubSortOrder,
+  saveStoredGitHubOwnerFilter,
+  saveStoredGitHubSortOrder,
+  type GitHubListSort
+} from '../lib/storage';
 import { CardShell } from './CardShell';
 import { SectionHeading } from './SectionHeading';
 
@@ -48,12 +55,17 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
   const [activeGitHubView, setActiveGitHubView] = useState<
     'notifications' | 'my-prs' | 'needs-review'
   >('my-prs');
+  const [organizationFilter, setOrganizationFilter] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
+  const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
+  const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
   const myOpenPRs = data.pullRequests.filter((pullRequest) => pullRequest.source === 'authored');
   const reviewRequestedPRs = data.pullRequests.filter(
     (pullRequest) => pullRequest.source === 'review-requested'
   );
   const notifications = data.notifications ?? [];
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
+  const ownerOptions = getOwnerOptions(data, username, organizationFilter);
   const currentView = getGitHubViewContent(
     activeGitHubView,
     data,
@@ -61,6 +73,53 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
     myOpenPRs,
     reviewRequestedPRs
   );
+  const filteredItems = sortGitHubItems(
+    filterGitHubItems(currentView.items, organizationFilter),
+    sortOrder
+  );
+  const isFilterApplied = organizationFilter !== 'all' || sortOrder !== 'recently-updated';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getStoredGitHubOwnerFilter().then((storedOwnerFilter) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setOrganizationFilter(storedOwnerFilter);
+      setHasLoadedOwnerFilter(true);
+    });
+
+    getStoredGitHubSortOrder().then((storedSortOrder) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setSortOrder(storedSortOrder);
+      setHasLoadedSortOrder(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedOwnerFilter) {
+      return;
+    }
+
+    void saveStoredGitHubOwnerFilter(organizationFilter);
+  }, [hasLoadedOwnerFilter, organizationFilter]);
+
+  useEffect(() => {
+    if (!hasLoadedSortOrder) {
+      return;
+    }
+
+    void saveStoredGitHubSortOrder(sortOrder);
+  }, [hasLoadedSortOrder, sortOrder]);
 
   return (
     <CardShell className="flex h-full min-w-0 flex-col overflow-hidden">
@@ -129,6 +188,58 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
+          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-white/5 bg-black/10 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+              <label className="flex min-w-0 flex-col gap-2">
+                <span className="text-[0.7rem] uppercase tracking-[0.18em] text-textSoft">Owner</span>
+                <select
+                  value={organizationFilter}
+                  onChange={(event) => setOrganizationFilter(event.target.value)}
+                  className="rounded-xl border border-white/10 bg-panel px-3 py-2 text-sm text-stone-100 outline-none transition hover:border-white/20 focus:border-white/25"
+                >
+                  {ownerOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-panel text-stone-100">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex min-w-0 flex-col gap-2">
+                <span className="text-[0.7rem] uppercase tracking-[0.18em] text-textSoft">Sort</span>
+                <select
+                  value={sortOrder}
+                  onChange={(event) => setSortOrder(event.target.value as GitHubListSort)}
+                  className="rounded-xl border border-white/10 bg-panel px-3 py-2 text-sm text-stone-100 outline-none transition hover:border-white/20 focus:border-white/25"
+                >
+                  <option value="recently-updated" className="bg-panel text-stone-100">
+                    Recently updated
+                  </option>
+                  <option value="oldest-updated" className="bg-panel text-stone-100">
+                    Oldest updated
+                  </option>
+                  <option value="repository-asc" className="bg-panel text-stone-100">
+                    Repository A-Z
+                  </option>
+                  <option value="title-asc" className="bg-panel text-stone-100">
+                    Title A-Z
+                  </option>
+                </select>
+              </label>
+            </div>
+
+            {!isLoading ? (
+              <p className="text-xs text-stone-400">
+                {getFilteredCountLabel(
+                  filteredItems.length,
+                  currentView.items.length,
+                  currentView.itemLabel,
+                  isFilterApplied
+                )}
+              </p>
+            ) : null}
+          </div>
+
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{currentView.title}</p>
             {!isLoading && currentView.count > 0 ? (
@@ -142,13 +253,19 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
                   <ListItemSkeleton key={index} />
                 ))}
               </div>
-            ) : currentView.items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-5 text-sm text-stone-500">
-                {currentView.emptyMessage}
+                {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
             ) : (
               <div className="space-y-3">
-                {currentView.items.map((item) => item)}
+                {filteredItems.map((item) =>
+                  item.kind === 'notification' ? (
+                    <NotificationRow key={item.key} notification={item.value} />
+                  ) : (
+                    <PullRequestRow key={item.key} pullRequest={item.value} />
+                  )
+                )}
               </div>
             )}
           </div>
@@ -169,6 +286,26 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
     </CardShell>
   );
 }
+
+type GitHubViewItem =
+  | {
+      kind: 'notification';
+      key: string;
+      owner: string;
+      repositoryName: string;
+      title: string;
+      updatedAt: string;
+      value: GitHubNotification;
+    }
+  | {
+      kind: 'pull-request';
+      key: string;
+      owner: string;
+      repositoryName: string;
+      title: string;
+      updatedAt: string;
+      value: GitHubPullRequestItem;
+    };
 
 function Stat({
   label,
@@ -307,13 +444,20 @@ function getGitHubViewContent(
       title: 'Notifications',
       count: data.notificationsCount,
       countLabel: `${data.notificationsCount} notifications`,
+      itemLabel: 'notifications',
       emptyMessage:
         data.connectionStatus === 'connected'
           ? 'No notifications right now.'
           : getEmptyListMessage(data),
-      items: notifications.map((notification) => (
-        <NotificationRow key={notification.id} notification={notification} />
-      ))
+      items: notifications.map((notification) => ({
+        kind: 'notification' as const,
+        key: notification.id,
+        owner: getOwnerFromRepositoryName(notification.repository.full_name),
+        repositoryName: notification.repository.full_name,
+        title: notification.subject.title,
+        updatedAt: notification.updated_at,
+        value: notification
+      }))
     };
   }
 
@@ -322,10 +466,9 @@ function getGitHubViewContent(
       title: 'Needs Review',
       count: data.reviewRequestedCount,
       countLabel: `${data.reviewRequestedCount} review requests`,
+      itemLabel: 'PRs',
       emptyMessage: data.connectionStatus === 'connected' ? 'No pull requests need your review.' : getEmptyListMessage(data),
-      items: reviewRequestedPRs.map((pullRequest) => (
-        <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
-      ))
+      items: reviewRequestedPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest))
     };
   }
 
@@ -333,11 +476,109 @@ function getGitHubViewContent(
     title: 'Pull Requests',
     count: data.openPrsCount,
     countLabel: `${data.openPrsCount} open PRs`,
+    itemLabel: 'PRs',
     emptyMessage: getEmptyListMessage(data),
-    items: myOpenPRs.map((pullRequest) => (
-      <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
-    ))
+    items: myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest))
   };
+}
+
+function mapPullRequestViewItem(pullRequest: GitHubPullRequestItem): GitHubViewItem {
+  return {
+    kind: 'pull-request',
+    key: pullRequest.url,
+    owner: getOwnerFromRepositoryName(pullRequest.repositoryName),
+    repositoryName: pullRequest.repositoryName,
+    title: pullRequest.title,
+    updatedAt: pullRequest.updatedAt,
+    value: pullRequest
+  };
+}
+
+function getOwnerOptions(data: GitHubDashboardData, username: string, selectedOwner: string) {
+  const owners = new Set<string>();
+
+  for (const pullRequest of data.pullRequests) {
+    owners.add(getOwnerFromRepositoryName(pullRequest.repositoryName));
+  }
+
+  for (const notification of data.notifications ?? []) {
+    owners.add(getOwnerFromRepositoryName(notification.repository.full_name));
+  }
+
+  const trimmedUsername = username.trim();
+  const sortedOwners = [...owners].filter(Boolean).sort((left, right) => left.localeCompare(right));
+  const options = [{ value: 'all', label: 'All' }];
+
+  if (trimmedUsername) {
+    options.push({ value: trimmedUsername, label: trimmedUsername });
+  }
+
+  for (const owner of sortedOwners) {
+    if (owner !== trimmedUsername) {
+      options.push({ value: owner, label: owner });
+    }
+  }
+
+  if (
+    selectedOwner !== 'all' &&
+    selectedOwner.trim() &&
+    !options.some((option) => option.value === selectedOwner)
+  ) {
+    options.push({ value: selectedOwner, label: selectedOwner });
+  }
+
+  return options;
+}
+
+function getOwnerFromRepositoryName(repositoryName: string) {
+  return repositoryName.split('/')[0] ?? '';
+}
+
+function filterGitHubItems(items: GitHubViewItem[], organizationFilter: string) {
+  if (organizationFilter === 'all') {
+    return items;
+  }
+
+  return items.filter((item) => item.owner === organizationFilter);
+}
+
+function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
+  const sortedItems = [...items];
+
+  sortedItems.sort((left, right) => {
+    if (sortOrder === 'oldest-updated') {
+      return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime();
+    }
+
+    if (sortOrder === 'repository-asc') {
+      return left.repositoryName.localeCompare(right.repositoryName);
+    }
+
+    if (sortOrder === 'title-asc') {
+      return left.title.localeCompare(right.title);
+    }
+
+    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  });
+
+  return sortedItems;
+}
+
+function getFilteredCountLabel(
+  visibleCount: number,
+  totalCount: number,
+  itemLabel: string,
+  isFilterApplied: boolean
+) {
+  if (!isFilterApplied) {
+    return `Showing ${visibleCount} ${itemLabel}`;
+  }
+
+  return `Showing ${visibleCount} of ${totalCount} ${itemLabel}`;
+}
+
+function getNoFilterResultsMessage(itemLabel: string) {
+  return `No ${itemLabel} match the current filters.`;
 }
 
 function formatCount(value: number, isLoading: boolean) {

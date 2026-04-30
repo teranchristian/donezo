@@ -6,6 +6,8 @@ export type Note = {
 
 const NOTES_STORAGE_KEY = 'dashboard-notes';
 const SETTINGS_STORAGE_KEY = 'dashboard-settings';
+const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
+const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
 
 export type DashboardSettings = {
   name: string;
@@ -17,6 +19,13 @@ export type DashboardSettings = {
   };
 };
 
+export type GitHubListOrganizationFilter = 'all' | string;
+export type GitHubListSort =
+  | 'recently-updated'
+  | 'oldest-updated'
+  | 'repository-asc'
+  | 'title-asc';
+
 const DEFAULT_SETTINGS: DashboardSettings = {
   name: 'Christian',
   integrations: {
@@ -26,6 +35,9 @@ const DEFAULT_SETTINGS: DashboardSettings = {
     }
   }
 };
+
+const DEFAULT_GITHUB_OWNER_FILTER: GitHubListOrganizationFilter = 'all';
+const DEFAULT_GITHUB_SORT_ORDER: GitHubListSort = 'recently-updated';
 
 function hasChromeStorage() {
   return typeof chrome !== 'undefined' && Boolean(chrome.storage?.local);
@@ -87,6 +99,60 @@ export async function saveStoredSettings(settings: DashboardSettings) {
   localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
 }
 
+export async function getStoredGitHubOwnerFilter() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_OWNER_FILTER_STORAGE_KEY]);
+    return mergeGitHubOwnerFilter(result[GITHUB_OWNER_FILTER_STORAGE_KEY] as string | undefined);
+  }
+
+  const raw = localStorage.getItem(GITHUB_OWNER_FILTER_STORAGE_KEY);
+  if (!raw) {
+    return DEFAULT_GITHUB_OWNER_FILTER;
+  }
+
+  try {
+    return mergeGitHubOwnerFilter(JSON.parse(raw) as string);
+  } catch {
+    return DEFAULT_GITHUB_OWNER_FILTER;
+  }
+}
+
+export async function saveStoredGitHubOwnerFilter(filter: GitHubListOrganizationFilter) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_OWNER_FILTER_STORAGE_KEY]: filter });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_OWNER_FILTER_STORAGE_KEY, JSON.stringify(filter));
+}
+
+export async function getStoredGitHubSortOrder() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_SORT_ORDER_STORAGE_KEY]);
+    return mergeGitHubSortOrder(result[GITHUB_SORT_ORDER_STORAGE_KEY] as string | undefined);
+  }
+
+  const raw = localStorage.getItem(GITHUB_SORT_ORDER_STORAGE_KEY);
+  if (!raw) {
+    return DEFAULT_GITHUB_SORT_ORDER;
+  }
+
+  try {
+    return mergeGitHubSortOrder(JSON.parse(raw) as string);
+  } catch {
+    return DEFAULT_GITHUB_SORT_ORDER;
+  }
+}
+
+export async function saveStoredGitHubSortOrder(sortOrder: GitHubListSort) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_SORT_ORDER_STORAGE_KEY]: sortOrder });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_SORT_ORDER_STORAGE_KEY, JSON.stringify(sortOrder));
+}
+
 export function getDefaultSettings() {
   return structuredClone(DEFAULT_SETTINGS);
 }
@@ -118,4 +184,21 @@ function mergeSettings(settings?: Partial<DashboardSettings>): DashboardSettings
       }
     }
   };
+}
+
+function mergeGitHubOwnerFilter(filter?: string): GitHubListOrganizationFilter {
+  return typeof filter === 'string' && filter.trim() ? filter : DEFAULT_GITHUB_OWNER_FILTER;
+}
+
+function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
+  if (
+    sortOrder === 'oldest-updated' ||
+    sortOrder === 'repository-asc' ||
+    sortOrder === 'title-asc' ||
+    sortOrder === 'recently-updated'
+  ) {
+    return sortOrder;
+  }
+
+  return DEFAULT_GITHUB_SORT_ORDER;
 }
