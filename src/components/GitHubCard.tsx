@@ -43,6 +43,9 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
 
 export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
+  const myOpenPRs = data.pullRequests;
+  const totalPRs = data.openPrsCount;
+  const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
 
   return (
     <CardShell className="min-w-0 overflow-hidden">
@@ -105,26 +108,43 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
-          <p className="text-sm uppercase tracking-[0.28em] text-textSoft">Pull Requests</p>
-          <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[360px] overflow-y-auto pr-1">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">Pull Requests</p>
+            {!isLoading && totalPRs > 0 ? (
+              <p className="text-xs text-stone-500">{totalPRs} open PRs</p>
+            ) : null}
+          </div>
+          <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <PullRequestSkeleton key={index} />
                 ))}
               </div>
-            ) : data.pullRequests.length === 0 ? (
+            ) : myOpenPRs.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-5 text-sm text-stone-500">
                 {getEmptyListMessage(data)}
               </div>
             ) : (
               <div className="space-y-3">
-                {data.pullRequests.map((pullRequest) => (
+                {myOpenPRs.map((pullRequest) => (
                   <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
                 ))}
               </div>
             )}
           </div>
+          {!isLoading && totalPRs > 0 && username.trim() ? (
+            <div className="mt-3 text-right">
+              <a
+                href={viewAllUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-indigo-400 transition hover:text-indigo-300"
+              >
+                View all PRs →
+              </a>
+            </div>
+          ) : null}
         </div>
       </div>
     </CardShell>
