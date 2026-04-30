@@ -1,51 +1,103 @@
-import { DashboardHeader } from './components/DashboardHeader';
-import { NotesCard } from './components/NotesCard';
-import { PlaceholderCard } from './components/PlaceholderCard';
-import { SummaryCard } from './components/SummaryCard';
+import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { testGitHubConnection, type GitHubConnectionStatus } from './lib/github';
+import {
+  getDefaultSettings,
+  getStoredSettings,
+  saveStoredSettings,
+  type DashboardSettings
+} from './lib/storage';
+import { DashboardPage } from './pages/DashboardPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 export default function App() {
+  const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [savedGitHubStatus, setSavedGitHubStatus] = useState<GitHubConnectionStatus>('not-connected');
+  const [settingsTestStatus, setSettingsTestStatus] = useState<GitHubConnectionStatus>('not-connected');
+  const [isTestingSettings, setIsTestingSettings] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    getStoredSettings().then((storedSettings) => {
+      if (!active) {
+        return;
+      }
+
+      setSettings(storedSettings);
+      setIsLoadingSettings(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isLoadingSettings) {
+      return;
+    }
+
+    const savedToken = settings.integrations.github.token.trim();
+    if (!savedToken) {
+      setSavedGitHubStatus('not-connected');
+      setSettingsTestStatus('not-connected');
+      return;
+    }
+
+    let active = true;
+    setSavedGitHubStatus('testing');
+
+    testGitHubConnection(savedToken).then((status) => {
+      if (!active) {
+        return;
+      }
+
+      setSavedGitHubStatus(status);
+      setSettingsTestStatus(status);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isLoadingSettings, settings.integrations.github.token]);
+
+  async function handleSaveSettings(nextSettings: DashboardSettings) {
+    await saveStoredSettings(nextSettings);
+    setSettings(nextSettings);
+  }
+
+  async function handleTestGitHubConnection(token: string) {
+    setIsTestingSettings(true);
+    setSettingsTestStatus('testing');
+
+    const status = await testGitHubConnection(token);
+
+    setSettingsTestStatus(status);
+    setIsTestingSettings(false);
+    return status;
+  }
+
   return (
-    <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8">
-        <DashboardHeader name="Christian" />
-
-        <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-          <div className="grid gap-6">
-            <SummaryCard />
-
-            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-              <NotesCard />
-              <div className="grid gap-6">
-                <PlaceholderCard
-                  title="GitHub"
-                  subtitle="Placeholder"
-                  description="Open pull requests, review requests, and branch health can land here next."
-                />
-                <PlaceholderCard
-                  title="Jira"
-                  subtitle="Placeholder"
-                  description="Ticket status, blockers, and sprint priorities can be added without changing the layout."
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-6">
-            <PlaceholderCard
-              title="Calendar"
-              subtitle="Placeholder"
-              description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
-              className="min-h-[220px]"
-            />
-            <PlaceholderCard
-              title="Workspace"
-              subtitle="Later"
-              description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
-              className="min-h-[220px]"
-            />
-          </div>
-        </section>
-      </div>
-    </main>
+    <Routes>
+      <Route
+        path="/"
+        element={<DashboardPage settings={settings} gitHubStatus={savedGitHubStatus} />}
+      />
+      <Route
+        path="/settings"
+        element={
+          <SettingsPage
+            settings={settings}
+            onSave={handleSaveSettings}
+            onTestConnection={handleTestGitHubConnection}
+            testStatus={settingsTestStatus}
+            isTesting={isTestingSettings}
+          />
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
