@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
+import { InfoBanner } from '../components/InfoBanner';
 import { GitHubConnectionStatus } from '../lib/github';
 import { DashboardSettings } from '../lib/storage';
 
@@ -111,6 +112,31 @@ export function SettingsPage({
             </div>
 
             <div className="space-y-4">
+              <InfoBanner title="GitHub Token Required">
+                <p>To connect GitHub, create a Personal Access Token (classic).</p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-indigo-100/90 marker:text-indigo-200/80">
+                  <li>
+                    Go to:{' '}
+                    <a
+                      href="https://github.com/settings/tokens"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-indigo-100 underline decoration-indigo-200/50 underline-offset-4 transition hover:text-white"
+                    >
+                      https://github.com/settings/tokens
+                    </a>
+                  </li>
+                  <li>Select: “Tokens (classic)”</li>
+                  <li>Required scopes:</li>
+                  <li className="list-none pl-1">repo</li>
+                  <li className="list-none pl-1">notifications</li>
+                  <li className="list-none pl-1">read:user</li>
+                </ul>
+                <p className="mt-3 text-indigo-100/75">
+                  Classic tokens are recommended for this app for simplicity.
+                </p>
+              </InfoBanner>
+
               <label className="block">
                 <span className="mb-2 block text-sm text-stone-300">GitHub username</span>
                 <input
