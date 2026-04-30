@@ -3,7 +3,8 @@ import {
   GitHubConnectionStatus,
   GitHubDashboardData,
   GitHubNotification,
-  GitHubPullRequestItem
+  GitHubPullRequestItem,
+  enrichGitHubPullRequests
 } from '../lib/githubApi';
 import {
   getStoredGitHubOwnerFilter,
@@ -18,6 +19,7 @@ import { SectionHeading } from './SectionHeading';
 type GitHubCardProps = {
   data: GitHubDashboardData;
   username: string;
+  token: string;
   isLoading: boolean;
   onRefresh: () => void;
 };
@@ -50,7 +52,7 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
   }
 };
 
-export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardProps) {
+export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const [activeGitHubView, setActiveGitHubView] = useState<
     'notifications' | 'my-prs' | 'needs-review'
@@ -59,8 +61,14 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
-  const myOpenPRs = data.pullRequests.filter((pullRequest) => pullRequest.source === 'authored');
-  const reviewRequestedPRs = data.pullRequests.filter(
+  const [enrichedPullRequestsByUrl, setEnrichedPullRequestsByUrl] = useState<
+    Record<string, GitHubPullRequestItem>
+  >({});
+  const resolvedPullRequests = data.pullRequests.map(
+    (pullRequest) => enrichedPullRequestsByUrl[pullRequest.url] ?? pullRequest
+  );
+  const myOpenPRs = resolvedPullRequests.filter((pullRequest) => pullRequest.source === 'authored');
+  const reviewRequestedPRs = resolvedPullRequests.filter(
     (pullRequest) => pullRequest.source === 'review-requested'
   );
   const notifications = data.notifications ?? [];
@@ -77,6 +85,13 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
     filterGitHubItems(currentView.items, organizationFilter),
     sortOrder
   );
+  const visiblePullRequestsToEnrich = filteredItems
+    .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
+    .map((item) => item.value)
+    .filter((pullRequest) => !pullRequest.detailsLoaded);
+  const visiblePullRequestKey = visiblePullRequestsToEnrich
+    .map((pullRequest) => `${pullRequest.url}:${pullRequest.updatedAt}`)
+    .join('|');
   const isFilterApplied = organizationFilter !== 'all' || sortOrder !== 'recently-updated';
 
   useEffect(() => {
@@ -120,6 +135,48 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
 
     void saveStoredGitHubSortOrder(sortOrder);
   }, [hasLoadedSortOrder, sortOrder]);
+
+  useEffect(() => {
+    const activePullRequestUrls = new Set(data.pullRequests.map((pullRequest) => pullRequest.url));
+
+    setEnrichedPullRequestsByUrl((currentEntries) => {
+      const nextEntries = Object.fromEntries(
+        Object.entries(currentEntries).filter(([url]) => activePullRequestUrls.has(url))
+      );
+
+      return Object.keys(nextEntries).length === Object.keys(currentEntries).length
+        ? currentEntries
+        : nextEntries;
+    });
+  }, [data.pullRequests]);
+
+  useEffect(() => {
+    if (!token.trim() || visiblePullRequestsToEnrich.length === 0) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    enrichGitHubPullRequests(visiblePullRequestsToEnrich, token).then((enrichedPullRequests) => {
+      if (isCancelled) {
+        return;
+      }
+
+      setEnrichedPullRequestsByUrl((currentEntries) => {
+        const nextEntries = { ...currentEntries };
+
+        for (const pullRequest of enrichedPullRequests) {
+          nextEntries[pullRequest.url] = pullRequest;
+        }
+
+        return nextEntries;
+      });
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [token, visiblePullRequestKey]);
 
   return (
     <CardShell className="flex h-full min-w-0 flex-col overflow-hidden">

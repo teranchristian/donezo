@@ -40,6 +40,7 @@ export function DashboardPage({
             <GitHubCard
               data={gitHubData}
               username={settings.integrations.github.username}
+              token={settings.integrations.github.token}
               isLoading={isGitHubLoading}
               onRefresh={onRefreshGitHub}
             />

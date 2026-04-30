@@ -29,6 +29,7 @@ export type GitHubPullRequestItem = {
   source: 'authored' | 'review-requested';
   reviewStatus: 'approved' | 'changes-requested' | 'waiting-review';
   ciStatus: 'passing' | 'failing' | 'pending' | 'unknown';
+  detailsLoaded: boolean;
 };
 
 export type GitHubDashboardData = {
@@ -200,10 +201,7 @@ export async function loadGitHubDashboardData(options: {
       getReviewRequestedPRs(username, token)
     ]);
 
-    const pullRequests = await enrichPullRequests(
-      mergePullRequestSeeds(myOpenPrs.items, reviewRequestedPrs.items),
-      token
-    );
+    const pullRequests = mergePullRequestSeeds(myOpenPrs.items, reviewRequestedPrs.items);
 
     const data: GitHubDashboardData = {
       connectionStatus: 'connected',
@@ -290,11 +288,15 @@ function mapPullRequestSeed(
     url: item.html_url,
     source,
     reviewStatus: 'waiting-review',
-    ciStatus: 'unknown'
+    ciStatus: 'unknown',
+    detailsLoaded: false
   };
 }
 
-async function enrichPullRequests(pullRequests: GitHubPullRequestItem[], token: string) {
+export async function enrichGitHubPullRequests(
+  pullRequests: GitHubPullRequestItem[],
+  token: string
+) {
   return runWithConcurrency(
     pullRequests,
     STATUS_CONCURRENCY,
@@ -330,13 +332,15 @@ async function enrichPullRequest(
       repositoryName: `${owner}/${repo}`,
       headSha,
       reviewStatus: getReviewStatus(reviews),
-      ciStatus: getCiStatus(checkRuns)
+      ciStatus: getCiStatus(checkRuns),
+      detailsLoaded: true
     };
   } catch {
     return {
       ...pullRequest,
       reviewStatus: 'waiting-review',
-      ciStatus: 'unknown'
+      ciStatus: 'unknown',
+      detailsLoaded: true
     };
   }
 }
