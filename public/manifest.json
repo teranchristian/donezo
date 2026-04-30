@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Christian New Tab Dashboard",
+  "version": "0.1.0",
+  "description": "A personal work dashboard that replaces the Chrome new tab page.",
+  "permissions": ["storage"],
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  }
+}
