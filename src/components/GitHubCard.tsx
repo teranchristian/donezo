@@ -48,14 +48,14 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
 
   return (
-    <CardShell className="min-w-0 overflow-hidden">
+    <CardShell className="flex h-full min-w-0 flex-col overflow-hidden">
       <SectionHeading
         eyebrow="Integration"
         title="GitHub"
         description="Notifications, authored pull requests, and review requests from your saved GitHub account."
       />
 
-      <div className="flex min-h-[720px] flex-col rounded-[22px] border border-white/5 bg-panelAlt/80 p-5 shadow-glow">
+      <div className="flex min-h-[720px] flex-1 flex-col rounded-[22px] border border-white/5 bg-panelAlt/80 p-5 shadow-glow">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm uppercase tracking-[0.28em] text-textSoft">Connection</p>
           <div className="flex flex-wrap items-center gap-3">
@@ -114,7 +114,7 @@ export function GitHubCard({ data, username, isLoading, onRefresh }: GitHubCardP
               <p className="text-xs text-stone-500">{totalPRs} open PRs</p>
             ) : null}
           </div>
-          <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] overflow-y-auto pr-1">
+          <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (

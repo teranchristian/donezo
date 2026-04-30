@@ -30,42 +30,41 @@ export function DashboardPage({
           <HeaderMenu />
         </div>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="grid gap-6">
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <section className="flex flex-col gap-6">
             <SummaryCard summary={gitHubSummary} />
+            <NotesCard />
+          </section>
 
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-              <NotesCard />
-              <div className="grid gap-6">
-                <GitHubCard
-                  data={gitHubData}
-                  username={settings.integrations.github.username}
-                  isLoading={isGitHubLoading}
-                  onRefresh={onRefreshGitHub}
-                />
-                <PlaceholderCard
-                  title="Jira"
-                  subtitle="Placeholder"
-                  description="Ticket status, blockers, and sprint priorities can be added without changing the layout."
-                />
-              </div>
-            </div>
-          </div>
+          <section className="flex min-h-0">
+            <GitHubCard
+              data={gitHubData}
+              username={settings.integrations.github.username}
+              isLoading={isGitHubLoading}
+              onRefresh={onRefreshGitHub}
+            />
+          </section>
+        </section>
 
-          <div className="grid gap-6">
-            <PlaceholderCard
-              title="Calendar"
-              subtitle="Placeholder"
-              description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
-              className="min-h-[220px]"
-            />
-            <PlaceholderCard
-              title="Workspace"
-              subtitle="Later"
-              description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
-              className="min-h-[220px]"
-            />
-          </div>
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <PlaceholderCard
+            title="Calendar"
+            subtitle="Placeholder"
+            description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
+            className="min-h-[220px]"
+          />
+          <PlaceholderCard
+            title="Jira"
+            subtitle="Placeholder"
+            description="Ticket status, blockers, and sprint priorities can be added without changing the layout."
+            className="min-h-[220px]"
+          />
+          <PlaceholderCard
+            title="Workspace"
+            subtitle="Later"
+            description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
+            className="min-h-[220px]"
+          />
         </section>
       </div>
     </main>
