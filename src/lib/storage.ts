@@ -41,7 +41,7 @@ export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
 export type ActiveJiraView = 'active' | 'in-progress' | 'high-priority';
 
 const DEFAULT_SETTINGS: DashboardSettings = {
-  name: 'Christian',
+  name: '',
   integrations: {
     github: {
       username: '',
@@ -316,7 +316,7 @@ function mergeSettings(
     DEFAULT_SETTINGS.integrations.jira.apiToken;
 
   return {
-    name: settings?.name?.trim() ? settings.name : DEFAULT_SETTINGS.name,
+    name: settings?.name?.trim() ?? DEFAULT_SETTINGS.name,
     integrations: {
       github: {
         username: settings?.integrations?.github?.username ?? DEFAULT_SETTINGS.integrations.github.username,

@@ -64,7 +64,7 @@ export function SettingsPage({
 
     await onSave({
       ...draft,
-      name: draft.name.trim() || 'Christian',
+      name: draft.name.trim(),
       integrations: {
         github: {
           username: draft.integrations.github.username.trim(),
@@ -131,7 +131,7 @@ export function SettingsPage({
                 value={draft.name}
                 onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-500 focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
-                placeholder="Christian"
+                placeholder="Your name"
                 maxLength={40}
               />
             </label>
