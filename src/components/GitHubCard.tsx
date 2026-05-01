@@ -88,6 +88,20 @@ export function GitHubCard({
   const notifications = (data.notifications ?? []).filter(shouldDisplayNotification);
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
   const ownerOptions = getOwnerOptions(data, username, organizationFilter);
+  const notificationItems = notifications.map((notification) => ({
+    kind: 'notification' as const,
+    key: notification.id,
+    owner: getOwnerFromRepositoryName(notification.repository.full_name),
+    repositoryName: notification.repository.full_name,
+    title: notification.subject.title,
+    updatedAt: notification.updated_at,
+    value: notification
+  }));
+  const myOpenPrItems = myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
+  const reviewRequestedItems = reviewRequestedPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
+  const filteredNotificationCount = filterGitHubItems(notificationItems, organizationFilter).length;
+  const filteredMyOpenPrCount = filterGitHubItems(myOpenPrItems, organizationFilter).length;
+  const filteredReviewRequestedCount = filterGitHubItems(reviewRequestedItems, organizationFilter).length;
   const currentView = getGitHubViewContent(
     activeGitHubView,
     data,
@@ -114,7 +128,6 @@ export function GitHubCard({
   const visibleNotificationPullRequestKey = visiblePullRequestNotifications
     .map((notification) => notification.id)
     .join('|');
-  const isFilterApplied = organizationFilter !== 'all' || sortOrder !== 'recently-updated';
 
   useEffect(() => {
     let isMounted = true;
@@ -301,32 +314,37 @@ export function GitHubCard({
           <div className="mb-4 flex flex-wrap gap-2">
             <TabButton
               label="PRs"
-              value={formatCount(data.openPrsCount, isLoading)}
+              value={formatCount(filteredMyOpenPrCount, isLoading)}
               isActive={activeGitHubView === 'my-prs'}
+              title={
+                isLoading ? undefined : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`
+              }
               onClick={() => setActiveGitHubView('my-prs')}
             />
             <TabButton
               label="Notifications"
-              value={formatCount(notifications.length, isLoading)}
+              value={formatCount(filteredNotificationCount, isLoading)}
               isActive={activeGitHubView === 'notifications'}
               onClick={() => setActiveGitHubView('notifications')}
             />
             <TabButton
               label="Review"
-              value={formatCount(data.reviewRequestedCount, isLoading)}
+              value={formatCount(filteredReviewRequestedCount, isLoading)}
               isActive={activeGitHubView === 'needs-review'}
               onClick={() => setActiveGitHubView('needs-review')}
             />
           </div>
 
-          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-white/5 bg-black/10 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-              <label className="flex min-w-0 flex-col gap-2">
-                <span className="text-[0.7rem] uppercase tracking-[0.18em] text-textSoft">Owner</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{currentView.title}</p>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
+                <span className="shrink-0 text-stone-400">Owner:</span>
                 <select
+                  aria-label="Owner"
                   value={organizationFilter}
                   onChange={(event) => setOrganizationFilter(event.target.value)}
-                  className="rounded-xl border border-white/10 bg-panel px-3 py-2 text-sm text-stone-100 outline-none transition hover:border-white/20 focus:border-white/25"
+                  className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
                 >
                   {ownerOptions.map((option) => (
                     <option key={option.value} value={option.value} className="bg-panel text-stone-100">
@@ -336,12 +354,13 @@ export function GitHubCard({
                 </select>
               </label>
 
-              <label className="flex min-w-0 flex-col gap-2">
-                <span className="text-[0.7rem] uppercase tracking-[0.18em] text-textSoft">Sort</span>
+              <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
+                <span className="shrink-0 text-stone-400">Sort:</span>
                 <select
+                  aria-label="Sort"
                   value={sortOrder}
                   onChange={(event) => setSortOrder(event.target.value as GitHubListSort)}
-                  className="rounded-xl border border-white/10 bg-panel px-3 py-2 text-sm text-stone-100 outline-none transition hover:border-white/20 focus:border-white/25"
+                  className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
                 >
                   <option value="recently-updated" className="bg-panel text-stone-100">
                     Recently updated
@@ -358,24 +377,6 @@ export function GitHubCard({
                 </select>
               </label>
             </div>
-
-            {!isLoading ? (
-              <p className="text-xs text-stone-400">
-                {getFilteredCountLabel(
-                  filteredItems.length,
-                  currentView.items.length,
-                  currentView.itemLabel,
-                  isFilterApplied
-                )}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{currentView.title}</p>
-            {!isLoading && currentView.count > 0 ? (
-              <p className="text-xs text-stone-500">{currentView.countLabel}</p>
-            ) : null}
           </div>
           <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
@@ -446,17 +447,20 @@ function TabButton({
   label,
   value,
   isActive,
+  title,
   onClick
 }: {
   label: string;
   value: string;
   isActive: boolean;
+  title?: string;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={title}
       className={`rounded-full border px-4 py-2 text-sm transition ${
         isActive
           ? 'border-white/20 bg-white/10 text-stone-100'
@@ -847,19 +851,6 @@ function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
   });
 
   return sortedItems;
-}
-
-function getFilteredCountLabel(
-  visibleCount: number,
-  totalCount: number,
-  itemLabel: string,
-  isFilterApplied: boolean
-) {
-  if (!isFilterApplied) {
-    return `Showing ${visibleCount} ${itemLabel}`;
-  }
-
-  return `Showing ${visibleCount} of ${totalCount} ${itemLabel}`;
 }
 
 function getNoFilterResultsMessage(itemLabel: string) {
