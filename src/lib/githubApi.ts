@@ -31,7 +31,7 @@ export type GitHubPullRequestItem = {
   url: string;
   source: 'authored' | 'review-requested';
   reviewStatus: 'approved' | 'changes-requested' | 'waiting-review' | 'draft' | 'open';
-  ciStatus: 'passing' | 'failing' | 'pending' | 'unknown';
+  ciStatus: 'passing' | 'failing' | 'pending' | 'no-checks';
   detailsLoaded: boolean;
 };
 
@@ -108,6 +108,15 @@ type GitHubGraphQlPullRequestNode = {
         | null;
     }>;
   };
+  commits: {
+    nodes: Array<{
+      commit: {
+        statusCheckRollup: {
+          state: 'SUCCESS' | 'FAILURE' | 'ERROR' | 'PENDING' | 'EXPECTED' | null;
+        } | null;
+      } | null;
+    }>;
+  };
 };
 
 type GitHubPullRequestDetail = {
@@ -125,18 +134,6 @@ type GitHubPullRequestDetail = {
       };
     };
   };
-};
-
-type GitHubReview = {
-  state: string;
-  submitted_at?: string;
-};
-
-type GitHubCheckRunsResponse = {
-  check_runs: Array<{
-    status: string;
-    conclusion: string | null;
-  }>;
 };
 
 type CachedGitHubDashboardData = {
@@ -203,6 +200,15 @@ const GITHUB_PULL_REQUESTS_QUERY = `
             organization {
               login
             }
+          }
+        }
+      }
+    }
+    commits(last: 1) {
+      nodes {
+        commit {
+          statusCheckRollup {
+            state
           }
         }
       }
@@ -552,7 +558,7 @@ function mapGraphQlPullRequest(
     url: pullRequest.url,
     source,
     reviewStatus: getReviewStatusFromDecision(pullRequest.isDraft, pullRequest.reviewDecision),
-    ciStatus: 'unknown',
+    ciStatus: getCiStatusFromRollup(pullRequest.commits.nodes[0]?.commit?.statusCheckRollup ?? null),
     detailsLoaded: true
   };
 }
@@ -590,56 +596,6 @@ async function getPullRequestDetail(
   return (await response.json()) as GitHubPullRequestDetail;
 }
 
-async function getPullRequestReviews(
-  owner: string,
-  repo: string,
-  pullNumber: number,
-  token: string
-) {
-  const response = await fetchGitHub(
-    `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
-    token
-  );
-  return (await response.json()) as GitHubReview[];
-}
-
-async function getCommitCheckRuns(owner: string, repo: string, headSha: string, token: string) {
-  const response = await fetchGitHub(
-    `https://api.github.com/repos/${owner}/${repo}/commits/${headSha}/check-runs`,
-    token
-  );
-  const result = (await response.json()) as GitHubCheckRunsResponse;
-  return result.check_runs ?? [];
-}
-
-function getReviewStatus(reviews: GitHubReview[]): Exclude<GitHubPullRequestItem['reviewStatus'], 'draft' | 'open'> {
-  if (reviews.length === 0) {
-    return 'waiting-review';
-  }
-
-  const sorted = [...reviews].sort((left, right) => {
-    const leftTime = left.submitted_at ? new Date(left.submitted_at).getTime() : 0;
-    const rightTime = right.submitted_at ? new Date(right.submitted_at).getTime() : 0;
-    return rightTime - leftTime;
-  });
-
-  for (const review of sorted) {
-    if (review.state === 'CHANGES_REQUESTED') {
-      return 'changes-requested';
-    }
-
-    if (review.state === 'APPROVED') {
-      return 'approved';
-    }
-
-    if (review.state === 'COMMENTED') {
-      return 'waiting-review';
-    }
-  }
-
-  return 'waiting-review';
-}
-
 function getReviewStatusFromDecision(
   isDraft: boolean,
   reviewDecision: GitHubGraphQlPullRequestNode['reviewDecision']
@@ -663,38 +619,32 @@ function getReviewStatusFromDecision(
   return 'open';
 }
 
-function getCiStatus(
-  checkRuns: GitHubCheckRunsResponse['check_runs']
+function getCiStatusFromRollup(
+  statusCheckRollup:
+    | {
+        state: 'SUCCESS' | 'FAILURE' | 'ERROR' | 'PENDING' | 'EXPECTED' | null;
+      }
+    | null
 ): GitHubPullRequestItem['ciStatus'] {
-  if (checkRuns.length === 0) {
-    return 'unknown';
+  const state = statusCheckRollup?.state;
+
+  if (!state) {
+    return 'no-checks';
   }
 
-  if (
-    checkRuns.some((checkRun) =>
-      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(checkRun.conclusion ?? '')
-    )
-  ) {
+  if (state === 'FAILURE' || state === 'ERROR') {
     return 'failing';
   }
 
-  if (
-    checkRuns.some((checkRun) =>
-      ['queued', 'in_progress', 'waiting', 'requested', 'pending'].includes(checkRun.status)
-    )
-  ) {
+  if (state === 'PENDING' || state === 'EXPECTED') {
     return 'pending';
   }
 
-  if (
-    checkRuns.every((checkRun) =>
-      ['success', 'neutral', 'skipped'].includes(checkRun.conclusion ?? '')
-    )
-  ) {
+  if (state === 'SUCCESS') {
     return 'passing';
   }
 
-  return 'unknown';
+  return 'no-checks';
 }
 
 async function getCachedGitHubDashboardData(

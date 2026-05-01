@@ -476,7 +476,7 @@ function PullRequestRow({
           <div className="flex min-w-0 items-center gap-2">
             <GitHubItemIcon kind="pull-request" />
             <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
-            <PullRequestCiIcon ciStatus={pullRequest.ciStatus} />
+            <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
           <p className="mt-2 truncate text-sm text-stone-400">
             {pullRequest.repositoryName} • opened {formatRelativeTime(pullRequest.updatedAt)}
@@ -488,48 +488,21 @@ function PullRequestRow({
   );
 }
 
-function PullRequestCiIcon({
+function PullRequestCheckStatusIcon({
   ciStatus
 }: {
   ciStatus: GitHubPullRequestItem['ciStatus'];
 }) {
   if (ciStatus === 'passing') {
-    return (
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-        className="h-4 w-4 flex-none text-emerald-400"
-        fill="currentColor"
-      >
-        <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0L2.22 7.28a.75.75 0 1 1 1.06-1.06L7 9.94l5.72-5.72a.75.75 0 0 1 1.06 0Z" />
-      </svg>
-    );
+    return <span className="shrink-0 text-base leading-none text-emerald-400">✓</span>;
   }
 
   if (ciStatus === 'failing') {
-    return (
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-        className="h-4 w-4 flex-none text-rose-400"
-        fill="currentColor"
-      >
-        <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 0 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 1 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
-      </svg>
-    );
+    return <span className="shrink-0 text-sm leading-none text-rose-400">✕</span>;
   }
 
   if (ciStatus === 'pending') {
-    return (
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-        className="h-4 w-4 flex-none text-amber-400"
-        fill="currentColor"
-      >
-        <circle cx="8" cy="8" r="3" />
-      </svg>
-    );
+    return <span className="shrink-0 text-sm leading-none text-amber-400">●</span>;
   }
 
   return null;
