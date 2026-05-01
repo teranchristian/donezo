@@ -8,7 +8,6 @@ import {
   type JiraIssue
 } from '../lib/jiraApi';
 import { CardShell } from './CardShell';
-import { SectionHeading } from './SectionHeading';
 
 type JiraCardProps = {
   baseUrl: string;
@@ -63,75 +62,59 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
   }, [activeFilter, data.issues]);
 
   return (
-    <CardShell className="flex min-h-[580px] min-w-0 flex-col overflow-hidden">
-      <SectionHeading
-        eyebrow="Integration"
-        title="Jira"
-        description="Your active assigned tickets from Jira, using the saved Atlassian credentials."
-      />
-
+    <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col rounded-[22px] border border-white/5 bg-panelAlt/80 p-5 shadow-glow">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm uppercase tracking-[0.28em] text-textSoft">Connection</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading || data.connectionStatus === 'not-connected'}
-              className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-300 transition hover:border-white/20 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading ? 'Refreshing...' : 'Refresh'}
-            </button>
-            <span className={`rounded-full border px-3 py-1 text-sm ${copy.tone}`}>{copy.label}</span>
+        <div className="flex flex-col gap-3 border-b border-white/5 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-stone-100">Jira</p>
+            <p className="mt-1 break-all text-sm text-stone-400">{formatWorkspaceLabel(baseUrl)}</p>
+          </div>
+
+          <div className="flex flex-col items-start sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
+                {copy.label}
+              </span>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isLoading || data.connectionStatus === 'not-connected'}
+                className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-300 transition hover:border-white/20 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500 sm:justify-end">
+              <span>Last updated {formatCompactTime(data.lastUpdatedAt)}</span>
+            </div>
           </div>
         </div>
 
-        <p className="mt-4 text-sm leading-6 text-stone-300">{getJiraMessage(data, copy.message)}</p>
-
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Stat
-            label="Active tickets"
-            value={formatCount(counts.active, isLoading)}
-            isLoading={isLoading}
-            isActive={activeFilter === 'active'}
-            onClick={() => setActiveFilter('active')}
-          />
-          <Stat
-            label="In Progress"
-            value={formatCount(counts.inProgress, isLoading)}
-            isLoading={isLoading}
-            isActive={activeFilter === 'in-progress'}
-            onClick={() => setActiveFilter('in-progress')}
-          />
-          <Stat
-            label="High priority"
-            value={formatCount(counts.highPriority, isLoading)}
-            isLoading={isLoading}
-            isActive={activeFilter === 'high-priority'}
-            onClick={() => setActiveFilter('high-priority')}
-          />
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-textSoft">Workspace</p>
-          <p className="mt-2 break-all text-sm text-stone-200">{baseUrl || 'Not set'}</p>
-          {data.lastUpdatedAt ? (
-            <p className="mt-2 text-xs text-stone-500">
-              Last updated{' '}
-              {new Date(data.lastUpdatedAt).toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit'
-              })}
-            </p>
-          ) : null}
-        </div>
-
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
+          <div className="mb-4 grid min-w-0 grid-cols-2 gap-2 lg:flex lg:flex-wrap">
+            <TabButton
+              label="Active"
+              value={formatCount(counts.active, isLoading)}
+              isActive={activeFilter === 'active'}
+              onClick={() => setActiveFilter('active')}
+            />
+            <TabButton
+              label="In Progress"
+              value={formatCount(counts.inProgress, isLoading)}
+              isActive={activeFilter === 'in-progress'}
+              onClick={() => setActiveFilter('in-progress')}
+            />
+            <TabButton
+              label="High Priority"
+              value={formatCount(counts.highPriority, isLoading)}
+              isActive={activeFilter === 'high-priority'}
+              onClick={() => setActiveFilter('high-priority')}
+            />
+          </div>
+
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{getListTitle(activeFilter)}</p>
-            {!isLoading && data.connectionStatus === 'connected' ? (
-              <p className="text-xs text-stone-500">{filteredIssues.length} total</p>
-            ) : null}
           </div>
 
           <div className="dashboard-scrollbar mt-3 min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
@@ -174,16 +157,14 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
   );
 }
 
-function Stat({
+function TabButton({
   label,
   value,
-  isLoading,
   isActive,
   onClick
 }: {
   label: string;
   value: string;
-  isLoading: boolean;
   isActive: boolean;
   onClick: () => void;
 }) {
@@ -191,18 +172,14 @@ function Stat({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[92px] rounded-2xl border px-4 py-3 text-left transition ${
+      className={`min-w-0 max-w-full rounded-full border px-3 py-2 text-xs transition ${
         isActive
-          ? 'border-white/20 bg-white/10'
-          : 'border-white/5 bg-black/10 hover:border-white/10 hover:bg-black/20'
+          ? 'border-white/20 bg-white/10 text-stone-100'
+          : 'border-white/8 bg-black/10 text-stone-400 hover:border-white/15 hover:bg-black/20 hover:text-stone-200'
       }`}
     >
-      <p className="text-xs uppercase tracking-[0.16em] text-textSoft">{label}</p>
-      {isLoading ? (
-        <div className="mt-3 h-8 w-12 animate-pulse rounded-lg bg-white/10" />
-      ) : (
-        <p className="mt-2 text-2xl text-stone-100">{value}</p>
-      )}
+      <span className="font-medium">{label}</span>
+      <span className={`ml-1 ${isActive ? 'text-stone-200' : 'text-stone-500'}`}>({value})</span>
     </button>
   );
 }
@@ -275,21 +252,31 @@ function ListItemSkeleton() {
   );
 }
 
-function getJiraMessage(data: JiraDashboardData, defaultMessage: string) {
-  if (data.connectionStatus !== 'connected') {
-    return data.errorMessage || defaultMessage;
-  }
-
-  if (data.issues.length === 0) {
-    return 'Your Jira connection is live. No active tickets are currently assigned to you.';
-  }
-
-  const counts = getJiraIssueCounts(data.issues);
-  return `${counts.active} active tickets, ${counts.inProgress} in progress, and ${counts.highPriority} high-priority items need attention.`;
-}
-
 function formatCount(value: number, isLoading: boolean) {
   return isLoading ? '...' : value.toString();
+}
+
+function formatCompactTime(value: number | null) {
+  if (!value) {
+    return 'Never';
+  }
+
+  return new Date(value).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
+function formatWorkspaceLabel(baseUrl: string) {
+  if (!baseUrl) {
+    return 'Workspace not set';
+  }
+
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return baseUrl.replace(/^https?:\/\//, '');
+  }
 }
 
 function formatUpdatedDate(updatedAt: string) {
