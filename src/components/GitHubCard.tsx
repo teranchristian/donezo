@@ -254,7 +254,7 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
   }, [token, visibleNotificationPullRequestKey]);
 
   return (
-    <CardShell className="flex h-full min-w-0 flex-col overflow-hidden">
+    <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <SectionHeading
         eyebrow="Integration"
         title="GitHub"
