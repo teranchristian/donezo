@@ -284,30 +284,28 @@ export function GitHubCard({
             <p className="mt-1 truncate text-sm text-stone-400">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
-              {copy.label}
-            </span>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-300 transition hover:border-white/20 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading ? 'Refreshing...' : 'Refresh'}
-            </button>
-          </div>
-        </div>
+          <div className="flex flex-col items-start sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
+                {copy.label}
+              </span>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-300 transition hover:border-white/20 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
-          <span>
-            Last updated {formatCompactTime(data.lastUpdatedAt)}
-          </span>
-          <span className="text-stone-600">·</span>
-          <span>
-            Last checked {formatCompactTime(lastActivityCheckAt)}
-          </span>
-          {isCheckingActivity ? <span className="text-stone-400">· Checking…</span> : null}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500 sm:justify-end">
+              <span>Updated {formatCompactTime(data.lastUpdatedAt)}</span>
+              <span className="text-stone-600">·</span>
+              <span>Checked {formatCompactTime(lastActivityCheckAt)}</span>
+              {isCheckingActivity ? <span className="text-stone-400">· Checking…</span> : null}
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
