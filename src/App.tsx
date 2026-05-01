@@ -306,24 +306,25 @@ export default function App() {
     }
   }
 
+  const dashboardElement = (
+    <DashboardPage
+      settings={settings}
+      gitHubData={gitHubData}
+      isGitHubLoading={isGitHubLoading}
+      isCheckingGitHubActivity={isCheckingGitHubActivity}
+      lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
+      onRefreshGitHub={() => void handleRefreshGitHub()}
+      jiraData={jiraData}
+      isJiraLoading={isJiraLoading}
+      onRefreshJira={() => void handleRefreshJira()}
+    />
+  );
+
   return (
     <Routes>
-      <Route
-        path="/"
-        element={
-          <DashboardPage
-            settings={settings}
-            gitHubData={gitHubData}
-            isGitHubLoading={isGitHubLoading}
-            isCheckingGitHubActivity={isCheckingGitHubActivity}
-            lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
-            onRefreshGitHub={() => void handleRefreshGitHub()}
-            jiraData={jiraData}
-            isJiraLoading={isJiraLoading}
-            onRefreshJira={() => void handleRefreshJira()}
-          />
-        }
-      />
+      <Route path="/" element={dashboardElement} />
+      <Route path="/github" element={dashboardElement} />
+      <Route path="/jira" element={dashboardElement} />
       <Route
         path="/settings"
         element={

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
@@ -7,11 +7,7 @@ import {
   type JiraDashboardData,
   type JiraIssue
 } from '../lib/jiraApi';
-import {
-  getStoredActiveJiraView,
-  saveStoredActiveJiraView,
-  type ActiveJiraView
-} from '../lib/storage';
+import { type ActiveJiraView } from '../lib/storage';
 import { CardShell } from './CardShell';
 import { TabButton } from './TabButton';
 
@@ -20,10 +16,8 @@ type JiraCardProps = {
   data: JiraDashboardData;
   isLoading: boolean;
   onRefresh: () => void;
-  navigationTarget?: {
-    view: ActiveJiraView;
-    nonce: number;
-  } | null;
+  activeView: ActiveJiraView;
+  onViewChange: (view: ActiveJiraView) => void;
 };
 
 const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; message: string }> = {
@@ -54,57 +48,21 @@ const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; m
   }
 };
 
-export function JiraCard({ baseUrl, data, isLoading, onRefresh, navigationTarget }: JiraCardProps) {
+export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onViewChange }: JiraCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const counts = getJiraIssueCounts(data.issues);
   const viewAllUrl = baseUrl ? getJiraSearchUrl(baseUrl) : '';
-  const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
-  const [hasLoadedActiveJiraView, setHasLoadedActiveJiraView] = useState(false);
   const filteredIssues = useMemo(() => {
-    if (activeJiraView === 'in-progress') {
+    if (activeView === 'in-progress') {
       return data.issues.filter(isInProgressIssue);
     }
 
-    if (activeJiraView === 'high-priority') {
+    if (activeView === 'high-priority') {
       return data.issues.filter(isHighPriorityIssue);
     }
 
     return data.issues;
-  }, [activeJiraView, data.issues]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getStoredActiveJiraView().then((storedActiveJiraView) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setActiveJiraView(storedActiveJiraView);
-      setHasLoadedActiveJiraView(true);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedActiveJiraView) {
-      return;
-    }
-
-    void saveStoredActiveJiraView(activeJiraView);
-  }, [activeJiraView, hasLoadedActiveJiraView]);
-
-  useEffect(() => {
-    if (!navigationTarget) {
-      return;
-    }
-
-    setActiveJiraView(navigationTarget.view);
-    setHasLoadedActiveJiraView(true);
-  }, [navigationTarget]);
+  }, [activeView, data.issues]);
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
@@ -141,25 +99,25 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, navigationTarget
             <TabButton
               label="Active"
               value={formatCount(counts.active, isLoading)}
-              isActive={activeJiraView === 'active'}
-              onClick={() => setActiveJiraView('active')}
+              isActive={activeView === 'active'}
+              onClick={() => onViewChange('active')}
             />
             <TabButton
               label="In Progress"
               value={formatCount(counts.inProgress, isLoading)}
-              isActive={activeJiraView === 'in-progress'}
-              onClick={() => setActiveJiraView('in-progress')}
+              isActive={activeView === 'in-progress'}
+              onClick={() => onViewChange('in-progress')}
             />
             <TabButton
               label="High Priority"
               value={formatCount(counts.highPriority, isLoading)}
-              isActive={activeJiraView === 'high-priority'}
-              onClick={() => setActiveJiraView('high-priority')}
+              isActive={activeView === 'high-priority'}
+              onClick={() => onViewChange('high-priority')}
             />
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{getListTitle(activeJiraView)}</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{getListTitle(activeView)}</p>
           </div>
 
           <div className="dashboard-scrollbar mt-3 min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
@@ -174,7 +132,7 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, navigationTarget
             ) : data.connectionStatus === 'invalid' || data.connectionStatus === 'error' ? (
               <EmptyState message={data.errorMessage || copy.message} />
             ) : filteredIssues.length === 0 ? (
-              <EmptyState message={getEmptyFilterMessage(activeJiraView)} />
+              <EmptyState message={getEmptyFilterMessage(activeView)} />
             ) : (
               <div className="space-y-3">
                 {filteredIssues.map((issue) => (

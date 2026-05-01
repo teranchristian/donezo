@@ -9,8 +9,15 @@ import { SummaryCard, type SummaryContent } from '../components/SummaryCard';
 import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
 import { getJiraIssueCounts, JiraDashboardData } from '../lib/jiraApi';
 import {
+  buildDashboardHashNavigation,
+  parseDashboardHashNavigation
+} from '../lib/dashboardRouting';
+import {
   DashboardSettings,
+  getStoredActiveGitHubView,
   getStoredActiveIntegration,
+  getStoredActiveJiraView,
+  getStoredGitHubPrStatusFilter,
   saveStoredActiveIntegration,
   saveStoredActiveGitHubView,
   saveStoredActiveJiraView,
@@ -45,16 +52,10 @@ export function DashboardPage({
   onRefreshJira
 }: DashboardPageProps) {
   const [activeIntegration, setActiveIntegration] = useState<ActiveIntegration>('github');
-  const [hasLoadedActiveIntegration, setHasLoadedActiveIntegration] = useState(false);
-  const [gitHubNavigationTarget, setGitHubNavigationTarget] = useState<{
-    view: ActiveGitHubView;
-    prStatusFilter: GitHubPrStatusFilter;
-    nonce: number;
-  } | null>(null);
-  const [jiraNavigationTarget, setJiraNavigationTarget] = useState<{
-    view: ActiveJiraView;
-    nonce: number;
-  } | null>(null);
+  const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
+  const [githubPrStatusFilter, setGitHubPrStatusFilter] = useState<GitHubPrStatusFilter>('all');
+  const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
+  const [hasLoadedNavigation, setHasLoadedNavigation] = useState(false);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
@@ -64,29 +65,94 @@ export function DashboardPage({
   });
 
   useEffect(() => {
-    let isMounted = true;
+    let isActive = true;
 
-    getStoredActiveIntegration().then((storedActiveIntegration) => {
-      if (!isMounted) {
+    const applyNavigationState = (nextState: {
+      activeIntegration: ActiveIntegration;
+      activeGitHubView: ActiveGitHubView;
+      githubPrStatusFilter: GitHubPrStatusFilter;
+      activeJiraView: ActiveJiraView;
+    }) => {
+      if (!isActive) {
         return;
       }
 
-      setActiveIntegration(storedActiveIntegration);
-      setHasLoadedActiveIntegration(true);
-    });
+      setActiveIntegration(nextState.activeIntegration);
+      setActiveGitHubView(nextState.activeGitHubView);
+      setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
+      setActiveJiraView(nextState.activeJiraView);
+      setHasLoadedNavigation(true);
+    };
+
+    const syncFromHashOrStorage = async (options?: { replaceUrl?: boolean }) => {
+      const hashState = parseDashboardHashNavigation(window.location.hash);
+      if (hashState) {
+        applyNavigationState(hashState);
+        return;
+      }
+
+      const [
+        storedActiveIntegration,
+        storedActiveGitHubView,
+        storedGitHubPrStatusFilter,
+        storedActiveJiraView
+      ] = await Promise.all([
+        getStoredActiveIntegration(),
+        getStoredActiveGitHubView(),
+        getStoredGitHubPrStatusFilter(),
+        getStoredActiveJiraView()
+      ]);
+
+      if (!isActive) {
+        return;
+      }
+
+      const nextState = {
+        activeIntegration: storedActiveIntegration,
+        activeGitHubView: storedActiveGitHubView,
+        githubPrStatusFilter: storedGitHubPrStatusFilter,
+        activeJiraView: storedActiveJiraView
+      };
+
+      applyNavigationState(nextState);
+
+      if (options?.replaceUrl) {
+        replaceDashboardHash(nextState);
+      }
+    };
+
+    void syncFromHashOrStorage({ replaceUrl: true });
+
+    const handleHashChange = () => {
+      void syncFromHashOrStorage({ replaceUrl: true });
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
 
     return () => {
-      isMounted = false;
+      isActive = false;
+      window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
 
   useEffect(() => {
-    if (!hasLoadedActiveIntegration) {
+    if (!hasLoadedNavigation) {
       return;
     }
 
-    void saveStoredActiveIntegration(activeIntegration);
-  }, [activeIntegration, hasLoadedActiveIntegration]);
+    void Promise.all([
+      saveStoredActiveIntegration(activeIntegration),
+      saveStoredActiveGitHubView(activeGitHubView),
+      saveStoredGitHubPrStatusFilter(githubPrStatusFilter),
+      saveStoredActiveJiraView(activeJiraView)
+    ]);
+  }, [
+    activeGitHubView,
+    activeIntegration,
+    activeJiraView,
+    githubPrStatusFilter,
+    hasLoadedNavigation
+  ]);
 
   useEffect(() => {
     setGitHubSummaryMetrics((current) => ({
@@ -112,32 +178,72 @@ export function DashboardPage({
     }
   });
 
-  function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
-    setActiveIntegration('github');
-    setGitHubNavigationTarget({
-      view: 'prs',
-      prStatusFilter,
-      nonce: Date.now()
-    });
+  function updateDashboardNavigation(nextState: {
+    activeIntegration: ActiveIntegration;
+    activeGitHubView: ActiveGitHubView;
+    githubPrStatusFilter: GitHubPrStatusFilter;
+    activeJiraView: ActiveJiraView;
+  }) {
+    setActiveIntegration(nextState.activeIntegration);
+    setActiveGitHubView(nextState.activeGitHubView);
+    setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
+    setActiveJiraView(nextState.activeJiraView);
+    setHasLoadedNavigation(true);
+    window.location.hash = buildDashboardHashNavigation(nextState);
+  }
 
-    void Promise.all([
-      saveStoredActiveIntegration('github'),
-      saveStoredActiveGitHubView('prs'),
-      saveStoredGitHubPrStatusFilter(prStatusFilter)
-    ]);
+  function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
+    updateDashboardNavigation({
+      activeIntegration: 'github',
+      activeGitHubView: 'prs',
+      githubPrStatusFilter: prStatusFilter,
+      activeJiraView
+    });
   }
 
   function navigateToJiraView(view: ActiveJiraView) {
-    setActiveIntegration('jira');
-    setJiraNavigationTarget({
-      view,
-      nonce: Date.now()
+    updateDashboardNavigation({
+      activeIntegration: 'jira',
+      activeGitHubView,
+      githubPrStatusFilter,
+      activeJiraView: view
     });
+  }
 
-    void Promise.all([
-      saveStoredActiveIntegration('jira'),
-      saveStoredActiveJiraView(view)
-    ]);
+  function handleIntegrationChange(nextIntegration: ActiveIntegration) {
+    updateDashboardNavigation({
+      activeIntegration: nextIntegration,
+      activeGitHubView,
+      githubPrStatusFilter,
+      activeJiraView
+    });
+  }
+
+  function handleGitHubViewChange(view: ActiveGitHubView) {
+    updateDashboardNavigation({
+      activeIntegration: 'github',
+      activeGitHubView: view,
+      githubPrStatusFilter,
+      activeJiraView
+    });
+  }
+
+  function handleGitHubPrStatusFilterChange(prStatusFilter: GitHubPrStatusFilter) {
+    updateDashboardNavigation({
+      activeIntegration: 'github',
+      activeGitHubView: 'prs',
+      githubPrStatusFilter: prStatusFilter,
+      activeJiraView
+    });
+  }
+
+  function handleJiraViewChange(view: ActiveJiraView) {
+    updateDashboardNavigation({
+      activeIntegration: 'jira',
+      activeGitHubView,
+      githubPrStatusFilter,
+      activeJiraView: view
+    });
   }
 
   return (
@@ -171,12 +277,12 @@ export function DashboardPage({
               <IntegrationTabButton
                 label="GitHub"
                 isActive={activeIntegration === 'github'}
-                onClick={() => setActiveIntegration('github')}
+                onClick={() => handleIntegrationChange('github')}
               />
               <IntegrationTabButton
                 label="Jira"
                 isActive={activeIntegration === 'jira'}
-                onClick={() => setActiveIntegration('jira')}
+                onClick={() => handleIntegrationChange('jira')}
               />
             </div>
 
@@ -194,7 +300,10 @@ export function DashboardPage({
                   lastActivityCheckAt={lastGitHubActivityCheckAt}
                   onRefresh={onRefreshGitHub}
                   onSummaryMetricsChange={setGitHubSummaryMetrics}
-                  navigationTarget={gitHubNavigationTarget}
+                  activeView={activeGitHubView}
+                  prStatusFilter={githubPrStatusFilter}
+                  onViewChange={handleGitHubViewChange}
+                  onPrStatusFilterChange={handleGitHubPrStatusFilterChange}
                 />
               </div>
               <div
@@ -206,7 +315,8 @@ export function DashboardPage({
                   data={jiraData}
                   isLoading={isJiraLoading}
                   onRefresh={onRefreshJira}
-                  navigationTarget={jiraNavigationTarget}
+                  activeView={activeJiraView}
+                  onViewChange={handleJiraViewChange}
                 />
               </div>
             </div>
@@ -215,6 +325,20 @@ export function DashboardPage({
       </div>
     </main>
   );
+}
+
+function replaceDashboardHash(nextState: {
+  activeIntegration: ActiveIntegration;
+  activeGitHubView: ActiveGitHubView;
+  githubPrStatusFilter: GitHubPrStatusFilter;
+  activeJiraView: ActiveJiraView;
+}) {
+  const nextHash = buildDashboardHashNavigation(nextState);
+  if (window.location.hash === nextHash) {
+    return;
+  }
+
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
 }
 
 function getDaySummary(options: {
@@ -240,7 +364,7 @@ function getDaySummary(options: {
     return { type: 'text', lines: ['Loading your latest work summary...'] };
   }
 
-  const jiraTicketCount = getJiraIssueCounts(jiraData.issues).active;
+  const jiraTicketCount = getJiraIssueCounts(jiraData.issues).inProgress;
 
   if (gitHubMetrics.connectionStatus === 'invalid') {
     return {

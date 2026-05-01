@@ -9,13 +9,9 @@ import {
   type GitHubPullRequestState
 } from '../lib/githubApi';
 import {
-  getStoredActiveGitHubView,
   getStoredGitHubOwnerFilter,
-  getStoredGitHubPrStatusFilter,
   getStoredGitHubSortOrder,
-  saveStoredActiveGitHubView,
   saveStoredGitHubOwnerFilter,
-  saveStoredGitHubPrStatusFilter,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
   type GitHubPrStatusFilter,
@@ -33,11 +29,10 @@ type GitHubCardProps = {
   lastActivityCheckAt: number | null;
   onRefresh: () => void;
   onSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
-  navigationTarget?: {
-    view: ActiveGitHubView;
-    prStatusFilter: GitHubPrStatusFilter;
-    nonce: number;
-  } | null;
+  activeView: ActiveGitHubView;
+  prStatusFilter: GitHubPrStatusFilter;
+  onViewChange: (view: ActiveGitHubView) => void;
+  onPrStatusFilterChange: (filter: GitHubPrStatusFilter) => void;
 };
 
 export type GitHubSummaryMetrics = {
@@ -85,16 +80,15 @@ export function GitHubCard({
   lastActivityCheckAt,
   onRefresh,
   onSummaryMetricsChange,
-  navigationTarget
+  activeView,
+  prStatusFilter,
+  onViewChange,
+  onPrStatusFilterChange
 }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
-  const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
-  const [prStatusFilter, setPrStatusFilter] = useState<GitHubPrStatusFilter>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
-  const [hasLoadedActiveGitHubView, setHasLoadedActiveGitHubView] = useState(false);
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
-  const [hasLoadedPrStatusFilter, setHasLoadedPrStatusFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
   const [enrichedPullRequestsByUrl, setEnrichedPullRequestsByUrl] = useState<
     Record<string, GitHubPullRequestItem>
@@ -136,7 +130,7 @@ export function GitHubCard({
     ? null
     : ownerFilteredMyOpenPRs.filter((pullRequest) => pullRequest.reviewStatus === 'approved').length;
   const currentView = getGitHubViewContent(
-    activeGitHubView,
+    activeView,
     data,
     notifications,
     filteredMyOpenPRs,
@@ -179,15 +173,6 @@ export function GitHubCard({
   useEffect(() => {
     let isMounted = true;
 
-    getStoredActiveGitHubView().then((storedActiveGitHubView) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setActiveGitHubView(storedActiveGitHubView);
-      setHasLoadedActiveGitHubView(true);
-    });
-
     getStoredGitHubOwnerFilter().then((storedOwnerFilter) => {
       if (!isMounted) {
         return;
@@ -206,27 +191,10 @@ export function GitHubCard({
       setHasLoadedSortOrder(true);
     });
 
-    getStoredGitHubPrStatusFilter().then((storedPrStatusFilter) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setPrStatusFilter(storedPrStatusFilter);
-      setHasLoadedPrStatusFilter(true);
-    });
-
     return () => {
       isMounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!hasLoadedActiveGitHubView) {
-      return;
-    }
-
-    void saveStoredActiveGitHubView(activeGitHubView);
-  }, [activeGitHubView, hasLoadedActiveGitHubView]);
 
   useEffect(() => {
     if (!hasLoadedOwnerFilter) {
@@ -243,25 +211,6 @@ export function GitHubCard({
 
     void saveStoredGitHubSortOrder(sortOrder);
   }, [hasLoadedSortOrder, sortOrder]);
-
-  useEffect(() => {
-    if (!hasLoadedPrStatusFilter) {
-      return;
-    }
-
-    void saveStoredGitHubPrStatusFilter(prStatusFilter);
-  }, [hasLoadedPrStatusFilter, prStatusFilter]);
-
-  useEffect(() => {
-    if (!navigationTarget) {
-      return;
-    }
-
-    setActiveGitHubView(navigationTarget.view);
-    setPrStatusFilter(navigationTarget.prStatusFilter);
-    setHasLoadedActiveGitHubView(true);
-    setHasLoadedPrStatusFilter(true);
-  }, [navigationTarget]);
 
   useEffect(() => {
     const activePullRequestUrls = new Set(data.pullRequests.map((pullRequest) => pullRequest.url));
@@ -422,23 +371,23 @@ export function GitHubCard({
             <TabButton
               label="PRs"
               value={formatCount(filteredMyOpenPrCount, isLoading)}
-              isActive={activeGitHubView === 'prs'}
+              isActive={activeView === 'prs'}
               title={
                 isLoading ? undefined : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`
               }
-              onClick={() => setActiveGitHubView('prs')}
+              onClick={() => onViewChange('prs')}
             />
             <TabButton
               label="Notifications"
               value={formatCount(filteredNotificationCount, isLoading)}
-              isActive={activeGitHubView === 'notifications'}
-              onClick={() => setActiveGitHubView('notifications')}
+              isActive={activeView === 'notifications'}
+              onClick={() => onViewChange('notifications')}
             />
             <TabButton
               label="Review"
               value={formatCount(filteredReviewRequestedCount, isLoading)}
-              isActive={activeGitHubView === 'review'}
-              onClick={() => setActiveGitHubView('review')}
+              isActive={activeView === 'review'}
+              onClick={() => onViewChange('review')}
             />
           </div>
 
@@ -461,13 +410,13 @@ export function GitHubCard({
                 </select>
               </label>
 
-              {activeGitHubView === 'prs' ? (
+              {activeView === 'prs' ? (
                 <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
                   <span className="shrink-0 text-stone-400">Status:</span>
                   <select
                     aria-label="PR status"
                     value={prStatusFilter}
-                    onChange={(event) => setPrStatusFilter(event.target.value as GitHubPrStatusFilter)}
+                    onChange={(event) => onPrStatusFilterChange(event.target.value as GitHubPrStatusFilter)}
                     className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
                   >
                     <option value="all" className="bg-panel text-stone-100">
@@ -538,7 +487,7 @@ export function GitHubCard({
               </div>
             )}
           </div>
-          {!isLoading && activeGitHubView === 'prs' && data.openPrsCount > 0 && username.trim() ? (
+          {!isLoading && activeView === 'prs' && data.openPrsCount > 0 && username.trim() ? (
             <div className="mt-3 text-right">
               <a
                 href={viewAllUrl}
