@@ -23,6 +23,8 @@ type GitHubCardProps = {
   username: string;
   token: string;
   isLoading: boolean;
+  isCheckingActivity: boolean;
+  lastActivityCheckAt: number | null;
   onRefresh: () => void;
 };
 
@@ -54,7 +56,15 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
   }
 };
 
-export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitHubCardProps) {
+export function GitHubCard({
+  data,
+  username,
+  token,
+  isLoading,
+  isCheckingActivity,
+  lastActivityCheckAt,
+  onRefresh
+}: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const [activeGitHubView, setActiveGitHubView] = useState<
     'notifications' | 'my-prs' | 'needs-review'
@@ -317,6 +327,18 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
               })}
             </p>
           ) : null}
+          {lastActivityCheckAt ? (
+            <p className="mt-2 text-xs text-stone-500">
+              Last checked{' '}
+              {new Date(lastActivityCheckAt).toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit'
+              })}
+            </p>
+          ) : null}
+          {isCheckingActivity ? (
+            <p className="mt-2 text-xs text-stone-500">Checking GitHub activity...</p>
+          ) : null}
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
@@ -489,12 +511,15 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
           <div className="flex items-center gap-2">
             <GitHubItemIcon kind="pull-request" />
             <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
+            <PullRequestCiIcon ciStatus={pullRequest.ciStatus} />
           </div>
           <p className="mt-1 text-sm text-stone-400">{pullRequest.repositoryName}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge label={pullRequest.source === 'authored' ? 'Mine' : 'Review'} tone="default" />
-            <Badge label={getReviewStatusLabel(pullRequest.reviewStatus)} tone={getReviewTone(pullRequest.reviewStatus)} />
-            <Badge label={getCiStatusLabel(pullRequest.ciStatus)} tone={getCiTone(pullRequest.ciStatus)} />
+            <Badge
+              label={getReviewStatusLabel(pullRequest.reviewStatus)}
+              tone={getReviewTone(pullRequest.reviewStatus)}
+            />
           </div>
         </div>
       </div>
@@ -503,6 +528,53 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
       </p>
     </a>
   );
+}
+
+function PullRequestCiIcon({
+  ciStatus
+}: {
+  ciStatus: GitHubPullRequestItem['ciStatus'];
+}) {
+  if (ciStatus === 'passing') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-emerald-400"
+        fill="currentColor"
+      >
+        <path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0L2.22 7.28a.75.75 0 1 1 1.06-1.06L7 9.94l5.72-5.72a.75.75 0 0 1 1.06 0Z" />
+      </svg>
+    );
+  }
+
+  if (ciStatus === 'failing') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-rose-400"
+        fill="currentColor"
+      >
+        <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 0 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 1 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
+      </svg>
+    );
+  }
+
+  if (ciStatus === 'pending') {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-amber-400"
+        fill="currentColor"
+      >
+        <circle cx="8" cy="8" r="3" />
+      </svg>
+    );
+  }
+
+  return null;
 }
 
 function NotificationRow({
@@ -920,40 +992,6 @@ function getReviewTone(
 
   if (reviewStatus === 'changes-requested') {
     return 'red';
-  }
-
-  return 'gray';
-}
-
-function getCiStatusLabel(ciStatus: GitHubPullRequestItem['ciStatus']) {
-  if (ciStatus === 'passing') {
-    return 'Passing';
-  }
-
-  if (ciStatus === 'failing') {
-    return 'Failing';
-  }
-
-  if (ciStatus === 'pending') {
-    return 'Pending';
-  }
-
-  return 'Unknown';
-}
-
-function getCiTone(
-  ciStatus: GitHubPullRequestItem['ciStatus']
-): 'green' | 'red' | 'yellow' | 'gray' {
-  if (ciStatus === 'passing') {
-    return 'green';
-  }
-
-  if (ciStatus === 'failing') {
-    return 'red';
-  }
-
-  if (ciStatus === 'pending') {
-    return 'yellow';
   }
 
   return 'gray';

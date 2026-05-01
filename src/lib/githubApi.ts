@@ -46,6 +46,11 @@ export type GitHubDashboardData = {
   lastUpdatedAt: number | null;
 };
 
+export type GitHubPullRequestNotificationSignal = {
+  id: string;
+  updatedAt: string;
+};
+
 type GitHubSearchResponse = {
   items: Array<{
     id: number;
@@ -93,7 +98,13 @@ type CachedGitHubDashboardData = {
   data: GitHubDashboardData;
 };
 
+type CachedGitHubNotificationSignals = {
+  cacheToken: string;
+  signals: GitHubPullRequestNotificationSignal[];
+};
+
 const CACHE_KEY = 'github-dashboard-cache';
+const NOTIFICATION_SIGNALS_CACHE_KEY = 'github-notification-signals';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const STATUS_CONCURRENCY = 3;
 
@@ -152,6 +163,15 @@ export async function getGitHubNotifications(token: string): Promise<GitHubNotif
   }
 
   return notifications;
+}
+
+export function getPullRequestNotificationSignals(notifications: GitHubNotification[]) {
+  return notifications
+    .filter((notification) => notification.subject.type === 'PullRequest')
+    .map((notification) => ({
+      id: notification.id,
+      updatedAt: notification.updated_at
+    }));
 }
 
 export async function getMyOpenPRs(username: string, token: string): Promise<GitHubSearchResponse> {
@@ -237,7 +257,10 @@ export async function loadGitHubDashboardData(options: {
       lastUpdatedAt: Date.now()
     };
 
-    await saveCachedGitHubDashboardData(cacheToken, data);
+    await Promise.all([
+      saveCachedGitHubDashboardData(cacheToken, data),
+      saveCachedGitHubNotificationSignals(cacheToken, notifications)
+    ]);
     return data;
   } catch (error) {
     if (error instanceof GitHubApiError && error.status === 401) {
@@ -252,6 +275,34 @@ export async function loadGitHubDashboardData(options: {
       errorMessage: 'GitHub data could not be loaded right now.'
     };
   }
+}
+
+export async function pollGitHubNotificationActivity(options: {
+  username: string;
+  token: string;
+}) {
+  const username = options.username.trim();
+  const token = options.token.trim();
+
+  if (!token) {
+    return {
+      hasChanges: false,
+      changedNotificationIds: []
+    };
+  }
+
+  const cacheToken = createCacheToken(username, token);
+  const previousSignals = await getCachedGitHubNotificationSignals(cacheToken);
+  const notifications = await getGitHubNotifications(token);
+  const nextSignals = getPullRequestNotificationSignals(notifications);
+  const changedNotificationIds = getChangedNotificationIds(previousSignals, nextSignals);
+
+  await saveCachedGitHubNotificationSignals(cacheToken, notifications);
+
+  return {
+    hasChanges: changedNotificationIds.length > 0,
+    changedNotificationIds
+  };
 }
 
 async function fetchGitHub(url: string, token: string) {
@@ -514,6 +565,30 @@ async function saveCachedGitHubDashboardData(cacheToken: string, data: GitHubDas
   await writeStorageValue(CACHE_KEY, cacheEntry);
 }
 
+async function getCachedGitHubNotificationSignals(cacheToken: string) {
+  const cached = await readStorageValue<CachedGitHubNotificationSignals | null>(
+    NOTIFICATION_SIGNALS_CACHE_KEY,
+    null
+  );
+  if (!cached || cached.cacheToken !== cacheToken) {
+    return [];
+  }
+
+  return cached.signals;
+}
+
+async function saveCachedGitHubNotificationSignals(
+  cacheToken: string,
+  notifications: GitHubNotification[]
+) {
+  const cacheEntry: CachedGitHubNotificationSignals = {
+    cacheToken,
+    signals: getPullRequestNotificationSignals(notifications)
+  };
+
+  await writeStorageValue(NOTIFICATION_SIGNALS_CACHE_KEY, cacheEntry);
+}
+
 function createCacheToken(username: string, token: string) {
   const input = `${username}:${token}`;
   let hash = 5381;
@@ -523,6 +598,22 @@ function createCacheToken(username: string, token: string) {
   }
 
   return `${username}:${(hash >>> 0).toString(16)}`;
+}
+
+function getChangedNotificationIds(
+  previousSignals: GitHubPullRequestNotificationSignal[],
+  nextSignals: GitHubPullRequestNotificationSignal[]
+) {
+  const previousById = new Map(previousSignals.map((signal) => [signal.id, signal.updatedAt]));
+  const changedIds: string[] = [];
+
+  for (const signal of nextSignals) {
+    if (previousById.get(signal.id) !== signal.updatedAt) {
+      changedIds.push(signal.id);
+    }
+  }
+
+  return changedIds;
 }
 
 async function runWithConcurrency<TInput, TResult>(
