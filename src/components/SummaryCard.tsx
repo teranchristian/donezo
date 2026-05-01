@@ -4,8 +4,9 @@ export type SummaryContent =
   | {
       type: 'segments';
       items: Array<{
-        value: number;
+        value: number | string;
         label: string;
+        onClick?: () => void;
       }>;
     }
   | {
@@ -28,22 +29,13 @@ export function SummaryCard({ summary }: SummaryCardProps) {
         {summary.type === 'segments' ? (
           <div className="flex flex-col gap-1 text-sm sm:text-base">
             <div className="font-medium text-stone-200">
-              <span className="summary-item whitespace-nowrap">
-                <span className="font-semibold text-stone-100">{summary.items[0]?.value ?? 0}</span>{' '}
-                {summary.items[0]?.label ?? ''}
-              </span>
+              <SummarySegment item={summary.items[0]} />
               <span className="mx-2 opacity-60">/</span>
-              <span className="summary-item whitespace-nowrap">
-                <span className="font-semibold text-stone-100">{summary.items[1]?.value ?? 0}</span>{' '}
-                {summary.items[1]?.label ?? ''}
-              </span>
+              <SummarySegment item={summary.items[1]} />
             </div>
 
             <div className="text-stone-400">
-              <span className="summary-item whitespace-nowrap">
-                <span className="font-semibold text-stone-100">{summary.items[2]?.value ?? 0}</span>{' '}
-                {summary.items[2]?.label ?? ''}
-              </span>
+              <SummarySegment item={summary.items[2]} />
             </div>
           </div>
         ) : (
@@ -55,6 +47,40 @@ export function SummaryCard({ summary }: SummaryCardProps) {
         )}
       </div>
     </CardShell>
+  );
+}
+
+function SummarySegment({
+  item
+}: {
+  item?: {
+    value: number | string;
+    label: string;
+    onClick?: () => void;
+  };
+}) {
+  if (!item) {
+    return null;
+  }
+
+  const content = (
+    <>
+      <span className="font-semibold text-stone-100">{item.value}</span> {item.label}
+    </>
+  );
+
+  if (!item.onClick) {
+    return <span className="summary-item whitespace-nowrap">{content}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={item.onClick}
+      className="summary-item whitespace-nowrap text-left transition hover:text-stone-100 hover:underline cursor-pointer"
+    >
+      {content}
+    </button>
   );
 }
 

@@ -33,13 +33,18 @@ type GitHubCardProps = {
   lastActivityCheckAt: number | null;
   onRefresh: () => void;
   onSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
+  navigationTarget?: {
+    view: ActiveGitHubView;
+    prStatusFilter: GitHubPrStatusFilter;
+    nonce: number;
+  } | null;
 };
 
 export type GitHubSummaryMetrics = {
   connectionStatus: GitHubConnectionStatus;
   missingUsername: boolean;
   reviewRequestedCount: number;
-  approvedPrCount: number;
+  approvedPrCount: number | null;
   relevantPrCount: number;
 };
 
@@ -79,7 +84,8 @@ export function GitHubCard({
   isCheckingActivity,
   lastActivityCheckAt,
   onRefresh,
-  onSummaryMetricsChange
+  onSummaryMetricsChange,
+  navigationTarget
 }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
@@ -126,9 +132,9 @@ export function GitHubCard({
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
-  const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
-    (pullRequest) => pullRequest.reviewStatus === 'approved'
-  ).length;
+  const summaryApprovedPrCount = ownerFilteredMyOpenPRs.length > 0 && ownerFilteredMyOpenPRs.some((pullRequest) => !pullRequest.detailsLoaded)
+    ? null
+    : ownerFilteredMyOpenPRs.filter((pullRequest) => pullRequest.reviewStatus === 'approved').length;
   const currentView = getGitHubViewContent(
     activeGitHubView,
     data,
@@ -245,6 +251,17 @@ export function GitHubCard({
 
     void saveStoredGitHubPrStatusFilter(prStatusFilter);
   }, [hasLoadedPrStatusFilter, prStatusFilter]);
+
+  useEffect(() => {
+    if (!navigationTarget) {
+      return;
+    }
+
+    setActiveGitHubView(navigationTarget.view);
+    setPrStatusFilter(navigationTarget.prStatusFilter);
+    setHasLoadedActiveGitHubView(true);
+    setHasLoadedPrStatusFilter(true);
+  }, [navigationTarget]);
 
   useEffect(() => {
     const activePullRequestUrls = new Set(data.pullRequests.map((pullRequest) => pullRequest.url));

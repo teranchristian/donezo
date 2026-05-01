@@ -20,6 +20,10 @@ type JiraCardProps = {
   data: JiraDashboardData;
   isLoading: boolean;
   onRefresh: () => void;
+  navigationTarget?: {
+    view: ActiveJiraView;
+    nonce: number;
+  } | null;
 };
 
 const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; message: string }> = {
@@ -50,7 +54,7 @@ const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; m
   }
 };
 
-export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps) {
+export function JiraCard({ baseUrl, data, isLoading, onRefresh, navigationTarget }: JiraCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const counts = getJiraIssueCounts(data.issues);
   const viewAllUrl = baseUrl ? getJiraSearchUrl(baseUrl) : '';
@@ -92,6 +96,15 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
 
     void saveStoredActiveJiraView(activeJiraView);
   }, [activeJiraView, hasLoadedActiveJiraView]);
+
+  useEffect(() => {
+    if (!navigationTarget) {
+      return;
+    }
+
+    setActiveJiraView(navigationTarget.view);
+    setHasLoadedActiveJiraView(true);
+  }, [navigationTarget]);
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">

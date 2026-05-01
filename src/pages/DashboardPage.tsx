@@ -12,7 +12,13 @@ import {
   DashboardSettings,
   getStoredActiveIntegration,
   saveStoredActiveIntegration,
-  type ActiveIntegration
+  saveStoredActiveGitHubView,
+  saveStoredActiveJiraView,
+  saveStoredGitHubPrStatusFilter,
+  type ActiveGitHubView,
+  type ActiveIntegration,
+  type ActiveJiraView,
+  type GitHubPrStatusFilter
 } from '../lib/storage';
 
 type DashboardPageProps = {
@@ -40,11 +46,20 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const [activeIntegration, setActiveIntegration] = useState<ActiveIntegration>('github');
   const [hasLoadedActiveIntegration, setHasLoadedActiveIntegration] = useState(false);
+  const [gitHubNavigationTarget, setGitHubNavigationTarget] = useState<{
+    view: ActiveGitHubView;
+    prStatusFilter: GitHubPrStatusFilter;
+    nonce: number;
+  } | null>(null);
+  const [jiraNavigationTarget, setJiraNavigationTarget] = useState<{
+    view: ActiveJiraView;
+    nonce: number;
+  } | null>(null);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
     reviewRequestedCount: 0,
-    approvedPrCount: 0,
+    approvedPrCount: null,
     relevantPrCount: gitHubData.openPrsCount
   });
 
@@ -85,8 +100,45 @@ export function DashboardPage({
     gitHubMetrics: gitHubSummaryMetrics,
     jiraData,
     isGitHubLoading,
-    isJiraLoading
+    isJiraLoading,
+    onOpenGitHubPrs: () => {
+      navigateToGitHubPrs('all');
+    },
+    onOpenApprovedPrs: () => {
+      navigateToGitHubPrs('approved');
+    },
+    onOpenJiraInProgress: () => {
+      navigateToJiraView('in-progress');
+    }
   });
+
+  function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
+    setActiveIntegration('github');
+    setGitHubNavigationTarget({
+      view: 'prs',
+      prStatusFilter,
+      nonce: Date.now()
+    });
+
+    void Promise.all([
+      saveStoredActiveIntegration('github'),
+      saveStoredActiveGitHubView('prs'),
+      saveStoredGitHubPrStatusFilter(prStatusFilter)
+    ]);
+  }
+
+  function navigateToJiraView(view: ActiveJiraView) {
+    setActiveIntegration('jira');
+    setJiraNavigationTarget({
+      view,
+      nonce: Date.now()
+    });
+
+    void Promise.all([
+      saveStoredActiveIntegration('jira'),
+      saveStoredActiveJiraView(view)
+    ]);
+  }
 
   return (
     <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
@@ -142,6 +194,7 @@ export function DashboardPage({
                   lastActivityCheckAt={lastGitHubActivityCheckAt}
                   onRefresh={onRefreshGitHub}
                   onSummaryMetricsChange={setGitHubSummaryMetrics}
+                  navigationTarget={gitHubNavigationTarget}
                 />
               </div>
               <div
@@ -153,6 +206,7 @@ export function DashboardPage({
                   data={jiraData}
                   isLoading={isJiraLoading}
                   onRefresh={onRefreshJira}
+                  navigationTarget={jiraNavigationTarget}
                 />
               </div>
             </div>
@@ -168,8 +222,19 @@ function getDaySummary(options: {
   jiraData: JiraDashboardData;
   isGitHubLoading: boolean;
   isJiraLoading: boolean;
+  onOpenGitHubPrs: () => void;
+  onOpenApprovedPrs: () => void;
+  onOpenJiraInProgress: () => void;
 }): SummaryContent {
-  const { gitHubMetrics, jiraData, isGitHubLoading, isJiraLoading } = options;
+  const {
+    gitHubMetrics,
+    jiraData,
+    isGitHubLoading,
+    isJiraLoading,
+    onOpenGitHubPrs,
+    onOpenApprovedPrs,
+    onOpenJiraInProgress
+  } = options;
 
   if (isGitHubLoading || isJiraLoading) {
     return { type: 'text', lines: ['Loading your latest work summary...'] };
@@ -217,15 +282,18 @@ function getDaySummary(options: {
     items: [
       {
         value: gitHubMetrics.relevantPrCount,
-        label: gitHubMetrics.relevantPrCount === 1 ? 'PR open' : 'PRs open'
+        label: gitHubMetrics.relevantPrCount === 1 ? 'PR open' : 'PRs open',
+        onClick: onOpenGitHubPrs
       },
       {
-        value: gitHubMetrics.approvedPrCount,
-        label: 'approved'
+        value: gitHubMetrics.approvedPrCount ?? 'Loading…',
+        label: 'approved',
+        onClick: onOpenApprovedPrs
       },
       {
         value: jiraTicketCount,
-        label: jiraTicketCount === 1 ? 'Jira ticket in progress' : 'Jira tickets in progress'
+        label: jiraTicketCount === 1 ? 'Jira ticket in progress' : 'Jira tickets in progress',
+        onClick: onOpenJiraInProgress
       }
     ]
   };
