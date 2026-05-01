@@ -8,6 +8,9 @@ const NOTES_STORAGE_KEY = 'dashboard-notes';
 const SETTINGS_STORAGE_KEY = 'dashboard-settings';
 const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
 const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
+const JIRA_BASE_URL_STORAGE_KEY = 'jiraBaseUrl';
+const JIRA_EMAIL_STORAGE_KEY = 'jiraEmail';
+const JIRA_API_TOKEN_STORAGE_KEY = 'jiraApiToken';
 
 export type DashboardSettings = {
   name: string;
@@ -15,6 +18,11 @@ export type DashboardSettings = {
     github: {
       username: string;
       token: string;
+    };
+    jira: {
+      baseUrl: string;
+      email: string;
+      apiToken: string;
     };
   };
 };
@@ -32,6 +40,11 @@ const DEFAULT_SETTINGS: DashboardSettings = {
     github: {
       username: '',
       token: ''
+    },
+    jira: {
+      baseUrl: '',
+      email: '',
+      apiToken: ''
     }
   }
 };
@@ -74,29 +87,54 @@ export { saveStoredNotes };
 
 export async function getStoredSettings() {
   if (hasChromeStorage()) {
-    const result = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
-    return mergeSettings(result[SETTINGS_STORAGE_KEY] as Partial<DashboardSettings> | undefined);
+    const result = await chrome.storage.local.get([
+      SETTINGS_STORAGE_KEY,
+      JIRA_BASE_URL_STORAGE_KEY,
+      JIRA_EMAIL_STORAGE_KEY,
+      JIRA_API_TOKEN_STORAGE_KEY
+    ]);
+
+    return mergeSettings(result[SETTINGS_STORAGE_KEY] as Partial<DashboardSettings> | undefined, {
+      baseUrl: result[JIRA_BASE_URL_STORAGE_KEY] as string | undefined,
+      email: result[JIRA_EMAIL_STORAGE_KEY] as string | undefined,
+      apiToken: result[JIRA_API_TOKEN_STORAGE_KEY] as string | undefined
+    });
   }
 
   const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-  if (!raw) {
-    return DEFAULT_SETTINGS;
-  }
-
+  const jiraBaseUrl = localStorage.getItem(JIRA_BASE_URL_STORAGE_KEY) ?? undefined;
+  const jiraEmail = localStorage.getItem(JIRA_EMAIL_STORAGE_KEY) ?? undefined;
+  const jiraApiToken = localStorage.getItem(JIRA_API_TOKEN_STORAGE_KEY) ?? undefined;
   try {
-    return mergeSettings(JSON.parse(raw) as Partial<DashboardSettings>);
+    return mergeSettings(raw ? (JSON.parse(raw) as Partial<DashboardSettings>) : undefined, {
+      baseUrl: jiraBaseUrl ?? undefined,
+      email: jiraEmail ?? undefined,
+      apiToken: jiraApiToken ?? undefined
+    });
   } catch {
-    return DEFAULT_SETTINGS;
+    return mergeSettings(undefined, {
+      baseUrl: jiraBaseUrl ?? undefined,
+      email: jiraEmail ?? undefined,
+      apiToken: jiraApiToken ?? undefined
+    });
   }
 }
 
 export async function saveStoredSettings(settings: DashboardSettings) {
   if (hasChromeStorage()) {
-    await chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: settings });
+    await chrome.storage.local.set({
+      [SETTINGS_STORAGE_KEY]: settings,
+      [JIRA_BASE_URL_STORAGE_KEY]: normalizeBaseUrl(settings.integrations.jira.baseUrl),
+      [JIRA_EMAIL_STORAGE_KEY]: settings.integrations.jira.email.trim(),
+      [JIRA_API_TOKEN_STORAGE_KEY]: settings.integrations.jira.apiToken.trim()
+    });
     return;
   }
 
   localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  localStorage.setItem(JIRA_BASE_URL_STORAGE_KEY, normalizeBaseUrl(settings.integrations.jira.baseUrl));
+  localStorage.setItem(JIRA_EMAIL_STORAGE_KEY, settings.integrations.jira.email.trim());
+  localStorage.setItem(JIRA_API_TOKEN_STORAGE_KEY, settings.integrations.jira.apiToken.trim());
 }
 
 export async function getStoredGitHubOwnerFilter() {
@@ -174,16 +212,37 @@ export function deleteNote(notes: Note[], noteId: string) {
   return notes.filter((note) => note.id !== noteId);
 }
 
-function mergeSettings(settings?: Partial<DashboardSettings>): DashboardSettings {
+function mergeSettings(
+  settings?: Partial<DashboardSettings>,
+  jiraOverrides?: Partial<DashboardSettings['integrations']['jira']>
+): DashboardSettings {
+  const jiraBaseUrl =
+    jiraOverrides?.baseUrl ?? settings?.integrations?.jira?.baseUrl ?? DEFAULT_SETTINGS.integrations.jira.baseUrl;
+  const jiraEmail =
+    jiraOverrides?.email ?? settings?.integrations?.jira?.email ?? DEFAULT_SETTINGS.integrations.jira.email;
+  const jiraApiToken =
+    jiraOverrides?.apiToken ??
+    settings?.integrations?.jira?.apiToken ??
+    DEFAULT_SETTINGS.integrations.jira.apiToken;
+
   return {
     name: settings?.name?.trim() ? settings.name : DEFAULT_SETTINGS.name,
     integrations: {
       github: {
         username: settings?.integrations?.github?.username ?? DEFAULT_SETTINGS.integrations.github.username,
         token: settings?.integrations?.github?.token ?? DEFAULT_SETTINGS.integrations.github.token
+      },
+      jira: {
+        baseUrl: normalizeBaseUrl(jiraBaseUrl),
+        email: jiraEmail.trim(),
+        apiToken: jiraApiToken.trim()
       }
     }
   };
+}
+
+function normalizeBaseUrl(value: string) {
+  return value.trim().replace(/\/+$/, '');
 }
 
 function mergeGitHubOwnerFilter(filter?: string): GitHubListOrganizationFilter {

@@ -1,10 +1,12 @@
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard } from '../components/GitHubCard';
 import { HeaderMenu } from '../components/HeaderMenu';
+import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard } from '../components/SummaryCard';
 import { GitHubDashboardData } from '../lib/githubApi';
+import { JiraDashboardData } from '../lib/jiraApi';
 import { DashboardSettings } from '../lib/storage';
 
 type DashboardPageProps = {
@@ -12,7 +14,12 @@ type DashboardPageProps = {
   gitHubData: GitHubDashboardData;
   gitHubSummary: string;
   isGitHubLoading: boolean;
+  isCheckingGitHubActivity: boolean;
+  lastGitHubActivityCheckAt: number | null;
   onRefreshGitHub: () => void;
+  jiraData: JiraDashboardData;
+  isJiraLoading: boolean;
+  onRefreshJira: () => void;
 };
 
 export function DashboardPage({
@@ -20,7 +27,12 @@ export function DashboardPage({
   gitHubData,
   gitHubSummary,
   isGitHubLoading,
-  onRefreshGitHub
+  isCheckingGitHubActivity,
+  lastGitHubActivityCheckAt,
+  onRefreshGitHub,
+  jiraData,
+  isJiraLoading,
+  onRefreshJira
 }: DashboardPageProps) {
   return (
     <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
@@ -42,6 +54,8 @@ export function DashboardPage({
               username={settings.integrations.github.username}
               token={settings.integrations.github.token}
               isLoading={isGitHubLoading}
+              isCheckingActivity={isCheckingGitHubActivity}
+              lastActivityCheckAt={lastGitHubActivityCheckAt}
               onRefresh={onRefreshGitHub}
             />
           </section>
@@ -54,11 +68,11 @@ export function DashboardPage({
             description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
             className="min-h-[220px]"
           />
-          <PlaceholderCard
-            title="Jira"
-            subtitle="Placeholder"
-            description="Ticket status, blockers, and sprint priorities can be added without changing the layout."
-            className="min-h-[220px]"
+          <JiraCard
+            baseUrl={settings.integrations.jira.baseUrl}
+            data={jiraData}
+            isLoading={isJiraLoading}
+            onRefresh={onRefreshJira}
           />
           <PlaceholderCard
             title="Workspace"
