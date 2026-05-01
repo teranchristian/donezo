@@ -1,5 +1,4 @@
 import { CardShell } from './CardShell';
-import { SectionHeading } from './SectionHeading';
 
 export type SummaryContent =
   | {
@@ -21,14 +20,11 @@ type SummaryCardProps = {
 export function SummaryCard({ summary }: SummaryCardProps) {
   return (
     <CardShell className="overflow-hidden">
-      <SectionHeading
-        eyebrow="Day Summary"
-        title="A clear start to the day"
-        description="Keep the high-level picture visible before you drop into tools."
-      />
+      <div className="mb-3 border-b border-white/5 pb-3">
+        <h2 className="text-lg font-semibold text-stone-100 sm:text-xl">A clear start to the day</h2>
+      </div>
 
-      <div className="relative rounded-[24px] border border-white/5 bg-panelAlt/90 p-5 shadow-glow">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
+      <div className="rounded-xl bg-panelAlt/40 px-4 py-3">
         {summary.type === 'segments' ? (
           <div className="flex flex-col gap-1 text-sm sm:text-base">
             <div className="font-medium text-stone-200">
