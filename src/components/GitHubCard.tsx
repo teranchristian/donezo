@@ -397,7 +397,11 @@ export function GitHubCard({
                       pullRequestState={notificationPullRequestStates[item.value.id]}
                     />
                   ) : (
-                    <PullRequestRow key={item.key} pullRequest={item.value} />
+                    <PullRequestRow
+                      key={item.key}
+                      pullRequest={item.value}
+                      username={username.trim()}
+                    />
                   )
                 )}
               </div>
@@ -471,7 +475,15 @@ function TabButton({
   );
 }
 
-function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem }) {
+function PullRequestRow({
+  pullRequest,
+  username
+}: {
+  pullRequest: GitHubPullRequestItem;
+  username: string;
+}) {
+  const reviewStatusLabel = getCompactReviewStatusLabel(pullRequest.reviewStatus);
+
   return (
     <a
       href={pullRequest.url}
@@ -479,26 +491,19 @@ function PullRequestRow({ pullRequest }: { pullRequest: GitHubPullRequestItem })
       rel="noreferrer"
       className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-3 transition hover:border-white/15 hover:bg-black/20"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <GitHubItemIcon kind="pull-request" />
             <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
             <PullRequestCiIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <p className="mt-1 text-sm text-stone-400">{pullRequest.repositoryName}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge label={pullRequest.source === 'authored' ? 'Mine' : 'Review'} tone="default" />
-            <Badge
-              label={getReviewStatusLabel(pullRequest.reviewStatus)}
-              tone={getReviewTone(pullRequest.reviewStatus)}
-            />
-          </div>
+          <p className="mt-2 truncate text-sm text-stone-400">
+            {pullRequest.repositoryName} • opened {formatRelativeTime(pullRequest.updatedAt)}
+            {username ? ` by ${username}` : ''} • {reviewStatusLabel}
+          </p>
         </div>
       </div>
-      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-textSoft">
-        Updated {new Date(pullRequest.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-      </p>
     </a>
   );
 }
@@ -697,7 +702,7 @@ function Badge({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-1 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
     >
       {label}
     </span>
@@ -874,6 +879,32 @@ function formatCompactTime(value: number | null) {
   });
 }
 
+function formatRelativeTime(dateString: string) {
+  const timestamp = new Date(dateString).getTime();
+  const diffMs = Date.now() - timestamp;
+
+  if (!Number.isFinite(timestamp) || diffMs < 0) {
+    return new Date(dateString).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 60) {
+    return `${diffSeconds}s ago`;
+  }
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  return new Date(dateString).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 function formatReason(reason: string) {
   return reason.replace(/-/g, ' ');
 }
@@ -942,30 +973,12 @@ function getNotificationUrl(notification: GitHubNotification) {
   return `https://github.com/${notification.repository.full_name}`;
 }
 
-function getReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
+function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
   if (reviewStatus === 'approved') {
     return 'Approved';
   }
 
-  if (reviewStatus === 'changes-requested') {
-    return 'Changes requested';
-  }
-
-  return 'Waiting review';
-}
-
-function getReviewTone(
-  reviewStatus: GitHubPullRequestItem['reviewStatus']
-): 'green' | 'red' | 'gray' {
-  if (reviewStatus === 'approved') {
-    return 'green';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'red';
-  }
-
-  return 'gray';
+  return 'Review required';
 }
 
 function getEmptyListMessage(data: GitHubDashboardData) {
