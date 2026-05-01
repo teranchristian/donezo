@@ -76,7 +76,7 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
   const reviewRequestedPRs = resolvedPullRequests.filter(
     (pullRequest) => pullRequest.source === 'review-requested'
   );
-  const notifications = data.notifications ?? [];
+  const notifications = (data.notifications ?? []).filter(shouldDisplayNotification);
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
   const ownerOptions = getOwnerOptions(data, username, organizationFilter);
   const currentView = getGitHubViewContent(
@@ -284,7 +284,7 @@ export function GitHubCard({ data, username, token, isLoading, onRefresh }: GitH
         <div className="mt-4 grid gap-3 grid-cols-1 sm:grid-cols-3">
           <Stat
             label="Notifications"
-            value={formatCount(data.notificationsCount, isLoading)}
+            value={formatCount(notifications.length, isLoading)}
             isLoading={isLoading}
             isActive={activeGitHubView === 'notifications'}
             onClick={() => setActiveGitHubView('notifications')}
@@ -513,6 +513,7 @@ function NotificationRow({
   pullRequestState?: GitHubPullRequestState;
 }) {
   const iconKind = getNotificationIconKind(notification.subject.type);
+  const notificationTypeLabel = getNotificationTypeLabel(notification);
 
   return (
     <a
@@ -523,18 +524,22 @@ function NotificationRow({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <GitHubItemIcon
-              kind={iconKind}
-              state={iconKind === 'pull-request' ? pullRequestState : undefined}
-            />
-            <p className="truncate text-sm font-medium text-stone-100">{notification.subject.title}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <GitHubItemIcon
+                kind={iconKind}
+                state={iconKind === 'pull-request' ? pullRequestState : undefined}
+              />
+              <p className="truncate text-sm font-medium text-stone-100">{notification.subject.title}</p>
+            </div>
+            <p className="shrink-0 text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
+              {notificationTypeLabel}
+            </p>
           </div>
           <p className="mt-1 text-sm text-stone-400">{notification.repository.full_name}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge label={notification.subject.type} tone="default" />
-            <Badge label={formatReason(notification.reason)} tone="gray" />
-            <Badge label={notification.unread ? 'Unread' : 'Read'} tone={notification.unread ? 'green' : 'gray'} />
+            <Badge label={notification.reason} tone="gray" />
+            {notification.unread ? <Badge label="Unread" tone="green" /> : null}
           </div>
         </div>
       </div>
@@ -679,8 +684,8 @@ function getGitHubViewContent(
   if (activeGitHubView === 'notifications') {
     return {
       title: 'Notifications',
-      count: data.notificationsCount,
-      countLabel: `${data.notificationsCount} notifications`,
+      count: notifications.length,
+      countLabel: `${notifications.length} notifications`,
       itemLabel: 'notifications',
       emptyMessage:
         data.connectionStatus === 'connected'
@@ -828,6 +833,18 @@ function formatCount(value: number, isLoading: boolean) {
 
 function formatReason(reason: string) {
   return reason.replace(/-/g, ' ');
+}
+
+function shouldDisplayNotification(notification: GitHubNotification) {
+  return notification.subject.type === 'PullRequest';
+}
+
+function getNotificationTypeLabel(notification: GitHubNotification) {
+  if (notification.reason === 'review_requested') {
+    return 'Review requested';
+  }
+
+  return formatReason(notification.reason);
 }
 
 function getNotificationIconKind(subjectType: string): 'pull-request' | 'issue' | 'commit' | 'discussion' {
