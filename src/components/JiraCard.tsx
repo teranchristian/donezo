@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { formatRelativeTime } from '../lib/date';
 import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
@@ -166,18 +167,24 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
       href={getJiraBrowseUrl(baseUrl, issue.key)}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-3 transition hover:border-white/15 hover:bg-black/20"
+      className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-2.5 transition hover:border-white/15 hover:bg-black/20"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs uppercase tracking-[0.16em] text-textSoft">{issue.key}</p>
-            <StatusBadge label={issue.status.name} />
-            <PriorityBadge priorityName={issue.priority?.name} />
+          <div className="flex items-start justify-between gap-3">
+            <p className="line-clamp-2 text-sm font-medium text-stone-100">
+              <span className="mr-2 text-xs uppercase tracking-[0.16em] text-textSoft">{issue.key}</span>
+              {issue.summary}
+            </p>
+
+            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+              <StatusBadge label={issue.status.name} />
+              <PriorityBadge priorityName={issue.priority?.name} />
+            </div>
           </div>
-          <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-stone-100">{issue.summary}</p>
+
+          <p className="mt-1 truncate text-sm text-stone-400">updated {formatRelativeTime(issue.updated)} • {issue.status.name}</p>
         </div>
-        <p className="shrink-0 text-xs text-stone-500">{formatUpdatedDate(issue.updated)}</p>
       </div>
     </a>
   );
@@ -185,7 +192,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
 
 function StatusBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2.5 py-1 text-xs text-sky-100">
+    <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-sky-100">
       {label}
     </span>
   );
@@ -193,11 +200,7 @@ function StatusBadge({ label }: { label: string }) {
 
 function PriorityBadge({ priorityName }: { priorityName?: string }) {
   if (!priorityName) {
-    return (
-      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-stone-300">
-        No priority
-      </span>
-    );
+    return null;
   }
 
   const tone =
@@ -207,7 +210,11 @@ function PriorityBadge({ priorityName }: { priorityName?: string }) {
         ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
         : 'border-white/10 bg-white/5 text-stone-300';
 
-  return <span className={`rounded-full border px-2.5 py-1 text-xs ${tone}`}>{priorityName}</span>;
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] ${tone}`}>
+      {priorityName}
+    </span>
+  );
 }
 
 function EmptyState({ message }: { message: string }) {
@@ -253,14 +260,6 @@ function formatWorkspaceLabel(baseUrl: string) {
   } catch {
     return baseUrl.replace(/^https?:\/\//, '');
   }
-}
-
-function formatUpdatedDate(updatedAt: string) {
-  const date = new Date(updatedAt);
-  return date.toLocaleDateString('en-AU', {
-    month: 'short',
-    day: 'numeric'
-  });
 }
 
 function isInProgressIssue(issue: JiraIssue) {

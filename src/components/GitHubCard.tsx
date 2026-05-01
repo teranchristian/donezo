@@ -8,6 +8,7 @@ import {
   getGitHubPullRequestState,
   type GitHubPullRequestState
 } from '../lib/githubApi';
+import { formatRelativeTime } from '../lib/date';
 import {
   getStoredGitHubOwnerFilter,
   getStoredGitHubSortOrder,
@@ -951,32 +952,6 @@ function formatCompactTime(value: number | null) {
     hour: 'numeric',
     minute: '2-digit'
   });
-}
-
-function formatRelativeTime(dateString: string) {
-  const timestamp = new Date(dateString).getTime();
-  const diffMs = Date.now() - timestamp;
-
-  if (!Number.isFinite(timestamp) || diffMs < 0) {
-    return new Date(dateString).toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
-
-  const diffSeconds = Math.floor(diffMs / 1000);
-  if (diffSeconds < 60) {
-    return `${diffSeconds}s ago`;
-  }
-
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) {
-    return `${diffMinutes}m ago`;
-  }
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-
-  return new Date(dateString).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function formatReason(reason: string) {
