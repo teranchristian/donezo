@@ -8,6 +8,7 @@ const NOTES_STORAGE_KEY = 'dashboard-notes';
 const SETTINGS_STORAGE_KEY = 'dashboard-settings';
 const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
 const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
+const GITHUB_PR_STATUS_FILTER_STORAGE_KEY = 'githubPrStatusFilter';
 const JIRA_BASE_URL_STORAGE_KEY = 'jiraBaseUrl';
 const JIRA_EMAIL_STORAGE_KEY = 'jiraEmail';
 const JIRA_API_TOKEN_STORAGE_KEY = 'jiraApiToken';
@@ -36,6 +37,7 @@ export type GitHubListSort =
   | 'oldest-updated'
   | 'repository-asc'
   | 'title-asc';
+export type GitHubPrStatusFilter = 'all' | 'approved' | 'waiting-review';
 export type ActiveIntegration = 'github' | 'jira';
 export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
 export type ActiveJiraView = 'active' | 'in-progress' | 'high-priority';
@@ -57,6 +59,7 @@ const DEFAULT_SETTINGS: DashboardSettings = {
 
 const DEFAULT_GITHUB_OWNER_FILTER: GitHubListOrganizationFilter = 'all';
 const DEFAULT_GITHUB_SORT_ORDER: GitHubListSort = 'recently-updated';
+const DEFAULT_GITHUB_PR_STATUS_FILTER: GitHubPrStatusFilter = 'all';
 const DEFAULT_ACTIVE_INTEGRATION: ActiveIntegration = 'github';
 const DEFAULT_ACTIVE_GITHUB_VIEW: ActiveGitHubView = 'prs';
 const DEFAULT_ACTIVE_JIRA_VIEW: ActiveJiraView = 'active';
@@ -198,6 +201,33 @@ export async function saveStoredGitHubSortOrder(sortOrder: GitHubListSort) {
   }
 
   localStorage.setItem(GITHUB_SORT_ORDER_STORAGE_KEY, JSON.stringify(sortOrder));
+}
+
+export async function getStoredGitHubPrStatusFilter() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_PR_STATUS_FILTER_STORAGE_KEY]);
+    return mergeGitHubPrStatusFilter(result[GITHUB_PR_STATUS_FILTER_STORAGE_KEY] as string | undefined);
+  }
+
+  const raw = localStorage.getItem(GITHUB_PR_STATUS_FILTER_STORAGE_KEY);
+  if (!raw) {
+    return DEFAULT_GITHUB_PR_STATUS_FILTER;
+  }
+
+  try {
+    return mergeGitHubPrStatusFilter(JSON.parse(raw) as string);
+  } catch {
+    return DEFAULT_GITHUB_PR_STATUS_FILTER;
+  }
+}
+
+export async function saveStoredGitHubPrStatusFilter(filter: GitHubPrStatusFilter) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_PR_STATUS_FILTER_STORAGE_KEY]: filter });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_PR_STATUS_FILTER_STORAGE_KEY, JSON.stringify(filter));
 }
 
 export async function getStoredActiveIntegration() {
@@ -350,6 +380,12 @@ function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
   }
 
   return DEFAULT_GITHUB_SORT_ORDER;
+}
+
+function mergeGitHubPrStatusFilter(filter?: string): GitHubPrStatusFilter {
+  return filter === 'approved' || filter === 'waiting-review' || filter === 'all'
+    ? filter
+    : DEFAULT_GITHUB_PR_STATUS_FILTER;
 }
 
 function mergeActiveIntegration(activeIntegration?: string): ActiveIntegration {

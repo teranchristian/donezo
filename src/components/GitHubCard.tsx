@@ -11,11 +11,14 @@ import {
 import {
   getStoredActiveGitHubView,
   getStoredGitHubOwnerFilter,
+  getStoredGitHubPrStatusFilter,
   getStoredGitHubSortOrder,
   saveStoredActiveGitHubView,
   saveStoredGitHubOwnerFilter,
+  saveStoredGitHubPrStatusFilter,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
+  type GitHubPrStatusFilter,
   type GitHubListSort
 } from '../lib/storage';
 import { CardShell } from './CardShell';
@@ -81,9 +84,11 @@ export function GitHubCard({
   const copy = STATUS_COPY[data.connectionStatus];
   const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
+  const [prStatusFilter, setPrStatusFilter] = useState<GitHubPrStatusFilter>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedActiveGitHubView, setHasLoadedActiveGitHubView] = useState(false);
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
+  const [hasLoadedPrStatusFilter, setHasLoadedPrStatusFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
   const [enrichedPullRequestsByUrl, setEnrichedPullRequestsByUrl] = useState<
     Record<string, GitHubPullRequestItem>
@@ -112,8 +117,10 @@ export function GitHubCard({
   }));
   const myOpenPrItems = myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
   const reviewRequestedItems = reviewRequestedPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
-  const filteredMyOpenPRs = filterGitHubPullRequests(myOpenPRs, organizationFilter);
-  const filteredReviewRequestedPRs = filterGitHubPullRequests(reviewRequestedPRs, organizationFilter);
+  const ownerFilteredMyOpenPRs = filterGitHubPullRequests(myOpenPRs, organizationFilter);
+  const ownerFilteredReviewRequestedPRs = filterGitHubPullRequests(reviewRequestedPRs, organizationFilter);
+  const filteredMyOpenPRs = filterGitHubPullRequests(myOpenPRs, organizationFilter, prStatusFilter);
+  const filteredReviewRequestedPRs = ownerFilteredReviewRequestedPRs;
   const filteredNotificationCount = filterGitHubItems(notificationItems, organizationFilter).length;
   const filteredMyOpenPrCount = filteredMyOpenPRs.length;
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
@@ -124,7 +131,7 @@ export function GitHubCard({
     activeGitHubView,
     data,
     notifications,
-    myOpenPRs,
+    filteredMyOpenPRs,
     reviewRequestedPRs
   );
   const filteredItems = sortGitHubItems(
@@ -135,7 +142,7 @@ export function GitHubCard({
     .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
     .map((item) => item.value)
     .filter((pullRequest) => !pullRequest.detailsLoaded);
-  const filteredSummaryPullRequestsToEnrich = [...filteredMyOpenPRs, ...filteredReviewRequestedPRs].filter(
+  const filteredSummaryPullRequestsToEnrich = [...ownerFilteredMyOpenPRs, ...ownerFilteredReviewRequestedPRs].filter(
     (pullRequest) => !pullRequest.detailsLoaded
   );
   const pullRequestsToEnrich = Array.from(
@@ -191,6 +198,15 @@ export function GitHubCard({
       setHasLoadedSortOrder(true);
     });
 
+    getStoredGitHubPrStatusFilter().then((storedPrStatusFilter) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setPrStatusFilter(storedPrStatusFilter);
+      setHasLoadedPrStatusFilter(true);
+    });
+
     return () => {
       isMounted = false;
     };
@@ -219,6 +235,14 @@ export function GitHubCard({
 
     void saveStoredGitHubSortOrder(sortOrder);
   }, [hasLoadedSortOrder, sortOrder]);
+
+  useEffect(() => {
+    if (!hasLoadedPrStatusFilter) {
+      return;
+    }
+
+    void saveStoredGitHubPrStatusFilter(prStatusFilter);
+  }, [hasLoadedPrStatusFilter, prStatusFilter]);
 
   useEffect(() => {
     const activePullRequestUrls = new Set(data.pullRequests.map((pullRequest) => pullRequest.url));
@@ -417,6 +441,28 @@ export function GitHubCard({
                   ))}
                 </select>
               </label>
+
+              {activeGitHubView === 'prs' ? (
+                <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
+                  <span className="shrink-0 text-stone-400">Status:</span>
+                  <select
+                    aria-label="PR status"
+                    value={prStatusFilter}
+                    onChange={(event) => setPrStatusFilter(event.target.value as GitHubPrStatusFilter)}
+                    className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
+                  >
+                    <option value="all" className="bg-panel text-stone-100">
+                      All
+                    </option>
+                    <option value="approved" className="bg-panel text-stone-100">
+                      Approved
+                    </option>
+                    <option value="waiting-review" className="bg-panel text-stone-100">
+                      Waiting review
+                    </option>
+                  </select>
+                </label>
+              ) : null}
 
               <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
                 <span className="shrink-0 text-stone-400">Sort:</span>
@@ -872,13 +918,26 @@ function filterGitHubItems(items: GitHubViewItem[], organizationFilter: string) 
 
 function filterGitHubPullRequests(
   pullRequests: GitHubPullRequestItem[],
-  organizationFilter: string
+  organizationFilter: string,
+  prStatusFilter: GitHubPrStatusFilter = 'all'
 ) {
-  if (organizationFilter === 'all') {
-    return pullRequests;
+  const organizationFilteredPullRequests =
+    organizationFilter === 'all'
+      ? pullRequests
+      : pullRequests.filter((pullRequest) => pullRequest.owner === organizationFilter);
+
+  if (prStatusFilter === 'approved') {
+    return organizationFilteredPullRequests.filter((pullRequest) => pullRequest.reviewStatus === 'approved');
   }
 
-  return pullRequests.filter((pullRequest) => pullRequest.owner === organizationFilter);
+  if (prStatusFilter === 'waiting-review') {
+    return organizationFilteredPullRequests.filter(
+      (pullRequest) =>
+        pullRequest.reviewStatus === 'waiting-review' || pullRequest.reviewStatus === 'changes-requested'
+    );
+  }
+
+  return organizationFilteredPullRequests;
 }
 
 function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
