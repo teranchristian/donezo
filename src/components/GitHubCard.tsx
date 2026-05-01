@@ -16,7 +16,6 @@ import {
   type GitHubListSort
 } from '../lib/storage';
 import { CardShell } from './CardShell';
-import { SectionHeading } from './SectionHeading';
 
 type GitHubCardProps = {
   data: GitHubDashboardData;
@@ -265,16 +264,17 @@ export function GitHubCard({
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
-      <SectionHeading
-        eyebrow="Integration"
-        title="GitHub"
-        description="Notifications, authored pull requests, and review requests from your saved GitHub account."
-      />
-
       <div className="flex min-h-[720px] flex-1 flex-col rounded-[22px] border border-white/5 bg-panelAlt/80 p-5 shadow-glow">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm uppercase tracking-[0.28em] text-textSoft">Connection</p>
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-3 border-b border-white/5 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-stone-100">GitHub</p>
+            <p className="mt-1 truncate text-sm text-stone-400">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
+              {copy.label}
+            </span>
             <button
               type="button"
               onClick={onRefresh}
@@ -283,65 +283,42 @@ export function GitHubCard({
             >
               {isLoading ? 'Refreshing...' : 'Refresh'}
             </button>
-            <span className={`rounded-full border px-3 py-1 text-sm ${copy.tone}`}>{copy.label}</span>
           </div>
         </div>
 
-        <p className="mt-4 text-sm leading-6 text-stone-300">
-          {getGitHubMessage(data, copy.message, username)}
-        </p>
-
-        <div className="mt-4 grid gap-3 grid-cols-1 sm:grid-cols-3">
-          <Stat
-            label="Notifications"
-            value={formatCount(notifications.length, isLoading)}
-            isLoading={isLoading}
-            isActive={activeGitHubView === 'notifications'}
-            onClick={() => setActiveGitHubView('notifications')}
-          />
-          <Stat
-            label="My Open PRs"
-            value={formatCount(data.openPrsCount, isLoading)}
-            isLoading={isLoading}
-            isActive={activeGitHubView === 'my-prs'}
-            onClick={() => setActiveGitHubView('my-prs')}
-          />
-          <Stat
-            label="Needs Review"
-            value={formatCount(data.reviewRequestedCount, isLoading)}
-            isLoading={isLoading}
-            isActive={activeGitHubView === 'needs-review'}
-            onClick={() => setActiveGitHubView('needs-review')}
-          />
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-textSoft">Username</p>
-          <p className="mt-2 text-sm text-stone-200">{username.trim() || 'Not set'}</p>
-          {data.lastUpdatedAt ? (
-            <p className="mt-2 text-xs text-stone-500">
-              Last updated{' '}
-              {new Date(data.lastUpdatedAt).toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit'
-              })}
-            </p>
-          ) : null}
-          {lastActivityCheckAt ? (
-            <p className="mt-2 text-xs text-stone-500">
-              Last checked{' '}
-              {new Date(lastActivityCheckAt).toLocaleTimeString([], {
-                hour: 'numeric',
-                minute: '2-digit'
-              })}
-            </p>
-          ) : null}
-          {isCheckingActivity ? (
-            <p className="mt-2 text-xs text-stone-500">Checking GitHub activity...</p>
-          ) : null}
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
+          <span>
+            Last updated {formatCompactTime(data.lastUpdatedAt)}
+          </span>
+          <span className="text-stone-600">·</span>
+          <span>
+            Last checked {formatCompactTime(lastActivityCheckAt)}
+          </span>
+          {isCheckingActivity ? <span className="text-stone-400">· Checking…</span> : null}
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
+          <div className="mb-4 flex flex-wrap gap-2">
+            <TabButton
+              label="PRs"
+              value={formatCount(data.openPrsCount, isLoading)}
+              isActive={activeGitHubView === 'my-prs'}
+              onClick={() => setActiveGitHubView('my-prs')}
+            />
+            <TabButton
+              label="Notifications"
+              value={formatCount(notifications.length, isLoading)}
+              isActive={activeGitHubView === 'notifications'}
+              onClick={() => setActiveGitHubView('notifications')}
+            />
+            <TabButton
+              label="Review"
+              value={formatCount(data.reviewRequestedCount, isLoading)}
+              isActive={activeGitHubView === 'needs-review'}
+              onClick={() => setActiveGitHubView('needs-review')}
+            />
+          </div>
+
           <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-white/5 bg-black/10 px-4 py-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
               <label className="flex min-w-0 flex-col gap-2">
@@ -465,16 +442,14 @@ type GitHubViewItem =
       value: GitHubPullRequestItem;
     };
 
-function Stat({
+function TabButton({
   label,
   value,
-  isLoading,
   isActive,
   onClick
 }: {
   label: string;
   value: string;
-  isLoading: boolean;
   isActive: boolean;
   onClick: () => void;
 }) {
@@ -482,18 +457,14 @@ function Stat({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[92px] rounded-2xl border px-4 py-3 text-left transition cursor-pointer ${
+      className={`rounded-full border px-4 py-2 text-sm transition ${
         isActive
-          ? 'border-white/20 bg-white/10'
-          : 'border-white/5 bg-black/10 hover:border-white/10 hover:bg-black/20'
+          ? 'border-white/20 bg-white/10 text-stone-100'
+          : 'border-white/8 bg-black/10 text-stone-400 hover:border-white/15 hover:bg-black/20 hover:text-stone-200'
       }`}
     >
-      <p className="text-xs uppercase tracking-[0.16em] text-textSoft">{label}</p>
-      {isLoading ? (
-        <div className="mt-3 h-8 w-12 animate-pulse rounded-lg bg-white/10" />
-      ) : (
-        <p className="mt-2 text-2xl text-stone-100">{value}</p>
-      )}
+      <span className="font-medium">{label}</span>
+      <span className={`ml-1 ${isActive ? 'text-stone-200' : 'text-stone-500'}`}>({value})</span>
     </button>
   );
 }
@@ -903,6 +874,17 @@ function formatCount(value: number, isLoading: boolean) {
   return String(value);
 }
 
+function formatCompactTime(value: number | null) {
+  if (!value) {
+    return 'Never';
+  }
+
+  return new Date(value).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+}
+
 function formatReason(reason: string) {
   return reason.replace(/-/g, ' ');
 }
@@ -995,28 +977,6 @@ function getReviewTone(
   }
 
   return 'gray';
-}
-
-function getGitHubMessage(
-  data: GitHubDashboardData,
-  fallbackMessage: string,
-  username: string
-) {
-  if (data.connectionStatus === 'not-connected') {
-    return username.trim()
-      ? 'Add a personal access token in Settings to enable GitHub integration.'
-      : 'Add a GitHub username and personal access token in Settings to enable GitHub integration.';
-  }
-
-  if (data.errorMessage) {
-    return data.errorMessage;
-  }
-
-  if (data.connectionStatus === 'connected') {
-    return 'GitHub activity is live on the dashboard.';
-  }
-
-  return fallbackMessage;
 }
 
 function getEmptyListMessage(data: GitHubDashboardData) {
