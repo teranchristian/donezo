@@ -19,6 +19,7 @@ import {
   type GitHubListSort
 } from '../lib/storage';
 import { CardShell } from './CardShell';
+import { TabButton } from './TabButton';
 
 type GitHubCardProps = {
   data: GitHubDashboardData;
@@ -463,36 +464,6 @@ type GitHubViewItem =
       updatedAt: string;
       value: GitHubPullRequestItem;
     };
-
-function TabButton({
-  label,
-  value,
-  isActive,
-  title,
-  onClick
-}: {
-  label: string;
-  value: string;
-  isActive: boolean;
-  title?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`rounded-full border px-4 py-2 text-sm transition ${
-        isActive
-          ? 'border-white/20 bg-white/10 text-stone-100'
-          : 'border-white/8 bg-black/10 text-stone-400 hover:border-white/15 hover:bg-black/20 hover:text-stone-200'
-      }`}
-    >
-      <span className="font-medium">{label}</span>
-      <span className={`ml-1 ${isActive ? 'text-stone-200' : 'text-stone-500'}`}>({value})</span>
-    </button>
-  );
-}
 
 function PullRequestRow({
   pullRequest,
