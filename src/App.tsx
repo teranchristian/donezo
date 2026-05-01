@@ -306,8 +306,6 @@ export default function App() {
     }
   }
 
-  const gitHubSummary = getGitHubSummary(gitHubData, isGitHubLoading);
-
   return (
     <Routes>
       <Route
@@ -316,7 +314,6 @@ export default function App() {
           <DashboardPage
             settings={settings}
             gitHubData={gitHubData}
-            gitHubSummary={gitHubSummary}
             isGitHubLoading={isGitHubLoading}
             isCheckingGitHubActivity={isCheckingGitHubActivity}
             lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
@@ -346,28 +343,4 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
-}
-
-function getGitHubSummary(data: GitHubDashboardData, isLoading: boolean) {
-  if (isLoading) {
-    return 'Today: loading GitHub activity...';
-  }
-
-  if (data.connectionStatus === 'not-connected') {
-    return 'Today: connect GitHub to load notifications and pull requests.';
-  }
-
-  if (data.connectionStatus === 'invalid') {
-    return 'Today: GitHub token is invalid. Update it in Settings.';
-  }
-
-  if (data.connectionStatus === 'error') {
-    return 'Today: GitHub data is temporarily unavailable.';
-  }
-
-  if (data.missingUsername) {
-    return 'Today: GitHub is connected, but your username is missing in Settings.';
-  }
-
-  return `Today: ${data.notificationsCount} GitHub notifications, ${data.openPrsCount} open PRs, ${data.reviewRequestedCount} waiting for review.`;
 }

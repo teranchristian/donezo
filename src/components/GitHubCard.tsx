@@ -29,6 +29,15 @@ type GitHubCardProps = {
   isCheckingActivity: boolean;
   lastActivityCheckAt: number | null;
   onRefresh: () => void;
+  onSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
+};
+
+export type GitHubSummaryMetrics = {
+  connectionStatus: GitHubConnectionStatus;
+  missingUsername: boolean;
+  reviewRequestedCount: number;
+  approvedPrCount: number;
+  relevantPrCount: number;
 };
 
 const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string; message: string }> = {
@@ -66,7 +75,8 @@ export function GitHubCard({
   isLoading,
   isCheckingActivity,
   lastActivityCheckAt,
-  onRefresh
+  onRefresh,
+  onSummaryMetricsChange
 }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
@@ -102,9 +112,14 @@ export function GitHubCard({
   }));
   const myOpenPrItems = myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
   const reviewRequestedItems = reviewRequestedPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
+  const filteredMyOpenPRs = filterGitHubPullRequests(myOpenPRs, organizationFilter);
+  const filteredReviewRequestedPRs = filterGitHubPullRequests(reviewRequestedPRs, organizationFilter);
   const filteredNotificationCount = filterGitHubItems(notificationItems, organizationFilter).length;
-  const filteredMyOpenPrCount = filterGitHubItems(myOpenPrItems, organizationFilter).length;
-  const filteredReviewRequestedCount = filterGitHubItems(reviewRequestedItems, organizationFilter).length;
+  const filteredMyOpenPrCount = filteredMyOpenPRs.length;
+  const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
+  const filteredApprovedPrCount = filteredMyOpenPRs.filter(
+    (pullRequest) => pullRequest.reviewStatus === 'approved'
+  ).length;
   const currentView = getGitHubViewContent(
     activeGitHubView,
     data,
@@ -120,7 +135,21 @@ export function GitHubCard({
     .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
     .map((item) => item.value)
     .filter((pullRequest) => !pullRequest.detailsLoaded);
+  const filteredSummaryPullRequestsToEnrich = [...filteredMyOpenPRs, ...filteredReviewRequestedPRs].filter(
+    (pullRequest) => !pullRequest.detailsLoaded
+  );
+  const pullRequestsToEnrich = Array.from(
+    new Map(
+      [...visiblePullRequestsToEnrich, ...filteredSummaryPullRequestsToEnrich].map((pullRequest) => [
+        pullRequest.url,
+        pullRequest
+      ])
+    ).values()
+  );
   const visiblePullRequestKey = visiblePullRequestsToEnrich
+    .map((pullRequest) => `${pullRequest.url}:${pullRequest.updatedAt}`)
+    .join('|');
+  const summaryPullRequestKey = filteredSummaryPullRequestsToEnrich
     .map((pullRequest) => `${pullRequest.url}:${pullRequest.updatedAt}`)
     .join('|');
   const visiblePullRequestNotifications = filteredItems
@@ -220,13 +249,13 @@ export function GitHubCard({
   }, [data.notifications]);
 
   useEffect(() => {
-    if (!token.trim() || visiblePullRequestsToEnrich.length === 0) {
+    if (!token.trim() || pullRequestsToEnrich.length === 0) {
       return;
     }
 
     let isCancelled = false;
 
-    enrichGitHubPullRequests(visiblePullRequestsToEnrich, token).then((enrichedPullRequests) => {
+    enrichGitHubPullRequests(pullRequestsToEnrich, token).then((enrichedPullRequests) => {
       if (isCancelled) {
         return;
       }
@@ -245,7 +274,24 @@ export function GitHubCard({
     return () => {
       isCancelled = true;
     };
-  }, [token, visiblePullRequestKey]);
+  }, [token, visiblePullRequestKey, summaryPullRequestKey]);
+
+  useEffect(() => {
+    onSummaryMetricsChange({
+      connectionStatus: data.connectionStatus,
+      missingUsername: data.missingUsername,
+      reviewRequestedCount: filteredReviewRequestedCount,
+      approvedPrCount: filteredApprovedPrCount,
+      relevantPrCount: filteredMyOpenPrCount + filteredReviewRequestedCount
+    });
+  }, [
+    data.connectionStatus,
+    data.missingUsername,
+    filteredApprovedPrCount,
+    filteredMyOpenPrCount,
+    filteredReviewRequestedCount,
+    onSummaryMetricsChange
+  ]);
 
   useEffect(() => {
     if (!token.trim() || visiblePullRequestNotifications.length === 0) {
@@ -822,6 +868,17 @@ function filterGitHubItems(items: GitHubViewItem[], organizationFilter: string) 
   }
 
   return items.filter((item) => item.owner === organizationFilter);
+}
+
+function filterGitHubPullRequests(
+  pullRequests: GitHubPullRequestItem[],
+  organizationFilter: string
+) {
+  if (organizationFilter === 'all') {
+    return pullRequests;
+  }
+
+  return pullRequests.filter((pullRequest) => pullRequest.owner === organizationFilter);
 }
 
 function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
