@@ -63,7 +63,7 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
   }, [activeFilter, data.issues]);
 
   return (
-    <CardShell className="flex min-h-[580px] min-w-0 flex-col overflow-hidden xl:col-span-2">
+    <CardShell className="flex min-h-[580px] min-w-0 flex-col overflow-hidden">
       <SectionHeading
         eyebrow="Integration"
         title="Jira"

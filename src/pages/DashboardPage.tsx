@@ -42,7 +42,7 @@ export function DashboardPage({
           <HeaderMenu />
         </div>
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
           <section className="flex flex-col gap-6">
             <SummaryCard summary={gitHubSummary} />
             <NotesCard />
@@ -61,25 +61,30 @@ export function DashboardPage({
           </section>
         </section>
 
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <PlaceholderCard
-            title="Calendar"
-            subtitle="Placeholder"
-            description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
-            className="min-h-[220px]"
-          />
-          <JiraCard
-            baseUrl={settings.integrations.jira.baseUrl}
-            data={jiraData}
-            isLoading={isJiraLoading}
-            onRefresh={onRefreshJira}
-          />
-          <PlaceholderCard
-            title="Workspace"
-            subtitle="Later"
-            description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
-            className="min-h-[220px]"
-          />
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+          <section className="flex flex-col gap-6">
+            <PlaceholderCard
+              title="Calendar"
+              subtitle="Placeholder"
+              description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
+              className="min-h-[220px]"
+            />
+            <PlaceholderCard
+              title="Workspace"
+              subtitle="Later"
+              description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
+              className="min-h-[220px]"
+            />
+          </section>
+
+          <section className="flex min-h-0">
+            <JiraCard
+              baseUrl={settings.integrations.jira.baseUrl}
+              data={jiraData}
+              isLoading={isJiraLoading}
+              onRefresh={onRefreshJira}
+            />
+          </section>
         </section>
       </div>
     </main>
