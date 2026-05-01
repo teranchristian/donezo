@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard } from '../components/GitHubCard';
 import { HeaderMenu } from '../components/HeaderMenu';
@@ -8,7 +8,12 @@ import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard } from '../components/SummaryCard';
 import { GitHubDashboardData } from '../lib/githubApi';
 import { JiraDashboardData } from '../lib/jiraApi';
-import { DashboardSettings } from '../lib/storage';
+import {
+  DashboardSettings,
+  getStoredActiveIntegration,
+  saveStoredActiveIntegration,
+  type ActiveIntegration
+} from '../lib/storage';
 
 type DashboardPageProps = {
   settings: DashboardSettings;
@@ -35,7 +40,33 @@ export function DashboardPage({
   isJiraLoading,
   onRefreshJira
 }: DashboardPageProps) {
-  const [activeIntegration, setActiveIntegration] = useState<'github' | 'jira'>('github');
+  const [activeIntegration, setActiveIntegration] = useState<ActiveIntegration>('github');
+  const [hasLoadedActiveIntegration, setHasLoadedActiveIntegration] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getStoredActiveIntegration().then((storedActiveIntegration) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setActiveIntegration(storedActiveIntegration);
+      setHasLoadedActiveIntegration(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedActiveIntegration) {
+      return;
+    }
+
+    void saveStoredActiveIntegration(activeIntegration);
+  }, [activeIntegration, hasLoadedActiveIntegration]);
 
   return (
     <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">

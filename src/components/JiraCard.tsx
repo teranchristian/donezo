@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
@@ -7,6 +7,11 @@ import {
   type JiraDashboardData,
   type JiraIssue
 } from '../lib/jiraApi';
+import {
+  getStoredActiveJiraView,
+  saveStoredActiveJiraView,
+  type ActiveJiraView
+} from '../lib/storage';
 import { CardShell } from './CardShell';
 
 type JiraCardProps = {
@@ -48,18 +53,44 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
   const copy = STATUS_COPY[data.connectionStatus];
   const counts = getJiraIssueCounts(data.issues);
   const viewAllUrl = baseUrl ? getJiraSearchUrl(baseUrl) : '';
-  const [activeFilter, setActiveFilter] = useState<'active' | 'in-progress' | 'high-priority'>('active');
+  const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
+  const [hasLoadedActiveJiraView, setHasLoadedActiveJiraView] = useState(false);
   const filteredIssues = useMemo(() => {
-    if (activeFilter === 'in-progress') {
+    if (activeJiraView === 'in-progress') {
       return data.issues.filter(isInProgressIssue);
     }
 
-    if (activeFilter === 'high-priority') {
+    if (activeJiraView === 'high-priority') {
       return data.issues.filter(isHighPriorityIssue);
     }
 
     return data.issues;
-  }, [activeFilter, data.issues]);
+  }, [activeJiraView, data.issues]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getStoredActiveJiraView().then((storedActiveJiraView) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setActiveJiraView(storedActiveJiraView);
+      setHasLoadedActiveJiraView(true);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedActiveJiraView) {
+      return;
+    }
+
+    void saveStoredActiveJiraView(activeJiraView);
+  }, [activeJiraView, hasLoadedActiveJiraView]);
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
@@ -96,25 +127,25 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
             <TabButton
               label="Active"
               value={formatCount(counts.active, isLoading)}
-              isActive={activeFilter === 'active'}
-              onClick={() => setActiveFilter('active')}
+              isActive={activeJiraView === 'active'}
+              onClick={() => setActiveJiraView('active')}
             />
             <TabButton
               label="In Progress"
               value={formatCount(counts.inProgress, isLoading)}
-              isActive={activeFilter === 'in-progress'}
-              onClick={() => setActiveFilter('in-progress')}
+              isActive={activeJiraView === 'in-progress'}
+              onClick={() => setActiveJiraView('in-progress')}
             />
             <TabButton
               label="High Priority"
               value={formatCount(counts.highPriority, isLoading)}
-              isActive={activeFilter === 'high-priority'}
-              onClick={() => setActiveFilter('high-priority')}
+              isActive={activeJiraView === 'high-priority'}
+              onClick={() => setActiveJiraView('high-priority')}
             />
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{getListTitle(activeFilter)}</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{getListTitle(activeJiraView)}</p>
           </div>
 
           <div className="dashboard-scrollbar mt-3 min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
@@ -129,7 +160,7 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
             ) : data.connectionStatus === 'invalid' || data.connectionStatus === 'error' ? (
               <EmptyState message={data.errorMessage || copy.message} />
             ) : filteredIssues.length === 0 ? (
-              <EmptyState message={getEmptyFilterMessage(activeFilter)} />
+              <EmptyState message={getEmptyFilterMessage(activeJiraView)} />
             ) : (
               <div className="space-y-3">
                 {filteredIssues.map((issue) => (

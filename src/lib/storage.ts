@@ -11,6 +11,9 @@ const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
 const JIRA_BASE_URL_STORAGE_KEY = 'jiraBaseUrl';
 const JIRA_EMAIL_STORAGE_KEY = 'jiraEmail';
 const JIRA_API_TOKEN_STORAGE_KEY = 'jiraApiToken';
+const ACTIVE_INTEGRATION_STORAGE_KEY = 'activeIntegration';
+const ACTIVE_GITHUB_VIEW_STORAGE_KEY = 'activeGitHubView';
+const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
 
 export type DashboardSettings = {
   name: string;
@@ -33,6 +36,9 @@ export type GitHubListSort =
   | 'oldest-updated'
   | 'repository-asc'
   | 'title-asc';
+export type ActiveIntegration = 'github' | 'jira';
+export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
+export type ActiveJiraView = 'active' | 'in-progress' | 'high-priority';
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   name: 'Christian',
@@ -51,6 +57,9 @@ const DEFAULT_SETTINGS: DashboardSettings = {
 
 const DEFAULT_GITHUB_OWNER_FILTER: GitHubListOrganizationFilter = 'all';
 const DEFAULT_GITHUB_SORT_ORDER: GitHubListSort = 'recently-updated';
+const DEFAULT_ACTIVE_INTEGRATION: ActiveIntegration = 'github';
+const DEFAULT_ACTIVE_GITHUB_VIEW: ActiveGitHubView = 'prs';
+const DEFAULT_ACTIVE_JIRA_VIEW: ActiveJiraView = 'active';
 
 function hasChromeStorage() {
   return typeof chrome !== 'undefined' && Boolean(chrome.storage?.local);
@@ -191,6 +200,87 @@ export async function saveStoredGitHubSortOrder(sortOrder: GitHubListSort) {
   localStorage.setItem(GITHUB_SORT_ORDER_STORAGE_KEY, JSON.stringify(sortOrder));
 }
 
+export async function getStoredActiveIntegration() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([ACTIVE_INTEGRATION_STORAGE_KEY]);
+    return mergeActiveIntegration(result[ACTIVE_INTEGRATION_STORAGE_KEY] as string | undefined);
+  }
+
+  const raw = localStorage.getItem(ACTIVE_INTEGRATION_STORAGE_KEY);
+  if (!raw) {
+    return DEFAULT_ACTIVE_INTEGRATION;
+  }
+
+  try {
+    return mergeActiveIntegration(JSON.parse(raw) as string);
+  } catch {
+    return DEFAULT_ACTIVE_INTEGRATION;
+  }
+}
+
+export async function saveStoredActiveIntegration(activeIntegration: ActiveIntegration) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [ACTIVE_INTEGRATION_STORAGE_KEY]: activeIntegration });
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_INTEGRATION_STORAGE_KEY, JSON.stringify(activeIntegration));
+}
+
+export async function getStoredActiveGitHubView() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([ACTIVE_GITHUB_VIEW_STORAGE_KEY]);
+    return mergeActiveGitHubView(result[ACTIVE_GITHUB_VIEW_STORAGE_KEY] as string | undefined);
+  }
+
+  const raw = localStorage.getItem(ACTIVE_GITHUB_VIEW_STORAGE_KEY);
+  if (!raw) {
+    return DEFAULT_ACTIVE_GITHUB_VIEW;
+  }
+
+  try {
+    return mergeActiveGitHubView(JSON.parse(raw) as string);
+  } catch {
+    return DEFAULT_ACTIVE_GITHUB_VIEW;
+  }
+}
+
+export async function saveStoredActiveGitHubView(activeGitHubView: ActiveGitHubView) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [ACTIVE_GITHUB_VIEW_STORAGE_KEY]: activeGitHubView });
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_GITHUB_VIEW_STORAGE_KEY, JSON.stringify(activeGitHubView));
+}
+
+export async function getStoredActiveJiraView() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([ACTIVE_JIRA_VIEW_STORAGE_KEY]);
+    return mergeActiveJiraView(result[ACTIVE_JIRA_VIEW_STORAGE_KEY] as string | undefined);
+  }
+
+  const raw = localStorage.getItem(ACTIVE_JIRA_VIEW_STORAGE_KEY);
+  if (!raw) {
+    return DEFAULT_ACTIVE_JIRA_VIEW;
+  }
+
+  try {
+    return mergeActiveJiraView(JSON.parse(raw) as string);
+  } catch {
+    return DEFAULT_ACTIVE_JIRA_VIEW;
+  }
+}
+
+export async function saveStoredActiveJiraView(activeJiraView: ActiveJiraView) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [ACTIVE_JIRA_VIEW_STORAGE_KEY]: activeJiraView });
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_JIRA_VIEW_STORAGE_KEY, JSON.stringify(activeJiraView));
+}
+
 export function getDefaultSettings() {
   return structuredClone(DEFAULT_SETTINGS);
 }
@@ -260,4 +350,22 @@ function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
   }
 
   return DEFAULT_GITHUB_SORT_ORDER;
+}
+
+function mergeActiveIntegration(activeIntegration?: string): ActiveIntegration {
+  return activeIntegration === 'jira' || activeIntegration === 'github'
+    ? activeIntegration
+    : DEFAULT_ACTIVE_INTEGRATION;
+}
+
+function mergeActiveGitHubView(activeGitHubView?: string): ActiveGitHubView {
+  return activeGitHubView === 'notifications' || activeGitHubView === 'review' || activeGitHubView === 'prs'
+    ? activeGitHubView
+    : DEFAULT_ACTIVE_GITHUB_VIEW;
+}
+
+function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
+  return activeJiraView === 'in-progress' || activeJiraView === 'high-priority' || activeJiraView === 'active'
+    ? activeJiraView
+    : DEFAULT_ACTIVE_JIRA_VIEW;
 }

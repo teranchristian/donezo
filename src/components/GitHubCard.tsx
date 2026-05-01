@@ -9,10 +9,13 @@ import {
   type GitHubPullRequestState
 } from '../lib/githubApi';
 import {
+  getStoredActiveGitHubView,
   getStoredGitHubOwnerFilter,
   getStoredGitHubSortOrder,
+  saveStoredActiveGitHubView,
   saveStoredGitHubOwnerFilter,
   saveStoredGitHubSortOrder,
+  type ActiveGitHubView,
   type GitHubListSort
 } from '../lib/storage';
 import { CardShell } from './CardShell';
@@ -65,11 +68,10 @@ export function GitHubCard({
   onRefresh
 }: GitHubCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
-  const [activeGitHubView, setActiveGitHubView] = useState<
-    'notifications' | 'my-prs' | 'needs-review'
-  >('my-prs');
+  const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
+  const [hasLoadedActiveGitHubView, setHasLoadedActiveGitHubView] = useState(false);
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
   const [enrichedPullRequestsByUrl, setEnrichedPullRequestsByUrl] = useState<
@@ -132,6 +134,15 @@ export function GitHubCard({
   useEffect(() => {
     let isMounted = true;
 
+    getStoredActiveGitHubView().then((storedActiveGitHubView) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setActiveGitHubView(storedActiveGitHubView);
+      setHasLoadedActiveGitHubView(true);
+    });
+
     getStoredGitHubOwnerFilter().then((storedOwnerFilter) => {
       if (!isMounted) {
         return;
@@ -154,6 +165,14 @@ export function GitHubCard({
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasLoadedActiveGitHubView) {
+      return;
+    }
+
+    void saveStoredActiveGitHubView(activeGitHubView);
+  }, [activeGitHubView, hasLoadedActiveGitHubView]);
 
   useEffect(() => {
     if (!hasLoadedOwnerFilter) {
@@ -313,11 +332,11 @@ export function GitHubCard({
             <TabButton
               label="PRs"
               value={formatCount(filteredMyOpenPrCount, isLoading)}
-              isActive={activeGitHubView === 'my-prs'}
+              isActive={activeGitHubView === 'prs'}
               title={
                 isLoading ? undefined : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`
               }
-              onClick={() => setActiveGitHubView('my-prs')}
+              onClick={() => setActiveGitHubView('prs')}
             />
             <TabButton
               label="Notifications"
@@ -328,8 +347,8 @@ export function GitHubCard({
             <TabButton
               label="Review"
               value={formatCount(filteredReviewRequestedCount, isLoading)}
-              isActive={activeGitHubView === 'needs-review'}
-              onClick={() => setActiveGitHubView('needs-review')}
+              isActive={activeGitHubView === 'review'}
+              onClick={() => setActiveGitHubView('review')}
             />
           </div>
 
@@ -407,7 +426,7 @@ export function GitHubCard({
               </div>
             )}
           </div>
-          {!isLoading && activeGitHubView === 'my-prs' && data.openPrsCount > 0 && username.trim() ? (
+          {!isLoading && activeGitHubView === 'prs' && data.openPrsCount > 0 && username.trim() ? (
             <div className="mt-3 text-right">
               <a
                 href={viewAllUrl}
@@ -725,7 +744,7 @@ function ListItemSkeleton() {
 }
 
 function getGitHubViewContent(
-  activeGitHubView: 'notifications' | 'my-prs' | 'needs-review',
+  activeGitHubView: ActiveGitHubView,
   data: GitHubDashboardData,
   notifications: GitHubNotification[],
   myOpenPRs: GitHubPullRequestItem[],
@@ -753,7 +772,7 @@ function getGitHubViewContent(
     };
   }
 
-  if (activeGitHubView === 'needs-review') {
+  if (activeGitHubView === 'review') {
     return {
       title: 'Needs Review',
       count: data.reviewRequestedCount,
