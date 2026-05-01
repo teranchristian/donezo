@@ -166,6 +166,7 @@ export function SettingsPage({
                   <li className="list-none pl-1">repo</li>
                   <li className="list-none pl-1">notifications</li>
                   <li className="list-none pl-1">read:user</li>
+                  <li className="list-none pl-1">read:org</li>
                 </ul>
                 <p className="mt-3 text-indigo-100/75">
                   Classic tokens are recommended for this app for simplicity.

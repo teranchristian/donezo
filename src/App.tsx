@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import {
   getEmptyGitHubDashboardData,
+  getLatestGitHubDashboardData,
   loadGitHubDashboardData,
   pollGitHubNotificationActivity,
   testGitHubConnection,
@@ -74,11 +75,34 @@ export default function App() {
       return;
     }
 
-    void refreshGitHubData({
-      username: settings.integrations.github.username,
-      token: settings.integrations.github.token,
-      showLoadingIndicator: true
-    });
+    let isCancelled = false;
+
+    void (async () => {
+      const cachedData = await getLatestGitHubDashboardData({
+        username: settings.integrations.github.username,
+        token: settings.integrations.github.token
+      });
+
+      if (isCancelled || !isMountedRef.current) {
+        return;
+      }
+
+      if (cachedData) {
+        setGitHubData(cachedData);
+        setGitHubSettingsTestStatus(cachedData.connectionStatus);
+      }
+
+      await refreshGitHubData({
+        username: settings.integrations.github.username,
+        token: settings.integrations.github.token,
+        forceRefresh: Boolean(cachedData),
+        showLoadingIndicator: !cachedData
+      });
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
 
   useEffect(() => {

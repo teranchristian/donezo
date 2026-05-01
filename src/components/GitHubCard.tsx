@@ -4,7 +4,6 @@ import {
   GitHubDashboardData,
   GitHubNotification,
   GitHubPullRequestItem,
-  enrichGitHubPullRequests,
   getGitHubPullRequestState,
   type GitHubPullRequestState
 } from '../lib/githubApi';
@@ -91,15 +90,10 @@ export function GitHubCard({
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
-  const [enrichedPullRequestsByUrl, setEnrichedPullRequestsByUrl] = useState<
-    Record<string, GitHubPullRequestItem>
-  >({});
   const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
     Record<string, GitHubPullRequestState>
   >({});
-  const resolvedPullRequests = data.pullRequests.map(
-    (pullRequest) => enrichedPullRequestsByUrl[pullRequest.url] ?? pullRequest
-  );
+  const resolvedPullRequests = data.pullRequests;
   const myOpenPRs = resolvedPullRequests.filter((pullRequest) => pullRequest.source === 'authored');
   const reviewRequestedPRs = resolvedPullRequests.filter(
     (pullRequest) => pullRequest.source === 'review-requested'
@@ -127,9 +121,9 @@ export function GitHubCard({
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
-  const summaryApprovedPrCount = ownerFilteredMyOpenPRs.length > 0 && ownerFilteredMyOpenPRs.some((pullRequest) => !pullRequest.detailsLoaded)
-    ? null
-    : ownerFilteredMyOpenPRs.filter((pullRequest) => pullRequest.reviewStatus === 'approved').length;
+  const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
+    (pullRequest) => pullRequest.reviewStatus === 'approved'
+  ).length;
   const currentView = getGitHubViewContent(
     activeView,
     data,
@@ -141,27 +135,6 @@ export function GitHubCard({
     filterGitHubItems(currentView.items, organizationFilter),
     sortOrder
   );
-  const visiblePullRequestsToEnrich = filteredItems
-    .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
-    .map((item) => item.value)
-    .filter((pullRequest) => !pullRequest.detailsLoaded);
-  const filteredSummaryPullRequestsToEnrich = [...ownerFilteredMyOpenPRs, ...ownerFilteredReviewRequestedPRs].filter(
-    (pullRequest) => !pullRequest.detailsLoaded
-  );
-  const pullRequestsToEnrich = Array.from(
-    new Map(
-      [...visiblePullRequestsToEnrich, ...filteredSummaryPullRequestsToEnrich].map((pullRequest) => [
-        pullRequest.url,
-        pullRequest
-      ])
-    ).values()
-  );
-  const visiblePullRequestKey = visiblePullRequestsToEnrich
-    .map((pullRequest) => `${pullRequest.url}:${pullRequest.updatedAt}`)
-    .join('|');
-  const summaryPullRequestKey = filteredSummaryPullRequestsToEnrich
-    .map((pullRequest) => `${pullRequest.url}:${pullRequest.updatedAt}`)
-    .join('|');
   const visiblePullRequestNotifications = filteredItems
     .filter((item): item is Extract<GitHubViewItem, { kind: 'notification' }> => item.kind === 'notification')
     .map((item) => item.value)
@@ -214,20 +187,6 @@ export function GitHubCard({
   }, [hasLoadedSortOrder, sortOrder]);
 
   useEffect(() => {
-    const activePullRequestUrls = new Set(data.pullRequests.map((pullRequest) => pullRequest.url));
-
-    setEnrichedPullRequestsByUrl((currentEntries) => {
-      const nextEntries = Object.fromEntries(
-        Object.entries(currentEntries).filter(([url]) => activePullRequestUrls.has(url))
-      );
-
-      return Object.keys(nextEntries).length === Object.keys(currentEntries).length
-        ? currentEntries
-        : nextEntries;
-    });
-  }, [data.pullRequests]);
-
-  useEffect(() => {
     const activeNotificationIds = new Set((data.notifications ?? []).map((notification) => notification.id));
 
     setNotificationPullRequestStates((currentEntries) => {
@@ -240,34 +199,6 @@ export function GitHubCard({
         : nextEntries;
     });
   }, [data.notifications]);
-
-  useEffect(() => {
-    if (!token.trim() || pullRequestsToEnrich.length === 0) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    enrichGitHubPullRequests(pullRequestsToEnrich, token).then((enrichedPullRequests) => {
-      if (isCancelled) {
-        return;
-      }
-
-      setEnrichedPullRequestsByUrl((currentEntries) => {
-        const nextEntries = { ...currentEntries };
-
-        for (const pullRequest of enrichedPullRequests) {
-          nextEntries[pullRequest.url] = pullRequest;
-        }
-
-        return nextEntries;
-      });
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [token, visiblePullRequestKey, summaryPullRequestKey]);
 
   useEffect(() => {
     onSummaryMetricsChange({
@@ -341,6 +272,7 @@ export function GitHubCard({
           <div className="min-w-0">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-stone-100">GitHub</p>
             <p className="mt-1 truncate text-sm text-stone-400">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
+            <p className="mt-2 text-sm text-stone-500">{data.errorMessage || copy.message}</p>
           </div>
 
           <div className="flex flex-col items-start sm:items-end">
@@ -481,7 +413,6 @@ export function GitHubCard({
                     <PullRequestRow
                       key={item.key}
                       pullRequest={item.value}
-                      username={username.trim()}
                     />
                   )
                 )}
@@ -528,10 +459,8 @@ type GitHubViewItem =
 
 function PullRequestRow({
   pullRequest,
-  username
 }: {
   pullRequest: GitHubPullRequestItem;
-  username: string;
 }) {
   const reviewStatusLabel = getCompactReviewStatusLabel(pullRequest.reviewStatus);
 
@@ -551,7 +480,7 @@ function PullRequestRow({
           </div>
           <p className="mt-2 truncate text-sm text-stone-400">
             {pullRequest.repositoryName} • opened {formatRelativeTime(pullRequest.updatedAt)}
-            {username ? ` by ${username}` : ''} • {reviewStatusLabel}
+            {pullRequest.authorLogin ? ` by ${pullRequest.authorLogin}` : ''} • {reviewStatusLabel}
           </p>
         </div>
       </div>
@@ -948,10 +877,7 @@ function formatCompactTime(value: number | null) {
     return 'Never';
   }
 
-  return new Date(value).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit'
-  });
+  return formatRelativeTime(new Date(value).toISOString());
 }
 
 function formatReason(reason: string) {
@@ -1027,7 +953,19 @@ function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['review
     return 'Approved';
   }
 
-  return 'Review required';
+  if (reviewStatus === 'changes-requested') {
+    return 'Changes requested';
+  }
+
+  if (reviewStatus === 'draft') {
+    return 'Draft';
+  }
+
+  if (reviewStatus === 'open') {
+    return 'Open';
+  }
+
+  return 'Waiting for review';
 }
 
 function getEmptyListMessage(data: GitHubDashboardData) {

@@ -25,11 +25,12 @@ export type GitHubPullRequestItem = {
   owner: string;
   repo: string;
   pullNumber: number;
-  headSha: string;
+  authorLogin: string;
+  isDraft: boolean;
   updatedAt: string;
   url: string;
   source: 'authored' | 'review-requested';
-  reviewStatus: 'approved' | 'changes-requested' | 'waiting-review';
+  reviewStatus: 'approved' | 'changes-requested' | 'waiting-review' | 'draft' | 'open';
   ciStatus: 'passing' | 'failing' | 'pending' | 'unknown';
   detailsLoaded: boolean;
 };
@@ -52,15 +53,61 @@ export type GitHubPullRequestNotificationSignal = {
 };
 
 type GitHubSearchResponse = {
-  items: Array<{
-    id: number;
-    title: string;
-    number: number;
-    updated_at: string;
-    html_url: string;
-    repository_url: string;
-  }>;
+  items: GitHubPullRequestItem[];
   total_count: number;
+};
+
+type GitHubGraphQlResponse = {
+  data?: {
+    authoredPullRequests: GitHubGraphQlSearchResult;
+    reviewRequestedPullRequests: GitHubGraphQlSearchResult;
+  };
+  errors?: Array<{
+    message: string;
+    type?: string;
+    path?: Array<string | number>;
+  }>;
+};
+
+type GitHubGraphQlSearchResult = {
+  issueCount: number;
+  nodes: GitHubGraphQlPullRequestNode[];
+};
+
+type GitHubGraphQlPullRequestNode = {
+  __typename: 'PullRequest';
+  number: number;
+  title: string;
+  url: string;
+  isDraft: boolean;
+  updatedAt: string;
+  reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  author: {
+    login: string;
+  } | null;
+  repository: {
+    name: string;
+    owner: {
+      login: string;
+    };
+  };
+  reviewRequests: {
+    nodes: Array<{
+      requestedReviewer:
+        | {
+            __typename: 'User';
+            login: string;
+          }
+        | {
+            __typename: 'Team';
+            slug: string;
+            organization: {
+              login: string;
+            } | null;
+          }
+        | null;
+    }>;
+  };
 };
 
 type GitHubPullRequestDetail = {
@@ -106,7 +153,62 @@ type CachedGitHubNotificationSignals = {
 const CACHE_KEY = 'github-dashboard-cache';
 const NOTIFICATION_SIGNALS_CACHE_KEY = 'github-notification-signals';
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const STATUS_CONCURRENCY = 3;
+const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
+const GRAPHQL_PULL_REQUEST_PAGE_SIZE = 50;
+const GITHUB_PULL_REQUESTS_QUERY = `
+  query DashboardPullRequests(
+    $authoredQuery: String!
+    $reviewRequestedQuery: String!
+    $first: Int!
+  ) {
+    authoredPullRequests: search(query: $authoredQuery, type: ISSUE, first: $first) {
+      issueCount
+      nodes {
+        ...PullRequestFields
+      }
+    }
+    reviewRequestedPullRequests: search(query: $reviewRequestedQuery, type: ISSUE, first: $first) {
+      issueCount
+      nodes {
+        ...PullRequestFields
+      }
+    }
+  }
+
+  fragment PullRequestFields on PullRequest {
+    number
+    title
+    url
+    isDraft
+    updatedAt
+    reviewDecision
+    author {
+      login
+    }
+    repository {
+      name
+      owner {
+        login
+      }
+    }
+    reviewRequests(first: 20) {
+      nodes {
+        requestedReviewer {
+          __typename
+          ... on User {
+            login
+          }
+          ... on Team {
+            slug
+            organization {
+              login
+            }
+          }
+        }
+      }
+    }
+  }
+`;
 
 export function getEmptyGitHubDashboardData(
   connectionStatus: GitHubConnectionStatus = 'not-connected'
@@ -175,18 +277,30 @@ export function getPullRequestNotificationSignals(notifications: GitHubNotificat
 }
 
 export async function getMyOpenPRs(username: string, token: string): Promise<GitHubSearchResponse> {
-  const query = encodeURIComponent(`is:pr is:open author:${username}`);
-  const response = await fetchGitHub(`https://api.github.com/search/issues?q=${query}`, token);
-  return (await response.json()) as GitHubSearchResponse;
+  const result = await getDashboardPullRequests(username, token);
+  return result.authored;
 }
 
 export async function getReviewRequestedPRs(
   username: string,
   token: string
 ): Promise<GitHubSearchResponse> {
-  const query = encodeURIComponent(`is:pr is:open review-requested:${username}`);
-  const response = await fetchGitHub(`https://api.github.com/search/issues?q=${query}`, token);
-  return (await response.json()) as GitHubSearchResponse;
+  const result = await getDashboardPullRequests(username, token);
+  return result.reviewRequested;
+}
+
+export async function getLatestGitHubDashboardData(options: {
+  username: string;
+  token: string;
+}) {
+  const username = options.username.trim();
+  const token = options.token.trim();
+
+  if (!token) {
+    return null;
+  }
+
+  return getCachedGitHubDashboardData(createCacheToken(username, token), { ignoreExpiration: true });
 }
 
 export async function loadGitHubDashboardData(options: {
@@ -237,19 +351,20 @@ export async function loadGitHubDashboardData(options: {
   }
 
   try {
-    const [notifications, myOpenPrs, reviewRequestedPrs] = await Promise.all([
+    const [notifications, pullRequestResult] = await Promise.all([
       getGitHubNotifications(token),
-      getMyOpenPRs(username, token),
-      getReviewRequestedPRs(username, token)
+      getDashboardPullRequests(username, token)
     ]);
-
-    const pullRequests = mergePullRequestSeeds(myOpenPrs.items, reviewRequestedPrs.items);
+    const pullRequests = mergePullRequestSeeds(
+      pullRequestResult.authored.items,
+      pullRequestResult.reviewRequested.items
+    );
 
     const data: GitHubDashboardData = {
       connectionStatus: 'connected',
       notificationsCount: notifications.length,
-      openPrsCount: myOpenPrs.total_count,
-      reviewRequestedCount: reviewRequestedPrs.total_count,
+      openPrsCount: pullRequestResult.authored.total_count,
+      reviewRequestedCount: pullRequestResult.reviewRequested.total_count,
       notifications,
       pullRequests,
       errorMessage: null,
@@ -263,17 +378,7 @@ export async function loadGitHubDashboardData(options: {
     ]);
     return data;
   } catch (error) {
-    if (error instanceof GitHubApiError && error.status === 401) {
-      return {
-        ...getEmptyGitHubDashboardData('invalid'),
-        errorMessage: 'GitHub rejected the saved token.'
-      };
-    }
-
-    return {
-      ...getEmptyGitHubDashboardData('error'),
-      errorMessage: 'GitHub data could not be loaded right now.'
-    };
+    return mapGitHubDashboardError(error);
   }
 }
 
@@ -320,6 +425,49 @@ async function fetchGitHub(url: string, token: string) {
   return response;
 }
 
+async function fetchGitHubGraphQL<TData>(
+  query: string,
+  variables: Record<string, string | number>,
+  token: string
+) {
+  let response: Response;
+
+  try {
+    response = await fetch(GITHUB_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query, variables })
+    });
+  } catch (error) {
+    throw new GitHubApiError(0, 'network', 'GitHub could not be reached right now.');
+  }
+
+  let result: GitHubGraphQlResponse;
+  try {
+    result = (await response.json()) as GitHubGraphQlResponse;
+  } catch (error) {
+    throw new GitHubApiError(response.status, 'graphql', 'GitHub returned an invalid response.');
+  }
+
+  if (!response.ok) {
+    throw createGitHubApiErrorFromResponse(response.status, result.errors);
+  }
+
+  if (result.errors?.length) {
+    throw createGitHubGraphQlError(result.errors);
+  }
+
+  if (!result.data) {
+    throw new GitHubApiError(response.status, 'graphql', 'GitHub returned an empty response.');
+  }
+
+  return result.data as TData;
+}
+
 function mergePullRequests(items: GitHubPullRequestItem[]) {
   const deduped = new Map<string, GitHubPullRequestItem>();
   for (const item of items) {
@@ -334,8 +482,8 @@ function mergePullRequests(items: GitHubPullRequestItem[]) {
 }
 
 function mergePullRequestSeeds(
-  myItems: GitHubSearchResponse['items'],
-  reviewItems: GitHubSearchResponse['items']
+  myItems: GitHubPullRequestItem[],
+  reviewItems: GitHubPullRequestItem[]
 ) {
   return mergePullRequests([
     ...myItems.map((item) => mapPullRequestSeed(item, 'authored')),
@@ -344,37 +492,69 @@ function mergePullRequestSeeds(
 }
 
 function mapPullRequestSeed(
-  item: GitHubSearchResponse['items'][number],
+  item: GitHubPullRequestItem,
   source: GitHubPullRequestItem['source']
 ): GitHubPullRequestItem {
-  const { owner, repo } = parseRepository(item.repository_url);
-
   return {
-    id: item.id,
-    title: item.title,
-    repositoryName: `${owner}/${repo}`,
-    owner,
-    repo,
-    pullNumber: item.number,
-    headSha: '',
-    updatedAt: item.updated_at,
-    url: item.html_url,
-    source,
-    reviewStatus: 'waiting-review',
-    ciStatus: 'unknown',
-    detailsLoaded: false
+    ...item,
+    source
   };
 }
 
-export async function enrichGitHubPullRequests(
-  pullRequests: GitHubPullRequestItem[],
-  token: string
-) {
-  return runWithConcurrency(
-    pullRequests,
-    STATUS_CONCURRENCY,
-    async (pullRequest) => enrichPullRequest(pullRequest, token)
+async function getDashboardPullRequests(username: string, token: string): Promise<{
+  authored: GitHubSearchResponse;
+  reviewRequested: GitHubSearchResponse;
+}> {
+  const data = await fetchGitHubGraphQL<GitHubGraphQlResponse['data']>(
+    GITHUB_PULL_REQUESTS_QUERY,
+    {
+      authoredQuery: `is:pr is:open author:${username}`,
+      reviewRequestedQuery: `is:pr is:open review-requested:${username}`,
+      first: GRAPHQL_PULL_REQUEST_PAGE_SIZE
+    },
+    token
   );
+
+  const authored = data?.authoredPullRequests;
+  const reviewRequested = data?.reviewRequestedPullRequests;
+
+  return {
+    authored: {
+      items: (authored?.nodes ?? []).map((node) => mapGraphQlPullRequest(node, 'authored')),
+      total_count: authored?.issueCount ?? 0
+    },
+    reviewRequested: {
+      items: (reviewRequested?.nodes ?? []).map((node) =>
+        mapGraphQlPullRequest(node, 'review-requested')
+      ),
+      total_count: reviewRequested?.issueCount ?? 0
+    }
+  };
+}
+
+function mapGraphQlPullRequest(
+  pullRequest: GitHubGraphQlPullRequestNode,
+  source: GitHubPullRequestItem['source']
+): GitHubPullRequestItem {
+  const owner = pullRequest.repository.owner.login;
+  const repo = pullRequest.repository.name;
+
+  return {
+    id: getPullRequestStableId(owner, repo, pullRequest.number),
+    title: pullRequest.title,
+    repositoryName: `${owner}/${repo}`,
+    owner,
+    repo,
+    pullNumber: pullRequest.number,
+    authorLogin: pullRequest.author?.login ?? '',
+    isDraft: pullRequest.isDraft,
+    updatedAt: pullRequest.updatedAt,
+    url: pullRequest.url,
+    source,
+    reviewStatus: getReviewStatusFromDecision(pullRequest.isDraft, pullRequest.reviewDecision),
+    ciStatus: 'unknown',
+    detailsLoaded: true
+  };
 }
 
 export async function getGitHubPullRequestState(options: {
@@ -395,47 +575,6 @@ export async function getGitHubPullRequestState(options: {
   }
 
   return detail.state === 'open' ? 'open' : 'closed';
-}
-
-async function enrichPullRequest(
-  pullRequest: GitHubPullRequestItem,
-  token: string
-): Promise<GitHubPullRequestItem> {
-  try {
-    const detail = await getPullRequestDetail(
-      pullRequest.owner,
-      pullRequest.repo,
-      pullRequest.pullNumber,
-      token
-    );
-
-    const owner = detail.base.repo.owner.login;
-    const repo = detail.base.repo.name;
-    const headSha = detail.head.sha;
-
-    const [reviews, checkRuns] = await Promise.all([
-      getPullRequestReviews(owner, repo, pullRequest.pullNumber, token).catch(() => []),
-      getCommitCheckRuns(owner, repo, headSha, token).catch(() => [])
-    ]);
-
-    return {
-      ...pullRequest,
-      owner,
-      repo,
-      repositoryName: `${owner}/${repo}`,
-      headSha,
-      reviewStatus: getReviewStatus(reviews),
-      ciStatus: getCiStatus(checkRuns),
-      detailsLoaded: true
-    };
-  } catch {
-    return {
-      ...pullRequest,
-      reviewStatus: 'waiting-review',
-      ciStatus: 'unknown',
-      detailsLoaded: true
-    };
-  }
 }
 
 async function getPullRequestDetail(
@@ -473,7 +612,7 @@ async function getCommitCheckRuns(owner: string, repo: string, headSha: string, 
   return result.check_runs ?? [];
 }
 
-function getReviewStatus(reviews: GitHubReview[]): GitHubPullRequestItem['reviewStatus'] {
+function getReviewStatus(reviews: GitHubReview[]): Exclude<GitHubPullRequestItem['reviewStatus'], 'draft' | 'open'> {
   if (reviews.length === 0) {
     return 'waiting-review';
   }
@@ -499,6 +638,29 @@ function getReviewStatus(reviews: GitHubReview[]): GitHubPullRequestItem['review
   }
 
   return 'waiting-review';
+}
+
+function getReviewStatusFromDecision(
+  isDraft: boolean,
+  reviewDecision: GitHubGraphQlPullRequestNode['reviewDecision']
+): GitHubPullRequestItem['reviewStatus'] {
+  if (isDraft) {
+    return 'draft';
+  }
+
+  if (reviewDecision === 'APPROVED') {
+    return 'approved';
+  }
+
+  if (reviewDecision === 'CHANGES_REQUESTED') {
+    return 'changes-requested';
+  }
+
+  if (reviewDecision === 'REVIEW_REQUIRED') {
+    return 'waiting-review';
+  }
+
+  return 'open';
 }
 
 function getCiStatus(
@@ -535,20 +697,17 @@ function getCiStatus(
   return 'unknown';
 }
 
-function parseRepository(repositoryUrl: string) {
-  const normalized = repositoryUrl.replace('https://api.github.com/repos/', '');
-  const [owner, repo] = normalized.split('/');
-  return { owner, repo };
-}
-
-async function getCachedGitHubDashboardData(cacheToken: string) {
+async function getCachedGitHubDashboardData(
+  cacheToken: string,
+  options: { ignoreExpiration?: boolean } = {}
+) {
   const cached = await readStorageValue<CachedGitHubDashboardData | null>(CACHE_KEY, null);
   if (!cached) {
     return null;
   }
 
   const isExpired = Date.now() - cached.fetchedAt > CACHE_TTL_MS;
-  if (cached.cacheToken !== cacheToken || isExpired) {
+  if (cached.cacheToken !== cacheToken || (!options.ignoreExpiration && isExpired)) {
     return null;
   }
 
@@ -600,6 +759,86 @@ function createCacheToken(username: string, token: string) {
   return `${username}:${(hash >>> 0).toString(16)}`;
 }
 
+function getPullRequestStableId(owner: string, repo: string, pullNumber: number) {
+  const input = `${owner}/${repo}#${pullNumber}`;
+  let hash = 0;
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) | 0;
+  }
+
+  return Math.abs(hash);
+}
+
+function createGitHubApiErrorFromResponse(
+  status: number,
+  errors?: GitHubGraphQlResponse['errors']
+) {
+  if (status === 401) {
+    return new GitHubApiError(status, 'invalid-token', 'GitHub rejected the saved token.');
+  }
+
+  if (status === 403) {
+    return new GitHubApiError(status, 'rate-limit', 'GitHub rate limit reached. Try again soon.');
+  }
+
+  const message = errors?.[0]?.message ?? `GitHub API error: ${status}`;
+  return new GitHubApiError(status, 'graphql', message);
+}
+
+function createGitHubGraphQlError(errors: NonNullable<GitHubGraphQlResponse['errors']>) {
+  const invalidToken = errors.some((error) =>
+    error.type === 'FORBIDDEN' && /resource not accessible|bad credentials/i.test(error.message)
+  );
+  if (invalidToken) {
+    return new GitHubApiError(401, 'invalid-token', 'GitHub rejected the saved token.');
+  }
+
+  const rateLimit = errors.some((error) => /rate limit/i.test(error.message));
+  if (rateLimit) {
+    return new GitHubApiError(403, 'rate-limit', 'GitHub rate limit reached. Try again soon.');
+  }
+
+  return new GitHubApiError(200, 'graphql', errors.map((error) => error.message).join(' '));
+}
+
+function mapGitHubDashboardError(error: unknown): GitHubDashboardData {
+  if (error instanceof GitHubApiError) {
+    if (error.kind === 'invalid-token') {
+      return {
+        ...getEmptyGitHubDashboardData('invalid'),
+        errorMessage: 'GitHub rejected the saved token.'
+      };
+    }
+
+    if (error.kind === 'rate-limit') {
+      return {
+        ...getEmptyGitHubDashboardData('error'),
+        errorMessage: 'GitHub rate limit reached. Try again soon.'
+      };
+    }
+
+    if (error.kind === 'graphql') {
+      return {
+        ...getEmptyGitHubDashboardData('error'),
+        errorMessage: error.message || 'GitHub returned a GraphQL error.'
+      };
+    }
+
+    if (error.kind === 'network') {
+      return {
+        ...getEmptyGitHubDashboardData('error'),
+        errorMessage: 'GitHub could not be reached right now.'
+      };
+    }
+  }
+
+  return {
+    ...getEmptyGitHubDashboardData('error'),
+    errorMessage: 'GitHub data could not be loaded right now.'
+  };
+}
+
 function getChangedNotificationIds(
   previousSignals: GitHubPullRequestNotificationSignal[],
   nextSignals: GitHubPullRequestNotificationSignal[]
@@ -614,26 +853,6 @@ function getChangedNotificationIds(
   }
 
   return changedIds;
-}
-
-async function runWithConcurrency<TInput, TResult>(
-  items: TInput[],
-  concurrency: number,
-  mapper: (item: TInput) => Promise<TResult>
-) {
-  const results: TResult[] = new Array(items.length);
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < items.length) {
-      const currentIndex = cursor;
-      cursor += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
-  return results;
 }
 
 function hasChromeStorage() {
@@ -669,9 +888,16 @@ async function writeStorageValue(key: string, value: unknown) {
 
 class GitHubApiError extends Error {
   status: number;
+  kind: 'invalid-token' | 'rate-limit' | 'graphql' | 'network' | 'http';
 
-  constructor(status: number) {
-    super(`GitHub API error: ${status}`);
+  constructor(
+    status: number,
+    kind: 'invalid-token' | 'rate-limit' | 'graphql' | 'network' | 'http' = 'http',
+    message = `GitHub API error: ${status}`
+  ) {
+    super(message);
     this.status = status;
+    this.kind = kind;
+    this.name = 'GitHubApiError';
   }
 }
