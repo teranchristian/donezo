@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard } from '../components/GitHubCard';
 import { HeaderMenu } from '../components/HeaderMenu';
@@ -34,6 +35,8 @@ export function DashboardPage({
   isJiraLoading,
   onRefreshJira
 }: DashboardPageProps) {
+  const [activeIntegration, setActiveIntegration] = useState<'github' | 'jira'>('github');
+
   return (
     <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
@@ -46,23 +49,6 @@ export function DashboardPage({
           <section className="flex flex-col gap-6">
             <SummaryCard summary={gitHubSummary} />
             <NotesCard />
-          </section>
-
-          <section className="flex min-h-0">
-            <GitHubCard
-              data={gitHubData}
-              username={settings.integrations.github.username}
-              token={settings.integrations.github.token}
-              isLoading={isGitHubLoading}
-              isCheckingActivity={isCheckingGitHubActivity}
-              lastActivityCheckAt={lastGitHubActivityCheckAt}
-              onRefresh={onRefreshGitHub}
-            />
-          </section>
-        </section>
-
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-          <section className="flex flex-col gap-6">
             <PlaceholderCard
               title="Calendar"
               subtitle="Placeholder"
@@ -77,16 +63,67 @@ export function DashboardPage({
             />
           </section>
 
-          <section className="flex min-h-0">
-            <JiraCard
-              baseUrl={settings.integrations.jira.baseUrl}
-              data={jiraData}
-              isLoading={isJiraLoading}
-              onRefresh={onRefreshJira}
-            />
+          <section className="flex min-h-0 flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-white/5 bg-panel/95 p-3 shadow-panel backdrop-blur-sm">
+              <IntegrationTabButton
+                label="GitHub"
+                isActive={activeIntegration === 'github'}
+                onClick={() => setActiveIntegration('github')}
+              />
+              <IntegrationTabButton
+                label="Jira"
+                isActive={activeIntegration === 'jira'}
+                onClick={() => setActiveIntegration('jira')}
+              />
+            </div>
+
+            <div className="flex min-h-0 flex-1">
+              {activeIntegration === 'github' ? (
+                <GitHubCard
+                  data={gitHubData}
+                  username={settings.integrations.github.username}
+                  token={settings.integrations.github.token}
+                  isLoading={isGitHubLoading}
+                  isCheckingActivity={isCheckingGitHubActivity}
+                  lastActivityCheckAt={lastGitHubActivityCheckAt}
+                  onRefresh={onRefreshGitHub}
+                />
+              ) : (
+                <JiraCard
+                  baseUrl={settings.integrations.jira.baseUrl}
+                  data={jiraData}
+                  isLoading={isJiraLoading}
+                  onRefresh={onRefreshJira}
+                />
+              )}
+            </div>
           </section>
         </section>
       </div>
     </main>
+  );
+}
+
+function IntegrationTabButton({
+  label,
+  isActive,
+  onClick
+}: {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-4 py-2 text-sm transition ${
+        isActive
+          ? 'border-white/20 bg-white/10 text-stone-100'
+          : 'border-white/8 bg-black/10 text-stone-400 hover:border-white/15 hover:bg-black/20 hover:text-stone-200'
+      }`}
+    >
+      {label}
+    </button>
   );
 }
