@@ -63,7 +63,7 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh }: JiraCardProps)
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col rounded-[22px] border border-white/5 bg-panelAlt/80 p-5 shadow-glow">
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-col gap-3 border-b border-white/5 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-stone-100">Jira</p>
