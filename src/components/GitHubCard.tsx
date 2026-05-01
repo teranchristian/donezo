@@ -124,7 +124,9 @@ export function GitHubCard({
   const filteredNotificationCount = filterGitHubItems(notificationItems, organizationFilter).length;
   const filteredMyOpenPrCount = filteredMyOpenPRs.length;
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
-  const filteredApprovedPrCount = filteredMyOpenPRs.filter(
+  const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
+  const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
+  const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
     (pullRequest) => pullRequest.reviewStatus === 'approved'
   ).length;
   const currentView = getGitHubViewContent(
@@ -304,16 +306,16 @@ export function GitHubCard({
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
-      reviewRequestedCount: filteredReviewRequestedCount,
-      approvedPrCount: filteredApprovedPrCount,
-      relevantPrCount: filteredMyOpenPrCount + filteredReviewRequestedCount
+      reviewRequestedCount: summaryReviewRequestedCount,
+      approvedPrCount: summaryApprovedPrCount,
+      relevantPrCount: summaryMyOpenPrCount + summaryReviewRequestedCount
     });
   }, [
     data.connectionStatus,
     data.missingUsername,
-    filteredApprovedPrCount,
-    filteredMyOpenPrCount,
-    filteredReviewRequestedCount,
+    summaryApprovedPrCount,
+    summaryMyOpenPrCount,
+    summaryReviewRequestedCount,
     onSummaryMetricsChange
   ]);
 
