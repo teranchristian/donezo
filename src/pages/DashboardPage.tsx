@@ -270,7 +270,7 @@ export function DashboardPage({
           <HeaderMenu />
         </div>
 
-        <section>
+        <section className="main-content">
           <div className="top-cards">
             {dashboardAlerts.map((alert) => (
               <DashboardAlert key={alert.title} alert={alert} />
