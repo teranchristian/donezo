@@ -11,6 +11,10 @@ export type JiraIssue = {
   key: string;
   summary: string;
   updated: string;
+  project?: {
+    key?: string;
+    name?: string;
+  };
   blockingCount: number;
   blockingIssues: JiraLinkedIssue[];
   blockedByIssues: JiraLinkedIssue[];
@@ -76,6 +80,10 @@ type JiraIssueLike = JiraIssue & {
       };
     };
     priority?: {
+      name?: string;
+    };
+    project?: {
+      key?: string;
       name?: string;
     };
     issuelinks?: Array<{
@@ -304,6 +312,7 @@ function normalizeJiraIssue(issue: JiraIssueLike): JiraIssue {
     key: String(issue?.key ?? ''),
     summary: String(issue?.summary ?? issue?.fields?.summary ?? ''),
     updated: String(issue?.updated ?? issue?.fields?.updated ?? ''),
+    project: issue?.project ?? issue?.fields?.project,
     blockingCount: blockingIssues.length,
     blockingIssues,
     blockedByIssues,

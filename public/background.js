@@ -1,4 +1,4 @@
-const JIRA_ISSUES_CACHE_KEY = 'jira-issues-cache-v3';
+const JIRA_ISSUES_CACHE_KEY = 'jira-issues-cache-v4';
 const JIRA_CACHE_TTL_MS = 5 * 60 * 1000;
 const JIRA_ACTIVE_ISSUES_JQL =
   'assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC';
@@ -61,6 +61,12 @@ function normalizeJiraIssue(issue) {
     key: String(issue?.key ?? ''),
     summary: String(issue?.fields?.summary ?? ''),
     updated: String(issue?.fields?.updated ?? ''),
+    project: issue?.fields?.project
+      ? {
+          key: issue.fields.project.key,
+          name: issue.fields.project.name
+        }
+      : undefined,
     blockingCount: blockingIssues.length,
     blockingIssues,
     blockedByIssues,
@@ -343,7 +349,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         },
         body: JSON.stringify({
           jql: JIRA_ACTIVE_ISSUES_JQL,
-          fields: ['summary', 'status', 'priority', 'updated', 'issuelinks'],
+          fields: ['summary', 'status', 'priority', 'updated', 'issuelinks', 'project'],
           maxResults: 50
         })
       });

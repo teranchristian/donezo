@@ -167,51 +167,66 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
   const blockingIssues = issue.blockingIssues;
   const blockedByIssues = issue.blockedByIssues;
   const issueUrl = getJiraBrowseUrl(baseUrl, issue.key);
+  const projectName = issue.project?.name || issue.project?.key || '';
 
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 shadow-[var(--shadow-card-soft)]">
-      <a href={issueUrl} target="_blank" rel="noreferrer" className="block">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-2">
-                <p className="line-clamp-2 min-w-0 text-sm font-medium text-primary">
-                  <span className="mr-2 text-xs uppercase tracking-[0.16em] text-[var(--text-tertiary)]">{issue.key}</span>
-                  {issue.summary}
-                </p>
-                <PriorityIcon priorityName={issue.priority?.name} />
-              </div>
-
-              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                <StatusBadge label={issue.status.name} />
-              </div>
+    <div className="relative rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 shadow-[var(--shadow-card-soft)]">
+      <a
+        href={issueUrl}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`Open Jira issue ${issue.key}`}
+        className="absolute inset-0 rounded-[14px]"
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-2">
+              <p className="line-clamp-2 min-w-0 text-sm font-medium text-primary">
+                <span className="mr-2 text-xs uppercase tracking-[0.16em] text-[var(--text-tertiary)]">{issue.key}</span>
+                {issue.summary}
+              </p>
+              <PriorityIcon priorityName={issue.priority?.name} />
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-secondary">
-              <span>
-                updated {formatRelativeTime(issue.updated)} • {issue.status.name}
-              </span>
-              {blockingIssues.map((blockingIssue) => (
-                <span
-                  key={blockingIssue.key}
-                  className="rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-amber-100"
-                >
-                  Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
-                </span>
-              ))}
-
-              {blockedByIssues.map((blockedByIssue) => (
-                <span
-                  key={blockedByIssue.key}
-                  className="rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-rose-100"
-                >
-                  Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
-                </span>
-              ))}
+            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+              <StatusBadge label={issue.status.name} />
             </div>
           </div>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-secondary">
+            <span className="flex min-w-0 flex-wrap items-center gap-2">
+              {projectName ? (
+                <span className="max-w-[14rem] truncate" title={projectName}>
+                  {projectName}
+                </span>
+              ) : null}
+              <span>
+                {projectName ? '• ' : ''}
+                updated {formatRelativeTime(issue.updated)} • {issue.status.name}
+              </span>
+            </span>
+
+            {blockingIssues.map((blockingIssue) => (
+              <span
+                key={blockingIssue.key}
+                className="rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-amber-100"
+              >
+                Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
+              </span>
+            ))}
+
+            {blockedByIssues.map((blockedByIssue) => (
+              <span
+                key={blockedByIssue.key}
+                className="rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-rose-100"
+              >
+                Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
+              </span>
+            ))}
+          </div>
         </div>
-      </a>
+      </div>
     </div>
   );
 }
