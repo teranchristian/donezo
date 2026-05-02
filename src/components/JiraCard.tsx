@@ -14,7 +14,7 @@ import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 
 type JiraCardProps = {
-  integrationSwitcher?: ReactNode;
+  topBar?: ReactNode;
   baseUrl: string;
   data: JiraDashboardData;
   isLoading: boolean;
@@ -52,7 +52,7 @@ const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; m
 };
 
 export function JiraCard({
-  integrationSwitcher,
+  topBar,
   baseUrl,
   data,
   isLoading,
@@ -112,40 +112,13 @@ export function JiraCard({
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col">
-        {integrationSwitcher ? (
+        {topBar ? (
           <div className="-mx-5 -mt-4 mb-5 border-b border-white/[0.04] px-5 py-4">
-            {integrationSwitcher}
+            {topBar}
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">Jira</p>
-            <p className="mt-1 break-all text-sm text-secondary">{formatWorkspaceLabel(baseUrl)}</p>
-          </div>
-
-          <div className="flex flex-col items-start sm:items-end">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
-                {copy.label}
-              </span>
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={isLoading || data.connectionStatus === 'not-connected'}
-                className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isLoading ? 'Refreshing...' : 'Refresh'}
-              </button>
-            </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)] sm:justify-end">
-              <span>Last updated {formatCompactTime(data.lastUpdatedAt)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-4 min-w-0">
             <CardTabMenu items={tabItems} />
           </div>
@@ -405,29 +378,6 @@ function ListItemSkeleton() {
 
 function formatCount(value: number, isLoading: boolean) {
   return isLoading ? '...' : value.toString();
-}
-
-function formatCompactTime(value: number | null) {
-  if (!value) {
-    return 'Never';
-  }
-
-  return new Date(value).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit'
-  });
-}
-
-function formatWorkspaceLabel(baseUrl: string) {
-  if (!baseUrl) {
-    return 'Workspace not set';
-  }
-
-  try {
-    return new URL(baseUrl).host;
-  } catch {
-    return baseUrl.replace(/^https?:\/\//, '');
-  }
 }
 
 function isInProgressIssue(issue: JiraIssue) {

@@ -21,7 +21,7 @@ import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 
 type GitHubCardProps = {
-  integrationSwitcher?: ReactNode;
+  topBar?: ReactNode;
   data: GitHubDashboardData;
   username: string;
   token: string;
@@ -73,7 +73,7 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
 };
 
 export function GitHubCard({
-  integrationSwitcher,
+  topBar,
   data,
   username,
   token,
@@ -90,7 +90,6 @@ export function GitHubCard({
   const filterControlClass =
     'flex h-10 min-w-0 items-center gap-1.5 rounded-[8px] border border-white/[0.07] bg-[#121820] px-3 text-sm text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]';
   const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-sm text-primary outline-none';
-  const copy = STATUS_COPY[data.connectionStatus];
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
@@ -297,43 +296,13 @@ export function GitHubCard({
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-[720px] flex-1 flex-col">
-        {integrationSwitcher ? (
+        {topBar ? (
           <div className="-mx-5 -mt-4 mb-5 border-b border-white/[0.04] px-5 py-4">
-            {integrationSwitcher}
+            {topBar}
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">GitHub</p>
-            <p className="mt-1 truncate text-sm text-secondary">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
-          </div>
-
-          <div className="flex flex-col items-start sm:items-end">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
-                {copy.label}
-              </span>
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={isLoading}
-                className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isLoading ? 'Refreshing...' : 'Refresh'}
-              </button>
-            </div>
-
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)] sm:justify-end">
-              <span>Updated {formatCompactTime(data.lastUpdatedAt)}</span>
-              <span>·</span>
-              <span>Checked {formatCompactTime(lastActivityCheckAt)}</span>
-              {isCheckingActivity ? <span className="text-secondary">· Checking…</span> : null}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-4 flex min-w-0 items-end justify-between gap-3 overflow-hidden border-b border-white/[0.05]">
             <div className="min-w-0 flex-1">
               <CardTabMenu items={tabItems} className="border-b-0 pb-0.5" />
@@ -853,14 +822,6 @@ function formatCount(value: number, isLoading: boolean) {
   }
 
   return String(value);
-}
-
-function formatCompactTime(value: number | null) {
-  if (!value) {
-    return 'Never';
-  }
-
-  return formatRelativeTime(new Date(value).toISOString());
 }
 
 function formatReason(reason: string) {

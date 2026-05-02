@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard';
 import { HeaderMenu } from '../components/HeaderMenu';
@@ -7,7 +7,7 @@ import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard, type SummaryContent } from '../components/SummaryCard';
 import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
-import { getJiraIssueCounts, JiraDashboardData } from '../lib/jiraApi';
+import { getJiraIssueCounts, JiraConnectionStatus, JiraDashboardData } from '../lib/jiraApi';
 import {
   buildDashboardHashNavigation,
   parseDashboardHashNavigation
@@ -276,6 +276,30 @@ export function DashboardPage({
       />
     </div>
   );
+  const integrationStatusBar =
+    activeIntegration === 'github' ? (
+      <GitHubIntegrationStatusBar
+        connectionStatus={gitHubData.connectionStatus}
+        isLoading={isGitHubLoading}
+        isCheckingActivity={isCheckingGitHubActivity}
+        lastUpdatedAt={gitHubData.lastUpdatedAt}
+        lastCheckedAt={lastGitHubActivityCheckAt}
+        onRefresh={onRefreshGitHub}
+      />
+    ) : (
+      <JiraIntegrationStatusBar
+        connectionStatus={jiraData.connectionStatus}
+        isLoading={isJiraLoading}
+        lastUpdatedAt={jiraData.lastUpdatedAt}
+        onRefresh={onRefreshJira}
+      />
+    );
+  const integrationTopBar = (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      {integrationSwitcher}
+      {integrationStatusBar}
+    </div>
+  );
 
   const [primaryAlert, ...secondaryAlerts] = dashboardAlerts;
 
@@ -327,7 +351,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'github'}
                 >
                   <GitHubCard
-                    integrationSwitcher={integrationSwitcher}
+                    topBar={integrationTopBar}
                     data={gitHubData}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
@@ -347,7 +371,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'jira'}
                 >
                   <JiraCard
-                    integrationSwitcher={integrationSwitcher}
+                    topBar={integrationTopBar}
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
                     isLoading={isJiraLoading}
@@ -613,4 +637,151 @@ function IntegrationTabButton({
       {label}
     </button>
   );
+}
+
+function GitHubIntegrationStatusBar({
+  connectionStatus,
+  isLoading,
+  isCheckingActivity,
+  lastUpdatedAt,
+  lastCheckedAt,
+  onRefresh
+}: {
+  connectionStatus: GitHubConnectionStatus;
+  isLoading: boolean;
+  isCheckingActivity: boolean;
+  lastUpdatedAt: number | null;
+  lastCheckedAt: number | null;
+  onRefresh: () => void;
+}) {
+  const toneClass =
+    connectionStatus === 'connected'
+      ? 'bg-emerald-200/10 text-emerald-100'
+      : connectionStatus === 'invalid'
+        ? 'bg-rose-200/10 text-rose-100'
+        : connectionStatus === 'testing' || connectionStatus === 'error'
+          ? 'bg-amber-200/10 text-amber-100'
+          : 'bg-white/6 text-stone-300';
+  const label =
+    connectionStatus === 'connected'
+      ? 'Connected'
+      : connectionStatus === 'invalid'
+        ? 'Invalid token'
+        : connectionStatus === 'testing'
+          ? 'Testing'
+          : connectionStatus === 'error'
+            ? 'Connection error'
+            : 'Not connected';
+
+  return (
+    <div className="ml-auto flex flex-col items-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <TopBarBadge className={toneClass}>{label}</TopBarBadge>
+        <TopBarButton onClick={onRefresh} disabled={isLoading}>
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </TopBarButton>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+        <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
+        <span>·</span>
+        <span>
+          Checked {formatDashboardTime(lastCheckedAt)}
+          {isCheckingActivity ? ' · Checking…' : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function JiraIntegrationStatusBar({
+  connectionStatus,
+  isLoading,
+  lastUpdatedAt,
+  onRefresh
+}: {
+  connectionStatus: JiraConnectionStatus;
+  isLoading: boolean;
+  lastUpdatedAt: number | null;
+  onRefresh: () => void;
+}) {
+  const toneClass =
+    connectionStatus === 'connected'
+      ? 'bg-emerald-200/10 text-emerald-100'
+      : connectionStatus === 'invalid'
+        ? 'bg-rose-200/10 text-rose-100'
+        : connectionStatus === 'testing' || connectionStatus === 'error'
+          ? 'bg-amber-200/10 text-amber-100'
+          : 'bg-white/6 text-stone-300';
+  const label =
+    connectionStatus === 'connected'
+      ? 'Connected'
+      : connectionStatus === 'invalid'
+        ? 'Invalid credentials'
+        : connectionStatus === 'testing'
+          ? 'Testing'
+          : connectionStatus === 'error'
+            ? 'API error'
+            : 'Not connected';
+
+  return (
+    <div className="ml-auto flex flex-col items-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <TopBarBadge className={toneClass}>{label}</TopBarBadge>
+        <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus === 'not-connected'}>
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </TopBarButton>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+        <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
+      </div>
+    </div>
+  );
+}
+
+function TopBarBadge({
+  children,
+  className
+}: {
+  children: ReactNode;
+  className: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function TopBarButton({
+  children,
+  disabled,
+  onClick
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+function formatDashboardTime(value: number | null) {
+  if (!value) {
+    return 'Never';
+  }
+
+  return new Date(value).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
 }
