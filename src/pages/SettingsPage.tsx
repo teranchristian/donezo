@@ -97,12 +97,12 @@ export function SettingsPage({
   }
 
   return (
-    <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
+    <main className="min-h-screen px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
       <div className="mx-auto flex max-w-5xl flex-col gap-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[0.7rem] uppercase tracking-[0.28em] text-textSoft">Settings</p>
-            <h1 className="mt-2 font-display text-4xl tracking-tight text-stone-100 sm:text-5xl">
+            <h1 className="mt-2 text-[2rem] font-semibold tracking-[-0.04em] text-primary sm:text-[2.35rem]">
               Dashboard preferences
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-400">

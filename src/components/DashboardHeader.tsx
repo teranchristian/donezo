@@ -7,7 +7,7 @@ type DashboardHeaderProps = {
 export function DashboardHeader({ name: _name }: DashboardHeaderProps) {
   return (
     <header>
-      <p className="font-display text-4xl tracking-tight text-stone-100 sm:text-5xl">
+      <p className="text-[2rem] font-semibold tracking-[-0.04em] text-primary sm:text-[2.35rem]">
         {getGreeting()},
       </p>
     </header>

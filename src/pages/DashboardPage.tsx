@@ -263,7 +263,7 @@ export function DashboardPage({
   }
 
   return (
-    <main className="min-h-screen bg-page-glow py-6 text-stone-100 sm:py-8">
+    <main className="min-h-screen py-6 text-stone-100 sm:py-8">
       <div className="dashboard-container flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <DashboardHeader name={settings.name} />

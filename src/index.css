@@ -10,18 +10,16 @@
   --radius-card: 16px;
   --radius-control: 999px;
   --container-width: 1600px;
-  --card-bg: rgba(255, 255, 255, 0.03);
-  --card-bg-strong: rgba(255, 255, 255, 0.045);
-  --card-bg-soft: rgba(255, 255, 255, 0.02);
+  --card-bg: rgba(255, 255, 255, 0.028);
+  --card-bg-strong: rgba(255, 255, 255, 0.04);
+  --card-bg-soft: rgba(255, 255, 255, 0.018);
+  --card-blur: 10px;
   --text-primary: rgba(255, 255, 255, 0.92);
   --text-secondary: rgba(255, 255, 255, 0.62);
   --text-tertiary: rgba(255, 255, 255, 0.42);
   --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.25);
   color: #f3f0ea;
-  background:
-    radial-gradient(circle at top left, rgba(214, 195, 161, 0.12), transparent 28%),
-    radial-gradient(circle at right top, rgba(109, 121, 140, 0.12), transparent 25%),
-    #0b0b0f;
+  background-color: #0b0f14;
   font-family: 'SF Pro Display', 'SF Pro Text', ui-sans-serif, system-ui, sans-serif;
   color-scheme: dark;
 }
@@ -39,7 +37,43 @@ body,
 body {
   margin: 0;
   min-height: 100vh;
-  color: #f3f0ea;
+  color: var(--text-primary);
+  background-color: #0b0f14;
+  font-size: 15px;
+  transition: background 0.3s ease;
+}
+
+#root {
+  position: relative;
+}
+
+.app-background {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  background:
+    radial-gradient(1200px at 18% 0%, rgba(88, 101, 242, 0.09), transparent 58%),
+    radial-gradient(1000px at 82% 0%, rgba(34, 197, 94, 0.045), transparent 60%),
+    linear-gradient(180deg, #0d1117 0%, #0b0f14 100%);
+  background-color: #0b0f14;
+}
+
+.app-background::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Fg id='n' fill='white' fill-opacity='1'%3E%3Ccircle cx='8' cy='11' r='1'/%3E%3Ccircle cx='42' cy='26' r='1'/%3E%3Ccircle cx='76' cy='18' r='1'/%3E%3Ccircle cx='124' cy='34' r='1'/%3E%3Ccircle cx='22' cy='58' r='1'/%3E%3Ccircle cx='63' cy='72' r='1'/%3E%3Ccircle cx='108' cy='64' r='1'/%3E%3Ccircle cx='17' cy='104' r='1'/%3E%3Ccircle cx='57' cy='116' r='1'/%3E%3Ccircle cx='95' cy='102' r='1'/%3E%3Ccircle cx='130' cy='118' r='1'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 140px 140px;
+  background-repeat: repeat;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
 }
 
 .dashboard-container {

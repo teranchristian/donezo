@@ -345,27 +345,29 @@ export default function App() {
   );
 
   return (
-    <Routes>
-      <Route path="/" element={dashboardElement} />
-      <Route path="/github" element={dashboardElement} />
-      <Route path="/jira" element={dashboardElement} />
-      <Route
-        path="/settings"
-        element={
-          <SettingsPage
-            settings={settings}
-            onSave={handleSaveSettings}
-            onTestGitHubConnection={handleTestGitHubConnection}
-            onTestJiraConnection={handleTestJiraConnection}
-            gitHubTestStatus={gitHubSettingsTestStatus}
-            jiraTestStatus={jiraSettingsTestStatus}
-            jiraErrorMessage={jiraErrorMessage}
-            isTestingGitHub={isTestingGitHubSettings}
-            isTestingJira={isTestingJiraSettings}
-          />
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <div className="app-background">
+      <Routes>
+        <Route path="/" element={dashboardElement} />
+        <Route path="/github" element={dashboardElement} />
+        <Route path="/jira" element={dashboardElement} />
+        <Route
+          path="/settings"
+          element={
+            <SettingsPage
+              settings={settings}
+              onSave={handleSaveSettings}
+              onTestGitHubConnection={handleTestGitHubConnection}
+              onTestJiraConnection={handleTestJiraConnection}
+              gitHubTestStatus={gitHubSettingsTestStatus}
+              jiraTestStatus={jiraSettingsTestStatus}
+              jiraErrorMessage={jiraErrorMessage}
+              isTestingGitHub={isTestingGitHubSettings}
+              isTestingJira={isTestingJiraSettings}
+            />
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
   );
 }
