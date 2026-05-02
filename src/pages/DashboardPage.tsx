@@ -1,7 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard';
-import { HeaderMenu } from '../components/HeaderMenu';
 import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
@@ -183,6 +182,9 @@ export function DashboardPage({
     jiraCounts,
     isGitHubLoading,
     isJiraLoading,
+    onOpenGitHubPrs: () => {
+      navigateToGitHubPrs('all');
+    },
     onOpenReviewRequestedPrs: () => {
       handleGitHubViewChange('review');
     },
@@ -294,40 +296,26 @@ export function DashboardPage({
         onRefresh={onRefreshJira}
       />
     );
-  const integrationTopBar = (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      {integrationSwitcher}
-      {integrationStatusBar}
-    </div>
-  );
-
   const [primaryAlert, ...secondaryAlerts] = dashboardAlerts;
 
   return (
     <main className="min-h-screen py-6 text-stone-100 sm:py-8">
       <div className="dashboard-container flex flex-col gap-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="dashboard-header-row">
           <DashboardHeader name={settings.name} />
-          <HeaderMenu />
+          <div className="dashboard-header-status">{integrationStatusBar}</div>
         </div>
 
-        <section className="main-content">
-          <div className="main-grid top-grid">
-            <div className="left-column">
-              {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
-            </div>
-
-            <div className="right-column">
-              <div className="right-top-cards">
-                {secondaryAlerts.map((alert) => (
-                  <DashboardAlert key={alert.title} alert={alert} />
-                ))}
-              </div>
-            </div>
+        <section className="main-content flex flex-col gap-4">
+          <div className="summary-cards-grid">
+            {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
+            {secondaryAlerts.map((alert) => (
+              <DashboardAlert key={alert.title} alert={alert} />
+            ))}
           </div>
 
-          <div className="main-grid">
-            <section className="left-column">
+          <div className="dashboard-main-grid">
+            <section className="dashboard-side-column">
               <SummaryCard summary={daySummary} />
               <NotesCard />
               <PlaceholderCard
@@ -344,14 +332,14 @@ export function DashboardPage({
               />
             </section>
 
-            <section className="right-column">
+            <section className="dashboard-panel-column">
               <div className="relative flex min-h-0">
                 <div
                   className={`min-h-0 flex-1 ${activeIntegration === 'github' ? 'flex' : 'hidden'}`}
                   aria-hidden={activeIntegration !== 'github'}
                 >
                   <GitHubCard
-                    topBar={integrationTopBar}
+                    topBar={integrationSwitcher}
                     data={gitHubData}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
@@ -371,7 +359,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'jira'}
                 >
                   <JiraCard
-                    topBar={integrationTopBar}
+                    topBar={integrationSwitcher}
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
                     isLoading={isJiraLoading}
@@ -486,9 +474,10 @@ function getDaySummary(options: {
 }
 
 type DashboardAlertItem = {
+  value: string;
   title: string;
   detail: string;
-  tone: 'amber' | 'rose' | 'emerald';
+  tone: 'amber' | 'rose' | 'emerald' | 'blue';
   onClick?: () => void;
 };
 
@@ -497,6 +486,7 @@ function getDashboardAlerts(options: {
   jiraCounts: ReturnType<typeof getJiraIssueCounts>;
   isGitHubLoading: boolean;
   isJiraLoading: boolean;
+  onOpenGitHubPrs: () => void;
   onOpenReviewRequestedPrs: () => void;
   onOpenBlockedIssues: () => void;
   onOpenApprovedPrs: () => void;
@@ -506,6 +496,7 @@ function getDashboardAlerts(options: {
     jiraCounts,
     isGitHubLoading,
     isJiraLoading,
+    onOpenGitHubPrs,
     onOpenReviewRequestedPrs,
     onOpenBlockedIssues,
     onOpenApprovedPrs
@@ -513,10 +504,11 @@ function getDashboardAlerts(options: {
 
   return [
     {
-      title:
+      value:
         isGitHubLoading || gitHubMetrics.connectionStatus !== 'connected'
-          ? 'PR review queue'
-          : `${gitHubMetrics.reviewRequestedCount} PR${gitHubMetrics.reviewRequestedCount === 1 ? '' : 's'} ready for review`,
+          ? '0'
+          : String(gitHubMetrics.reviewRequestedCount),
+      title: 'PRs ready for review',
       detail: getReviewAlertDetail(gitHubMetrics, isGitHubLoading),
       tone: 'amber',
       onClick:
@@ -525,17 +517,16 @@ function getDashboardAlerts(options: {
           : undefined
     },
     {
-      title:
-        isJiraLoading ? 'Blocked work' : `${jiraCounts.blocking} blocked item${jiraCounts.blocking === 1 ? '' : 's'}`,
+      value: isJiraLoading ? '0' : String(jiraCounts.blocking),
+      title: jiraCounts.blocking === 1 ? 'Blocked item' : 'Blocked items',
       detail: isJiraLoading ? 'Checking Jira blockers.' : 'Needs your input.',
       tone: 'rose',
       onClick: !isJiraLoading ? onOpenBlockedIssues : undefined
     },
     {
-      title:
-        isGitHubLoading || gitHubMetrics.approvedPrCount === null
-          ? 'Approved PRs'
-          : `${gitHubMetrics.approvedPrCount} PR${gitHubMetrics.approvedPrCount === 1 ? '' : 's'} approved`,
+      value:
+        isGitHubLoading || gitHubMetrics.approvedPrCount === null ? '0' : String(gitHubMetrics.approvedPrCount),
+      title: 'PRs approved',
       detail:
         gitHubMetrics.connectionStatus === 'connected'
           ? 'Ready to merge or follow through.'
@@ -545,6 +536,19 @@ function getDashboardAlerts(options: {
         gitHubMetrics.connectionStatus === 'connected' && gitHubMetrics.approvedPrCount !== null
           ? onOpenApprovedPrs
           : undefined
+    },
+    {
+      value:
+        isGitHubLoading || gitHubMetrics.connectionStatus !== 'connected'
+          ? '0'
+          : String(gitHubMetrics.relevantPrCount),
+      title: 'PRs open',
+      detail:
+        gitHubMetrics.connectionStatus === 'connected'
+          ? 'Across repositories.'
+          : 'Available once GitHub is connected.',
+      tone: 'blue',
+      onClick: gitHubMetrics.connectionStatus === 'connected' ? onOpenGitHubPrs : undefined
     }
   ];
 }
@@ -577,25 +581,37 @@ function getReviewAlertDetail(
 }
 
 function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
-  const toneClass =
+  const cardToneClass =
     alert.tone === 'amber'
-      ? 'bg-amber-300/[0.07] text-amber-50'
+      ? 'border-amber-400/10'
       : alert.tone === 'rose'
-        ? 'bg-rose-300/[0.07] text-rose-50'
-        : 'bg-emerald-300/[0.07] text-emerald-50';
-  const iconClass =
+        ? 'border-rose-400/10'
+        : alert.tone === 'emerald'
+          ? 'border-emerald-400/10'
+          : 'border-sky-400/10';
+  const iconWrapClass =
     alert.tone === 'amber'
-      ? 'bg-amber-400'
+      ? 'bg-amber-500/14 text-amber-300'
       : alert.tone === 'rose'
-        ? 'bg-rose-400'
-        : 'bg-emerald-400';
+        ? 'bg-rose-500/14 text-rose-300'
+        : alert.tone === 'emerald'
+          ? 'bg-emerald-500/14 text-emerald-300'
+          : 'bg-sky-500/14 text-sky-300';
 
   const content = (
-    <div className={`flex h-full items-start gap-3 rounded-[var(--radius-card)] px-5 py-5 shadow-[var(--shadow-card)] ${toneClass}`}>
-      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${iconClass}`} aria-hidden="true" />
+    <div
+      className={`flex h-full min-h-[160px] items-start gap-5 rounded-[18px] border bg-[rgba(255,255,255,0.028)] px-6 py-6 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)] ${cardToneClass}`}
+    >
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
+        aria-hidden="true"
+      >
+        <DashboardAlertIcon tone={alert.tone} />
+      </span>
       <div className="min-w-0">
-        <p className="text-base font-semibold leading-6 text-primary">{alert.title}</p>
-        <p className="mt-1 text-sm text-secondary">{alert.detail}</p>
+        <p className="text-[2.35rem] font-semibold leading-none tracking-[-0.04em] text-primary">{alert.value}</p>
+        <p className="mt-3 text-[1.05rem] font-semibold leading-6 text-primary">{alert.title}</p>
+        <p className="mt-2 text-sm leading-6 text-secondary">{alert.detail}</p>
       </div>
     </div>
   );
@@ -612,6 +628,51 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
     >
       {content}
     </button>
+  );
+}
+
+function DashboardAlertIcon({
+  tone
+}: {
+  tone: DashboardAlertItem['tone'];
+}) {
+  if (tone === 'amber') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (tone === 'rose') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v5" strokeLinecap="round" />
+        <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+
+  if (tone === 'emerald') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="8" />
+        <path d="m8.5 12 2.4 2.4L15.8 9.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="6.5" cy="6.5" r="1.6" />
+      <circle cx="17.5" cy="6.5" r="1.6" />
+      <circle cx="12" cy="17.5" r="1.6" />
+      <path d="M8 7.4h8" strokeLinecap="round" />
+      <path d="M7.4 8l3.5 7.2" strokeLinecap="round" />
+      <path d="M16.6 8 13 15.2" strokeLinecap="round" />
+    </svg>
   );
 }
 
