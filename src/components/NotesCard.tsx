@@ -65,12 +65,12 @@ export function NotesCard() {
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onComposerKeyDown}
           placeholder="Add a short note..."
-          className="flex-1 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-500 focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
+          className="flex-1 rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 text-sm text-primary outline-none transition placeholder:text-[var(--text-tertiary)] focus:bg-[var(--card-bg-strong)] focus:ring-1 focus:ring-white/10"
           maxLength={160}
         />
         <button
           type="submit"
-          className="rounded-2xl bg-accent px-4 py-3 text-sm font-medium text-stone-950 transition hover:brightness-105"
+          className="rounded-[14px] bg-accent px-4 py-3 text-sm font-medium text-stone-950 transition hover:-translate-y-0.5 hover:brightness-105"
         >
           Add
         </button>
@@ -78,22 +78,22 @@ export function NotesCard() {
 
       <div className="mt-6 flex flex-col gap-3">
         {isLoading ? (
-          <p className="text-sm text-stone-500">Loading notes...</p>
+          <p className="text-sm text-secondary">Loading notes...</p>
         ) : notes.length === 0 ? (
-          <div className="rounded-[22px] border border-dashed border-white/10 bg-black/10 p-5 text-sm text-stone-500">
+          <div className="rounded-[14px] bg-[var(--card-bg-soft)] p-5 text-sm text-secondary">
             No notes yet. Add one to start building your scratchpad for the day.
           </div>
         ) : (
           notes.map((note) => (
             <article
               key={note.id}
-              className="flex items-start justify-between gap-3 rounded-[22px] border border-white/5 bg-panelAlt/75 px-4 py-3"
+              className="flex items-start justify-between gap-3 rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3"
             >
-              <p className="text-sm leading-6 text-stone-200">{note.text}</p>
+              <p className="text-sm leading-6 text-primary">{note.text}</p>
               <button
                 type="button"
                 onClick={() => void handleDeleteNote(note.id)}
-                className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-400 transition hover:border-white/20 hover:text-stone-200"
+                className="shrink-0 rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary"
                 aria-label={`Delete note: ${note.text}`}
               >
                 Delete

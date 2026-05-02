@@ -46,27 +46,27 @@ export type GitHubSummaryMetrics = {
 const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string; message: string }> = {
   'not-connected': {
     label: 'Not connected',
-    tone: 'border-white/10 bg-white/5 text-stone-300',
+    tone: 'bg-white/6 text-stone-300',
     message: 'Add a personal access token in Settings to enable GitHub integration.'
   },
   testing: {
     label: 'Testing',
-    tone: 'border-amber-300/20 bg-amber-200/10 text-amber-100',
+    tone: 'bg-amber-200/10 text-amber-100',
     message: 'Checking the saved GitHub credentials.'
   },
   connected: {
     label: 'Connected',
-    tone: 'border-emerald-300/20 bg-emerald-200/10 text-emerald-100',
+    tone: 'bg-emerald-200/10 text-emerald-100',
     message: 'GitHub activity is live on the dashboard.'
   },
   invalid: {
     label: 'Invalid token',
-    tone: 'border-rose-300/20 bg-rose-200/10 text-rose-100',
+    tone: 'bg-rose-200/10 text-rose-100',
     message: 'GitHub returned 401 for the saved token. Update the token and test again.'
   },
   error: {
     label: 'Connection error',
-    tone: 'border-amber-300/20 bg-amber-200/10 text-amber-100',
+    tone: 'bg-amber-200/10 text-amber-100',
     message: 'GitHub data could not be loaded right now.'
   }
 };
@@ -268,33 +268,33 @@ export function GitHubCard({
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-[720px] flex-1 flex-col">
-        <div className="flex flex-col gap-3 border-b border-white/5 pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-stone-100">GitHub</p>
-            <p className="mt-1 truncate text-sm text-stone-400">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
-            <p className="mt-2 text-sm text-stone-500">{data.errorMessage || copy.message}</p>
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">GitHub</p>
+            <p className="mt-1 truncate text-sm text-secondary">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
+            <p className="mt-2 text-sm text-[var(--text-tertiary)]">{data.errorMessage || copy.message}</p>
           </div>
 
           <div className="flex flex-col items-start sm:items-end">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
                 {copy.label}
               </span>
               <button
                 type="button"
                 onClick={onRefresh}
                 disabled={isLoading}
-                className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-300 transition hover:border-white/20 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoading ? 'Refreshing...' : 'Refresh'}
               </button>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500 sm:justify-end">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)] sm:justify-end">
               <span>Updated {formatCompactTime(data.lastUpdatedAt)}</span>
-              <span className="text-stone-600">·</span>
+              <span>·</span>
               <span>Checked {formatCompactTime(lastActivityCheckAt)}</span>
-              {isCheckingActivity ? <span className="text-stone-400">· Checking…</span> : null}
+              {isCheckingActivity ? <span className="text-secondary">· Checking…</span> : null}
             </div>
           </div>
         </div>
@@ -325,15 +325,15 @@ export function GitHubCard({
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{currentView.title}</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-[var(--text-tertiary)]">{currentView.title}</p>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
-                <span className="shrink-0 text-stone-400">Owner:</span>
+              <label className="flex min-w-0 items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-secondary">
+                <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
                 <select
                   aria-label="Owner"
                   value={organizationFilter}
                   onChange={(event) => setOrganizationFilter(event.target.value)}
-                  className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
+                  className="min-w-0 bg-transparent pr-5 text-xs text-primary outline-none"
                 >
                   {ownerOptions.map((option) => (
                     <option key={option.value} value={option.value} className="bg-panel text-stone-100">
@@ -344,13 +344,13 @@ export function GitHubCard({
               </label>
 
               {activeView === 'prs' ? (
-                <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
-                  <span className="shrink-0 text-stone-400">Status:</span>
+                <label className="flex min-w-0 items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-secondary">
+                  <span className="shrink-0 text-[var(--text-tertiary)]">Status:</span>
                   <select
                     aria-label="PR status"
                     value={prStatusFilter}
                     onChange={(event) => onPrStatusFilterChange(event.target.value as GitHubPrStatusFilter)}
-                    className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
+                    className="min-w-0 bg-transparent pr-5 text-xs text-primary outline-none"
                   >
                     <option value="all" className="bg-panel text-stone-100">
                       All
@@ -365,13 +365,13 @@ export function GitHubCard({
                 </label>
               ) : null}
 
-              <label className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-panel px-3 py-2 text-xs text-stone-300">
-                <span className="shrink-0 text-stone-400">Sort:</span>
+              <label className="flex min-w-0 items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-secondary">
+                <span className="shrink-0 text-[var(--text-tertiary)]">Sort:</span>
                 <select
                   aria-label="Sort"
                   value={sortOrder}
                   onChange={(event) => setSortOrder(event.target.value as GitHubListSort)}
-                  className="min-w-0 bg-transparent pr-5 text-xs text-stone-100 outline-none"
+                  className="min-w-0 bg-transparent pr-5 text-xs text-primary outline-none"
                 >
                   <option value="recently-updated" className="bg-panel text-stone-100">
                     Recently updated
@@ -397,7 +397,7 @@ export function GitHubCard({
                 ))}
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-5 text-sm text-stone-500">
+              <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary">
                 {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
             ) : (
@@ -425,7 +425,7 @@ export function GitHubCard({
                 href={viewAllUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-indigo-400 transition hover:text-indigo-300"
+                className="text-sm text-secondary transition hover:text-primary"
               >
                 View all PRs →
               </a>
@@ -469,16 +469,16 @@ function PullRequestRow({
       href={pullRequest.url}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-3 transition hover:border-white/15 hover:bg-black/20"
+      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 transition hover:bg-[var(--card-bg-strong)]"
     >
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <GitHubItemIcon kind="pull-request" />
-            <p className="truncate text-sm font-medium text-stone-100">{pullRequest.title}</p>
+            <p className="truncate text-sm font-medium text-primary">{pullRequest.title}</p>
             <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <p className="mt-2 truncate text-sm text-stone-400">
+          <p className="mt-2 truncate text-sm text-secondary">
             {pullRequest.repositoryName} • opened {formatRelativeTime(pullRequest.updatedAt)}
             {pullRequest.authorLogin ? ` by ${pullRequest.authorLogin}` : ''} • {reviewStatusLabel}
           </p>
@@ -523,7 +523,7 @@ function NotificationRow({
       href={getNotificationUrl(notification)}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-3 transition hover:border-white/15 hover:bg-black/20"
+      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 transition hover:bg-[var(--card-bg-strong)]"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -533,20 +533,20 @@ function NotificationRow({
                 kind={iconKind}
                 state={iconKind === 'pull-request' ? pullRequestState : undefined}
               />
-              <p className="truncate text-sm font-medium text-stone-100">{notification.subject.title}</p>
+              <p className="truncate text-sm font-medium text-primary">{notification.subject.title}</p>
             </div>
-            <p className="shrink-0 text-xs font-medium uppercase tracking-[0.18em] text-stone-400">
+            <p className="shrink-0 text-xs font-medium uppercase tracking-[0.18em] text-secondary">
               {notificationTypeLabel}
             </p>
           </div>
-          <p className="mt-1 text-sm text-stone-400">{notification.repository.full_name}</p>
+          <p className="mt-1 text-sm text-secondary">{notification.repository.full_name}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge label={notification.reason} tone="gray" />
             {notification.unread ? <Badge label="Unread" tone="green" /> : null}
           </div>
         </div>
       </div>
-      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-textSoft">
+      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
         Updated{' '}
         {new Date(notification.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
       </p>
@@ -646,16 +646,16 @@ function Badge({
   tone: 'default' | 'green' | 'red' | 'yellow' | 'gray';
 }) {
   const toneClass = {
-    default: 'border-white/10 bg-white/5 text-stone-300',
-    green: 'border-emerald-300/20 bg-emerald-200/10 text-emerald-100',
-    red: 'border-rose-300/20 bg-rose-200/10 text-rose-100',
-    yellow: 'border-amber-300/20 bg-amber-200/10 text-amber-100',
-    gray: 'border-white/10 bg-white/5 text-stone-400'
+    default: 'bg-white/5 text-stone-300',
+    green: 'bg-emerald-200/10 text-emerald-100',
+    red: 'bg-rose-200/10 text-rose-100',
+    yellow: 'bg-amber-200/10 text-amber-100',
+    gray: 'bg-white/5 text-stone-400'
   }[tone];
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
     >
       {label}
     </span>
@@ -664,7 +664,7 @@ function Badge({
 
 function ListItemSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/5 bg-black/10 px-4 py-3">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="h-4 w-4/5 animate-pulse rounded bg-white/10" />

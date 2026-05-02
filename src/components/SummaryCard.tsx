@@ -21,25 +21,25 @@ type SummaryCardProps = {
 export function SummaryCard({ summary }: SummaryCardProps) {
   return (
     <CardShell className="overflow-hidden">
-      <div className="mb-3 border-b border-white/5 pb-3">
-        <h2 className="text-lg font-semibold text-stone-100 sm:text-xl">A clear start to the day</h2>
+      <div className="mb-4">
+        <h2 className="text-[1.05rem] font-semibold text-primary sm:text-[1.2rem]">A clear start to the day</h2>
       </div>
 
-      <div className="rounded-xl bg-panelAlt/40 px-4 py-3">
+      <div className="rounded-[calc(var(--radius-card)-4px)] bg-[var(--card-bg-soft)] px-4 py-4">
         {summary.type === 'segments' ? (
           <div className="flex flex-col gap-1 text-sm sm:text-base">
-            <div className="font-medium text-stone-200">
+            <div className="font-medium text-primary">
               <SummarySegment item={summary.items[0]} />
-              <span className="mx-2 opacity-60">/</span>
+              <span className="mx-2 text-secondary">/</span>
               <SummarySegment item={summary.items[1]} />
             </div>
 
-            <div className="text-stone-400">
+            <div className="text-secondary">
               <SummarySegment item={summary.items[2]} />
             </div>
           </div>
         ) : (
-          <div className="space-y-1.5 text-base leading-7 text-stone-200">
+          <div className="space-y-1.5 text-base leading-7 text-primary">
             {summary.lines.map((line) => (
               <p key={line}>{renderSummaryLine(line)}</p>
             ))}
@@ -65,7 +65,7 @@ function SummarySegment({
 
   const content = (
     <>
-      <span className="font-semibold text-stone-100">{item.value}</span> {item.label}
+      <span className="font-semibold text-primary">{item.value}</span> {item.label}
     </>
   );
 
@@ -77,7 +77,7 @@ function SummarySegment({
     <button
       type="button"
       onClick={item.onClick}
-      className="summary-item whitespace-nowrap text-left transition hover:text-stone-100 hover:underline cursor-pointer"
+      className="summary-item cursor-pointer whitespace-nowrap text-left transition hover:text-primary hover:underline"
     >
       {content}
     </button>
@@ -88,7 +88,7 @@ function renderSummaryLine(line: string) {
   return line.split(/(\d+)/).map((segment, index) => {
     if (/^\d+$/.test(segment)) {
       return (
-        <span key={`${segment}-${index}`} className="font-semibold text-stone-100">
+        <span key={`${segment}-${index}`} className="font-semibold text-primary">
           {segment}
         </span>
       );

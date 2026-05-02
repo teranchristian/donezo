@@ -25,27 +25,27 @@ type JiraCardProps = {
 const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; message: string }> = {
   'not-connected': {
     label: 'Not connected',
-    tone: 'border-white/10 bg-white/5 text-stone-300',
+    tone: 'bg-white/6 text-stone-300',
     message: 'Add your Jira site URL, email, and API token in Settings to enable Jira integration.'
   },
   testing: {
     label: 'Testing',
-    tone: 'border-amber-300/20 bg-amber-200/10 text-amber-100',
+    tone: 'bg-amber-200/10 text-amber-100',
     message: 'Checking the saved Jira credentials.'
   },
   connected: {
     label: 'Connected',
-    tone: 'border-emerald-300/20 bg-emerald-200/10 text-emerald-100',
+    tone: 'bg-emerald-200/10 text-emerald-100',
     message: 'Active Jira tickets are live on the dashboard.'
   },
   invalid: {
     label: 'Invalid credentials',
-    tone: 'border-rose-300/20 bg-rose-200/10 text-rose-100',
+    tone: 'bg-rose-200/10 text-rose-100',
     message: 'Jira returned 401 for the saved credentials. Update them in Settings and test again.'
   },
   error: {
     label: 'API error',
-    tone: 'border-amber-300/20 bg-amber-200/10 text-amber-100',
+    tone: 'bg-amber-200/10 text-amber-100',
     message: 'Jira data could not be loaded right now.'
   }
 };
@@ -73,28 +73,28 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onVi
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex flex-col gap-3 border-b border-white/5 pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-stone-100">Jira</p>
-            <p className="mt-1 break-all text-sm text-stone-400">{formatWorkspaceLabel(baseUrl)}</p>
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">Jira</p>
+            <p className="mt-1 break-all text-sm text-secondary">{formatWorkspaceLabel(baseUrl)}</p>
           </div>
 
           <div className="flex flex-col items-start sm:items-end">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${copy.tone}`}>
                 {copy.label}
               </span>
               <button
                 type="button"
                 onClick={onRefresh}
                 disabled={isLoading || data.connectionStatus === 'not-connected'}
-                className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-stone-300 transition hover:border-white/20 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLoading ? 'Refreshing...' : 'Refresh'}
               </button>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500 sm:justify-end">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)] sm:justify-end">
               <span>Last updated {formatCompactTime(data.lastUpdatedAt)}</span>
             </div>
           </div>
@@ -129,7 +129,7 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onVi
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-textSoft">{getListTitle(activeView)}</p>
+            <p className="text-sm uppercase tracking-[0.28em] text-[var(--text-tertiary)]">{getListTitle(activeView)}</p>
           </div>
 
           <div className="dashboard-scrollbar mt-3 min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
@@ -160,7 +160,7 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onVi
                 href={viewAllUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-indigo-400 transition hover:text-indigo-300"
+                className="text-sm text-secondary transition hover:text-primary"
               >
                 View all tickets →
               </a>
@@ -178,14 +178,14 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
       href={getJiraBrowseUrl(baseUrl, issue.key)}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-2xl border border-white/5 bg-black/10 px-4 py-2.5 transition hover:border-white/15 hover:bg-black/20"
+      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 transition hover:bg-[var(--card-bg-strong)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-2">
-              <p className="line-clamp-2 min-w-0 text-sm font-medium text-stone-100">
-              <span className="mr-2 text-xs uppercase tracking-[0.16em] text-textSoft">{issue.key}</span>
+              <p className="line-clamp-2 min-w-0 text-sm font-medium text-primary">
+              <span className="mr-2 text-xs uppercase tracking-[0.16em] text-[var(--text-tertiary)]">{issue.key}</span>
               {issue.summary}
               </p>
               <PriorityIcon priorityName={issue.priority?.name} />
@@ -196,7 +196,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             </div>
           </div>
 
-          <p className="mt-1 truncate text-sm text-stone-400">
+          <p className="mt-1 truncate text-sm text-secondary">
             updated {formatRelativeTime(issue.updated)} • {issue.status.name}
             {issue.blockingCount > 0 ? ` • Blocking ${issue.blockingCount}` : ''}
           </p>
@@ -208,7 +208,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
 
 function StatusBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full border border-sky-300/20 bg-sky-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-sky-100">
+    <span className="rounded-full bg-sky-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-sky-100">
       {label}
     </span>
   );
@@ -309,7 +309,7 @@ function PriorityIcon({ priorityName }: { priorityName?: string }) {
     <span
       aria-label={priorityName}
       title={priorityName}
-      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white/10 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
+      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/5 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
     >
       {priorityName.slice(0, 1)}
     </span>
@@ -318,7 +318,7 @@ function PriorityIcon({ priorityName }: { priorityName?: string }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 px-4 py-5 text-sm text-stone-500">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary">
       {message}
     </div>
   );
@@ -326,7 +326,7 @@ function EmptyState({ message }: { message: string }) {
 
 function ListItemSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/5 bg-black/10 px-4 py-3">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3">
       <div className="h-3 w-20 animate-pulse rounded bg-white/10" />
       <div className="mt-3 h-4 w-5/6 animate-pulse rounded bg-white/10" />
       <div className="mt-3 h-3 w-28 animate-pulse rounded bg-white/10" />

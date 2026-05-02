@@ -263,22 +263,22 @@ export function DashboardPage({
   }
 
   return (
-    <main className="min-h-screen bg-page-glow px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
-      <div className="mx-auto flex max-w-7xl flex-col gap-8">
+    <main className="min-h-screen bg-page-glow py-6 text-stone-100 sm:py-8">
+      <div className="dashboard-container flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <DashboardHeader name={settings.name} />
           <HeaderMenu />
         </div>
 
-        <section className="grid gap-6">
-          <section className="grid gap-3 rounded-[28px] border border-white/5 bg-panel/95 p-3 shadow-panel backdrop-blur-sm lg:grid-cols-3">
+        <section>
+          <div className="top-cards">
             {dashboardAlerts.map((alert) => (
               <DashboardAlert key={alert.title} alert={alert} />
             ))}
-          </section>
+          </div>
 
-          <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-            <section className="flex flex-col gap-6">
+          <div className="main-grid">
+            <section className="left-column">
               <SummaryCard summary={daySummary} />
               <NotesCard />
               <PlaceholderCard
@@ -295,8 +295,8 @@ export function DashboardPage({
               />
             </section>
 
-            <section className="flex min-h-0 flex-col gap-4">
-              <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-white/5 bg-panel/95 p-3 shadow-panel backdrop-blur-sm">
+            <section className="right-column">
+              <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[var(--card-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
                 <IntegrationTabButton
                   label="GitHub"
                   isActive={activeIntegration === 'github'}
@@ -309,7 +309,7 @@ export function DashboardPage({
                 />
               </div>
 
-              <div className="relative flex min-h-0 flex-1">
+              <div className="relative flex min-h-0">
                 <div
                   className={`min-h-0 flex-1 ${activeIntegration === 'github' ? 'flex' : 'hidden'}`}
                   aria-hidden={activeIntegration !== 'github'}
@@ -344,7 +344,7 @@ export function DashboardPage({
                 </div>
               </div>
             </section>
-          </section>
+          </div>
         </section>
       </div>
     </main>
@@ -541,10 +541,10 @@ function getReviewAlertDetail(
 function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
   const toneClass =
     alert.tone === 'amber'
-      ? 'border-amber-300/12 bg-amber-300/8 text-amber-50'
+      ? 'bg-amber-300/[0.07] text-amber-50'
       : alert.tone === 'rose'
-        ? 'border-rose-300/12 bg-rose-300/8 text-rose-50'
-        : 'border-emerald-300/12 bg-emerald-300/8 text-emerald-50';
+        ? 'bg-rose-300/[0.07] text-rose-50'
+        : 'bg-emerald-300/[0.07] text-emerald-50';
   const iconClass =
     alert.tone === 'amber'
       ? 'bg-amber-400'
@@ -553,11 +553,11 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
         : 'bg-emerald-400';
 
   const content = (
-    <div className={`flex h-full items-start gap-3 rounded-[22px] border px-4 py-4 ${toneClass}`}>
+    <div className={`flex h-full items-start gap-3 rounded-[var(--radius-card)] px-5 py-5 shadow-[var(--shadow-card)] ${toneClass}`}>
       <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${iconClass}`} aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-base font-semibold leading-6 text-stone-100">{alert.title}</p>
-        <p className="mt-1 text-sm text-stone-400">{alert.detail}</p>
+        <p className="text-base font-semibold leading-6 text-primary">{alert.title}</p>
+        <p className="mt-1 text-sm text-secondary">{alert.detail}</p>
       </div>
     </div>
   );
@@ -590,10 +590,10 @@ function IntegrationTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-4 py-2 text-sm transition ${
+      className={`rounded-full px-4 py-2 text-sm transition ${
         isActive
-          ? 'border-white/20 bg-white/10 text-stone-100'
-          : 'border-white/8 bg-black/10 text-stone-400 hover:border-white/15 hover:bg-black/20 hover:text-stone-200'
+          ? 'bg-white/10 text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
+          : 'bg-white/[0.035] text-secondary hover:bg-white/[0.07] hover:text-primary'
       }`}
     >
       {label}

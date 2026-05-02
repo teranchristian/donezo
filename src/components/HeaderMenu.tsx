@@ -32,7 +32,7 @@ export function HeaderMenu() {
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-stone-200 transition hover:border-white/20 hover:bg-white/10"
+        className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition hover:bg-white/10"
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label="Open menu"
@@ -45,11 +45,11 @@ export function HeaderMenu() {
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-14 z-20 min-w-[180px] rounded-2xl border border-white/10 bg-panel p-2 shadow-glow">
+        <div className="absolute right-0 top-14 z-20 min-w-[180px] rounded-2xl bg-panel p-2 shadow-glow">
           <Link
             to="/settings"
             onClick={() => setIsOpen(false)}
-            className="block rounded-xl px-4 py-3 text-sm text-stone-200 transition hover:bg-white/5"
+            className="block rounded-xl px-4 py-3 text-sm text-primary transition hover:bg-white/5"
           >
             Settings
           </Link>
