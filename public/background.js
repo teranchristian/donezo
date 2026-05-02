@@ -45,11 +45,17 @@ async function saveCachedJiraIssues(credentialsKey, issues) {
 }
 
 function normalizeJiraIssue(issue) {
+  const issueLinks = Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
+  const blockingCount = issueLinks.filter(
+    (link) => link?.type?.name === 'Blocks' && Boolean(link?.outwardIssue)
+  ).length;
+
   return {
     id: String(issue?.id ?? ''),
     key: String(issue?.key ?? ''),
     summary: String(issue?.fields?.summary ?? ''),
     updated: String(issue?.fields?.updated ?? ''),
+    blockingCount,
     status: {
       name: String(issue?.fields?.status?.name ?? 'Unknown'),
       statusCategory: issue?.fields?.status?.statusCategory
@@ -63,7 +69,8 @@ function normalizeJiraIssue(issue) {
       ? {
           name: issue.fields.priority.name
         }
-      : undefined
+      : undefined,
+    issuelinks: issueLinks
   };
 }
 
@@ -151,7 +158,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         },
         body: JSON.stringify({
           jql: JIRA_ACTIVE_ISSUES_JQL,
-          fields: ['summary', 'status', 'priority', 'updated'],
+          fields: ['summary', 'status', 'priority', 'updated', 'issuelinks'],
           maxResults: 50
         })
       });

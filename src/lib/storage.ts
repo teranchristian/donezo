@@ -40,7 +40,7 @@ export type GitHubListSort =
 export type GitHubPrStatusFilter = 'all' | 'approved' | 'waiting-review';
 export type ActiveIntegration = 'github' | 'jira';
 export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
-export type ActiveJiraView = 'active' | 'in-progress' | 'high-priority';
+export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-priority';
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   name: '',
@@ -401,7 +401,10 @@ function mergeActiveGitHubView(activeGitHubView?: string): ActiveGitHubView {
 }
 
 function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
-  return activeJiraView === 'in-progress' || activeJiraView === 'high-priority' || activeJiraView === 'active'
+  return activeJiraView === 'in-progress' ||
+    activeJiraView === 'blocking' ||
+    activeJiraView === 'high-priority' ||
+    activeJiraView === 'active'
     ? activeJiraView
     : DEFAULT_ACTIVE_JIRA_VIEW;
 }

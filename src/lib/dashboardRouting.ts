@@ -84,7 +84,10 @@ function mergeActiveGitHubView(activeGitHubView: string | null): ActiveGitHubVie
 }
 
 function mergeActiveJiraView(activeJiraView: string | null): ActiveJiraView {
-  return activeJiraView === 'in-progress' || activeJiraView === 'high-priority' || activeJiraView === 'active'
+  return activeJiraView === 'in-progress' ||
+    activeJiraView === 'blocking' ||
+    activeJiraView === 'high-priority' ||
+    activeJiraView === 'active'
     ? activeJiraView
     : 'active';
 }

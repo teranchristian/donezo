@@ -4,6 +4,7 @@ import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
   getJiraSearchUrl,
+  isBlockingIssue,
   type JiraConnectionStatus,
   type JiraDashboardData,
   type JiraIssue
@@ -58,6 +59,10 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onVi
       return data.issues.filter(isInProgressIssue);
     }
 
+    if (activeView === 'blocking') {
+      return data.issues.filter(isBlockingIssue);
+    }
+
     if (activeView === 'high-priority') {
       return data.issues.filter(isHighPriorityIssue);
     }
@@ -108,6 +113,12 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onVi
               value={formatCount(counts.inProgress, isLoading)}
               isActive={activeView === 'in-progress'}
               onClick={() => onViewChange('in-progress')}
+            />
+            <TabButton
+              label="Blocking"
+              value={formatCount(counts.blocking, isLoading)}
+              isActive={activeView === 'blocking'}
+              onClick={() => onViewChange('blocking')}
             />
             <TabButton
               label="High Priority"
@@ -185,7 +196,10 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             </div>
           </div>
 
-          <p className="mt-1 truncate text-sm text-stone-400">updated {formatRelativeTime(issue.updated)} • {issue.status.name}</p>
+          <p className="mt-1 truncate text-sm text-stone-400">
+            updated {formatRelativeTime(issue.updated)} • {issue.status.name}
+            {issue.blockingCount > 0 ? ` • Blocking ${issue.blockingCount}` : ''}
+          </p>
         </div>
       </div>
     </a>
@@ -364,9 +378,13 @@ function isHighPriorityIssue(issue: JiraIssue) {
   return priorityName === 'highest' || priorityName === 'high';
 }
 
-function getListTitle(activeFilter: 'active' | 'in-progress' | 'high-priority') {
+function getListTitle(activeFilter: 'active' | 'in-progress' | 'blocking' | 'high-priority') {
   if (activeFilter === 'in-progress') {
     return 'In Progress Tickets';
+  }
+
+  if (activeFilter === 'blocking') {
+    return 'Blocking Tickets';
   }
 
   if (activeFilter === 'high-priority') {
@@ -376,9 +394,13 @@ function getListTitle(activeFilter: 'active' | 'in-progress' | 'high-priority') 
   return 'My Active Tickets';
 }
 
-function getEmptyFilterMessage(activeFilter: 'active' | 'in-progress' | 'high-priority') {
+function getEmptyFilterMessage(activeFilter: 'active' | 'in-progress' | 'blocking' | 'high-priority') {
   if (activeFilter === 'in-progress') {
     return 'No tickets are currently in progress.';
+  }
+
+  if (activeFilter === 'blocking') {
+    return 'No tickets are currently blocking other work.';
   }
 
   if (activeFilter === 'high-priority') {

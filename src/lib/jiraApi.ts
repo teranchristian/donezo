@@ -11,6 +11,7 @@ export type JiraIssue = {
   key: string;
   summary: string;
   updated: string;
+  blockingCount: number;
   status: {
     name: string;
     statusCategory?: {
@@ -21,6 +22,14 @@ export type JiraIssue = {
   priority?: {
     name?: string;
   };
+  issuelinks?: Array<{
+    type?: {
+      name?: string;
+    };
+    outwardIssue?: {
+      key?: string;
+    };
+  }>;
 };
 
 type JiraIssueLike = JiraIssue & {
@@ -37,6 +46,14 @@ type JiraIssueLike = JiraIssue & {
     priority?: {
       name?: string;
     };
+    issuelinks?: Array<{
+      type?: {
+        name?: string;
+      };
+      outwardIssue?: {
+        key?: string;
+      };
+    }>;
   };
 };
 
@@ -170,6 +187,7 @@ export function getJiraIssueCounts(issues: JiraIssue[]) {
   return {
     active: issues.length,
     inProgress: issues.filter(isInProgressIssue).length,
+    blocking: issues.filter(isBlockingIssue).length,
     highPriority: issues.filter(isHighPriorityIssue).length
   };
 }
@@ -214,17 +232,31 @@ function isHighPriorityIssue(issue: JiraIssue) {
   return priorityName === 'highest' || priorityName === 'high';
 }
 
+function getBlockingCount(issue: JiraIssueLike) {
+  const issueLinks = issue?.issuelinks ?? issue?.fields?.issuelinks ?? [];
+
+  return issueLinks.filter(
+    (link) => link?.type?.name === 'Blocks' && Boolean(link?.outwardIssue)
+  ).length;
+}
+
+export function isBlockingIssue(issue: JiraIssue) {
+  return issue.blockingCount > 0;
+}
+
 function normalizeJiraIssue(issue: JiraIssueLike): JiraIssue {
   return {
     id: String(issue?.id ?? ''),
     key: String(issue?.key ?? ''),
     summary: String(issue?.summary ?? issue?.fields?.summary ?? ''),
     updated: String(issue?.updated ?? issue?.fields?.updated ?? ''),
+    blockingCount: getBlockingCount(issue),
     status: {
       name: String(issue?.status?.name ?? issue?.fields?.status?.name ?? 'Unknown'),
       statusCategory: issue?.status?.statusCategory ?? issue?.fields?.status?.statusCategory
     },
-    priority: issue?.priority ?? issue?.fields?.priority
+    priority: issue?.priority ?? issue?.fields?.priority,
+    issuelinks: issue?.issuelinks ?? issue?.fields?.issuelinks
   };
 }
 
