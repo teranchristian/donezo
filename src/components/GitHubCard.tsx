@@ -17,8 +17,8 @@ import {
   type GitHubPrStatusFilter,
   type GitHubListSort
 } from '../lib/storage';
+import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
-import { TabButton } from './TabButton';
 
 type GitHubCardProps = {
   integrationSwitcher?: ReactNode;
@@ -87,6 +87,9 @@ export function GitHubCard({
   onViewChange,
   onPrStatusFilterChange
 }: GitHubCardProps) {
+  const filterControlClass =
+    'flex h-10 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 text-sm text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+  const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-sm text-primary outline-none';
   const copy = STATUS_COPY[data.connectionStatus];
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
@@ -145,6 +148,30 @@ export function GitHubCard({
   const visibleNotificationPullRequestKey = visiblePullRequestNotifications
     .map((notification) => notification.id)
     .join('|');
+  const tabItems = [
+    {
+      key: 'prs',
+      label: 'PRs',
+      value: formatCount(filteredMyOpenPrCount, isLoading),
+      isActive: activeView === 'prs',
+      title: isLoading ? undefined : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`,
+      onClick: () => onViewChange('prs')
+    },
+    {
+      key: 'notifications',
+      label: 'Notifications',
+      value: formatCount(filteredNotificationCount, isLoading),
+      isActive: activeView === 'notifications',
+      onClick: () => onViewChange('notifications')
+    },
+    {
+      key: 'review',
+      label: 'Review',
+      value: formatCount(filteredReviewRequestedCount, isLoading),
+      isActive: activeView === 'review',
+      onClick: () => onViewChange('review')
+    }
+  ];
 
   useEffect(() => {
     let isMounted = true;
@@ -280,7 +307,6 @@ export function GitHubCard({
           <div className="min-w-0">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">GitHub</p>
             <p className="mt-1 truncate text-sm text-secondary">{username.trim() ? `@${username.trim()}` : 'Username not set'}</p>
-            <p className="mt-2 text-sm text-[var(--text-tertiary)]">{data.errorMessage || copy.message}</p>
           </div>
 
           <div className="flex flex-col items-start sm:items-end">
@@ -308,40 +334,18 @@ export function GitHubCard({
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
-          <div className="mb-4 flex flex-wrap gap-2">
-            <TabButton
-              label="PRs"
-              value={formatCount(filteredMyOpenPrCount, isLoading)}
-              isActive={activeView === 'prs'}
-              title={
-                isLoading ? undefined : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`
-              }
-              onClick={() => onViewChange('prs')}
-            />
-            <TabButton
-              label="Notifications"
-              value={formatCount(filteredNotificationCount, isLoading)}
-              isActive={activeView === 'notifications'}
-              onClick={() => onViewChange('notifications')}
-            />
-            <TabButton
-              label="Review"
-              value={formatCount(filteredReviewRequestedCount, isLoading)}
-              isActive={activeView === 'review'}
-              onClick={() => onViewChange('review')}
-            />
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm uppercase tracking-[0.28em] text-[var(--text-tertiary)]">{currentView.title}</p>
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <label className="flex min-w-0 items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-secondary">
+          <div className="mb-4 flex min-w-0 items-center justify-between gap-3 overflow-hidden">
+            <div className="min-w-0 flex-1">
+              <CardTabMenu items={tabItems} className="border-b-0 pb-0" />
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <label className={`${filterControlClass} w-[188px]`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
                 <select
                   aria-label="Owner"
                   value={organizationFilter}
                   onChange={(event) => setOrganizationFilter(event.target.value)}
-                  className="min-w-0 bg-transparent pr-5 text-xs text-primary outline-none"
+                  className={`${filterSelectClass} flex-1`}
                 >
                   {ownerOptions.map((option) => (
                     <option key={option.value} value={option.value} className="bg-panel text-stone-100">
@@ -352,13 +356,13 @@ export function GitHubCard({
               </label>
 
               {activeView === 'prs' ? (
-                <label className="flex min-w-0 items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-secondary">
+                <label className={`${filterControlClass} w-[168px]`}>
                   <span className="shrink-0 text-[var(--text-tertiary)]">Status:</span>
                   <select
                     aria-label="PR status"
                     value={prStatusFilter}
                     onChange={(event) => onPrStatusFilterChange(event.target.value as GitHubPrStatusFilter)}
-                    className="min-w-0 bg-transparent pr-5 text-xs text-primary outline-none"
+                    className={`${filterSelectClass} flex-1`}
                   >
                     <option value="all" className="bg-panel text-stone-100">
                       All
@@ -373,13 +377,13 @@ export function GitHubCard({
                 </label>
               ) : null}
 
-              <label className="flex min-w-0 items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-xs text-secondary">
+              <label className={`${filterControlClass} w-[220px]`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Sort:</span>
                 <select
                   aria-label="Sort"
                   value={sortOrder}
                   onChange={(event) => setSortOrder(event.target.value as GitHubListSort)}
-                  className="min-w-0 bg-transparent pr-5 text-xs text-primary outline-none"
+                  className={`${filterSelectClass} flex-1`}
                 >
                   <option value="recently-updated" className="bg-panel text-stone-100">
                     Recently updated
@@ -397,6 +401,7 @@ export function GitHubCard({
               </label>
             </div>
           </div>
+
           <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">

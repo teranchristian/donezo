@@ -10,8 +10,8 @@ import {
   type JiraIssue
 } from '../lib/jiraApi';
 import { type ActiveJiraView } from '../lib/storage';
+import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
-import { TabButton } from './TabButton';
 
 type JiraCardProps = {
   integrationSwitcher?: ReactNode;
@@ -78,6 +78,36 @@ export function JiraCard({
 
     return data.issues;
   }, [activeView, data.issues]);
+  const tabItems = [
+    {
+      key: 'active',
+      label: 'Active',
+      value: formatCount(counts.active, isLoading),
+      isActive: activeView === 'active',
+      onClick: () => onViewChange('active')
+    },
+    {
+      key: 'in-progress',
+      label: 'In Progress',
+      value: formatCount(counts.inProgress, isLoading),
+      isActive: activeView === 'in-progress',
+      onClick: () => onViewChange('in-progress')
+    },
+    {
+      key: 'blocking',
+      label: 'Blocking',
+      value: formatCount(counts.blocking, isLoading),
+      isActive: activeView === 'blocking',
+      onClick: () => onViewChange('blocking')
+    },
+    {
+      key: 'high-priority',
+      label: 'High Priority',
+      value: formatCount(counts.highPriority, isLoading),
+      isActive: activeView === 'high-priority',
+      onClick: () => onViewChange('high-priority')
+    }
+  ];
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
@@ -116,31 +146,8 @@ export function JiraCard({
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
-          <div className="mb-4 grid min-w-0 grid-cols-2 gap-2 lg:flex lg:flex-wrap">
-            <TabButton
-              label="Active"
-              value={formatCount(counts.active, isLoading)}
-              isActive={activeView === 'active'}
-              onClick={() => onViewChange('active')}
-            />
-            <TabButton
-              label="In Progress"
-              value={formatCount(counts.inProgress, isLoading)}
-              isActive={activeView === 'in-progress'}
-              onClick={() => onViewChange('in-progress')}
-            />
-            <TabButton
-              label="Blocking"
-              value={formatCount(counts.blocking, isLoading)}
-              isActive={activeView === 'blocking'}
-              onClick={() => onViewChange('blocking')}
-            />
-            <TabButton
-              label="High Priority"
-              value={formatCount(counts.highPriority, isLoading)}
-              isActive={activeView === 'high-priority'}
-              onClick={() => onViewChange('high-priority')}
-            />
+          <div className="mb-4 min-w-0">
+            <CardTabMenu items={tabItems} />
           </div>
 
           <div className="flex items-center justify-between gap-3">
