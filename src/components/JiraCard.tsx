@@ -172,14 +172,16 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
-            <p className="line-clamp-2 text-sm font-medium text-stone-100">
+            <div className="flex min-w-0 items-start gap-2">
+              <p className="line-clamp-2 min-w-0 text-sm font-medium text-stone-100">
               <span className="mr-2 text-xs uppercase tracking-[0.16em] text-textSoft">{issue.key}</span>
               {issue.summary}
-            </p>
+              </p>
+              <PriorityIcon priorityName={issue.priority?.name} />
+            </div>
 
             <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
               <StatusBadge label={issue.status.name} />
-              <PriorityBadge priorityName={issue.priority?.name} />
             </div>
           </div>
 
@@ -198,21 +200,104 @@ function StatusBadge({ label }: { label: string }) {
   );
 }
 
-function PriorityBadge({ priorityName }: { priorityName?: string }) {
+function PriorityIcon({ priorityName }: { priorityName?: string }) {
   if (!priorityName) {
     return null;
   }
 
-  const tone =
-    priorityName === 'Highest'
-      ? 'border-rose-300/20 bg-rose-300/10 text-rose-100'
-      : priorityName === 'High'
-        ? 'border-amber-300/20 bg-amber-300/10 text-amber-100'
-        : 'border-white/10 bg-white/5 text-stone-300';
+  const normalized = priorityName.toLowerCase();
+
+  if (normalized === 'blocker') {
+    return (
+      <span
+        aria-label={priorityName}
+        title={priorityName}
+        className="inline-flex h-5 w-5 items-center justify-center text-rose-400"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none">
+          <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M4.75 8h6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (normalized === 'critical') {
+    return (
+      <span
+        aria-label={priorityName}
+        title={priorityName}
+        className="inline-flex h-5 w-5 items-center justify-center text-rose-400"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none">
+          <path
+            d="M8 3.25 11.75 6v6.5H4.25V6L8 3.25Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  if (normalized === 'highest' || normalized === 'major' || normalized === 'high') {
+    return (
+      <span
+        aria-label={priorityName}
+        title={priorityName}
+        className="inline-flex h-5 w-5 items-center justify-center text-rose-400"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none">
+          <path d="M4 9.75 8 5.75l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 13 8 9l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          {normalized === 'highest' ? (
+            <path d="M4 6.5 8 2.5l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          ) : null}
+        </svg>
+      </span>
+    );
+  }
+
+  if (normalized === 'minor' || normalized === 'low' || normalized === 'lowest') {
+    return (
+      <span
+        aria-label={priorityName}
+        title={priorityName}
+        className="inline-flex h-5 w-5 items-center justify-center text-sky-400"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none">
+          {normalized === 'lowest' ? (
+            <path d="M4 2.75 8 6.75l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          ) : null}
+          <path d="M4 6 8 10l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M4 9.25 8 13.25l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (normalized === 'trivial') {
+    return (
+      <span
+        aria-label={priorityName}
+        title={priorityName}
+        className="inline-flex h-5 w-5 items-center justify-center text-stone-400"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true" className="h-4 w-4" fill="none">
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </span>
+    );
+  }
 
   return (
-    <span className={`rounded-full border px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] ${tone}`}>
-      {priorityName}
+    <span
+      aria-label={priorityName}
+      title={priorityName}
+      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white/10 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
+    >
+      {priorityName.slice(0, 1)}
     </span>
   );
 }
