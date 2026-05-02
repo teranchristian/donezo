@@ -88,7 +88,7 @@ export function GitHubCard({
   onPrStatusFilterChange
 }: GitHubCardProps) {
   const filterControlClass =
-    'flex h-10 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 text-sm text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+    'flex h-10 min-w-0 items-center gap-1.5 rounded-[8px] border border-white/[0.07] bg-[#121820] px-3 text-sm text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]';
   const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-sm text-primary outline-none';
   const copy = STATUS_COPY[data.connectionStatus];
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
@@ -334,11 +334,11 @@ export function GitHubCard({
         </div>
 
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
-          <div className="mb-4 flex min-w-0 items-center justify-between gap-3 overflow-hidden">
+          <div className="mb-4 flex min-w-0 items-end justify-between gap-3 overflow-hidden border-b border-white/[0.05]">
             <div className="min-w-0 flex-1">
-              <CardTabMenu items={tabItems} className="border-b-0 pb-0" />
+              <CardTabMenu items={tabItems} className="border-b-0 pb-0.5" />
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2 pb-2">
               <label className={`${filterControlClass} w-[188px]`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
                 <select
