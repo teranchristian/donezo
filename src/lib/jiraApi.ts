@@ -12,6 +12,8 @@ export type JiraIssue = {
   summary: string;
   updated: string;
   blockingCount: number;
+  blockingIssues: JiraLinkedIssue[];
+  blockedByIssues: JiraLinkedIssue[];
   status: {
     name: string;
     statusCategory?: {
@@ -25,11 +27,41 @@ export type JiraIssue = {
   issuelinks?: Array<{
     type?: {
       name?: string;
+      inward?: string;
+      outward?: string;
+    };
+    inwardIssue?: {
+      key?: string;
+      fields?: {
+        summary?: string;
+        status?: {
+          name?: string;
+        };
+        assignee?: {
+          displayName?: string;
+        };
+      };
     };
     outwardIssue?: {
       key?: string;
+      fields?: {
+        summary?: string;
+        status?: {
+          name?: string;
+        };
+        assignee?: {
+          displayName?: string;
+        };
+      };
     };
   }>;
+};
+
+export type JiraLinkedIssue = {
+  key: string;
+  summary?: string;
+  status?: string;
+  assignee?: string;
 };
 
 type JiraIssueLike = JiraIssue & {
@@ -49,9 +81,32 @@ type JiraIssueLike = JiraIssue & {
     issuelinks?: Array<{
       type?: {
         name?: string;
+        inward?: string;
+        outward?: string;
+      };
+      inwardIssue?: {
+        key?: string;
+        fields?: {
+          summary?: string;
+          status?: {
+            name?: string;
+          };
+          assignee?: {
+            displayName?: string;
+          };
+        };
       };
       outwardIssue?: {
         key?: string;
+        fields?: {
+          summary?: string;
+          status?: {
+            name?: string;
+          };
+          assignee?: {
+            displayName?: string;
+          };
+        };
       };
     }>;
   };
@@ -233,11 +288,7 @@ function isHighPriorityIssue(issue: JiraIssue) {
 }
 
 function getBlockingCount(issue: JiraIssueLike) {
-  const issueLinks = issue?.issuelinks ?? issue?.fields?.issuelinks ?? [];
-
-  return issueLinks.filter(
-    (link) => link?.type?.name === 'Blocks' && Boolean(link?.outwardIssue)
-  ).length;
+  return getBlockingIssues(issue).length;
 }
 
 export function isBlockingIssue(issue: JiraIssue) {
@@ -245,12 +296,17 @@ export function isBlockingIssue(issue: JiraIssue) {
 }
 
 function normalizeJiraIssue(issue: JiraIssueLike): JiraIssue {
+  const blockingIssues = getBlockingIssues(issue);
+  const blockedByIssues = getBlockedByIssues(issue);
+
   return {
     id: String(issue?.id ?? ''),
     key: String(issue?.key ?? ''),
     summary: String(issue?.summary ?? issue?.fields?.summary ?? ''),
     updated: String(issue?.updated ?? issue?.fields?.updated ?? ''),
-    blockingCount: getBlockingCount(issue),
+    blockingCount: blockingIssues.length,
+    blockingIssues,
+    blockedByIssues,
     status: {
       name: String(issue?.status?.name ?? issue?.fields?.status?.name ?? 'Unknown'),
       statusCategory: issue?.status?.statusCategory ?? issue?.fields?.status?.statusCategory
@@ -272,4 +328,76 @@ function sendMessage<ResponseType>(message: Record<string, unknown>) {
       resolve(response as ResponseType);
     });
   });
+}
+
+function getBlockingIssues(issue: JiraIssueLike) {
+  return getIssueLinks(issue)
+    .filter((link) => getIssueRelationshipType(link) === 'blocks')
+    .map(getRelatedIssue)
+    .filter((linkedIssue) => Boolean(linkedIssue.key));
+}
+
+function getBlockedByIssues(issue: JiraIssueLike) {
+  return getIssueLinks(issue)
+    .filter((link) => getIssueRelationshipType(link) === 'blocked-by')
+    .map(getRelatedIssue)
+    .filter((linkedIssue) => Boolean(linkedIssue.key));
+}
+
+function getIssueLinks(issue: JiraIssueLike) {
+  return issue?.issuelinks ?? issue?.fields?.issuelinks ?? [];
+}
+
+function getIssueRelationshipType(link: NonNullable<JiraIssueLike['issuelinks']>[number]) {
+  if (link?.type?.name !== 'Blocks') {
+    return null;
+  }
+
+  const inwardLabel = String(link?.type?.inward ?? '').trim().toLowerCase();
+  const outwardLabel = String(link?.type?.outward ?? '').trim().toLowerCase();
+
+  if (outwardLabel === 'blocks') {
+    if (link?.inwardIssue) {
+      return 'blocks';
+    }
+
+    if (link?.outwardIssue) {
+      return 'blocked-by';
+    }
+  }
+
+  if (inwardLabel === 'is blocked by') {
+    if (link?.inwardIssue) {
+      return 'blocked-by';
+    }
+
+    if (link?.outwardIssue) {
+      return 'blocks';
+    }
+  }
+
+  if (link?.outwardIssue) {
+    return 'blocks';
+  }
+
+  if (link?.inwardIssue) {
+    return 'blocked-by';
+  }
+
+  return null;
+}
+
+function getRelatedIssue(link: NonNullable<JiraIssueLike['issuelinks']>[number]) {
+  const relationshipType = getIssueRelationshipType(link);
+  const linkedIssue =
+    relationshipType === 'blocks'
+      ? (link?.inwardIssue ?? link?.outwardIssue)
+      : (link?.outwardIssue ?? link?.inwardIssue);
+
+  return {
+    key: String(linkedIssue?.key ?? ''),
+    summary: linkedIssue?.fields?.summary,
+    status: linkedIssue?.fields?.status?.name,
+    assignee: linkedIssue?.fields?.assignee?.displayName
+  };
 }

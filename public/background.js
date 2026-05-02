@@ -1,4 +1,4 @@
-const JIRA_ISSUES_CACHE_KEY = 'jira-issues-cache-v2';
+const JIRA_ISSUES_CACHE_KEY = 'jira-issues-cache-v3';
 const JIRA_CACHE_TTL_MS = 5 * 60 * 1000;
 const JIRA_ACTIVE_ISSUES_JQL =
   'assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC';
@@ -46,16 +46,24 @@ async function saveCachedJiraIssues(credentialsKey, issues) {
 
 function normalizeJiraIssue(issue) {
   const issueLinks = Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
-  const blockingCount = issueLinks.filter(
-    (link) => link?.type?.name === 'Blocks' && Boolean(link?.outwardIssue)
-  ).length;
+  const blockingIssues = getBlockingIssues(issue);
+  const blockedByIssues = getBlockedByIssues(issue);
+
+  console.log('Normalized Jira issue:', {
+    key: issue?.key,
+    issueLinks,
+    blockingIssues,
+    blockedByIssues
+  });
 
   return {
     id: String(issue?.id ?? ''),
     key: String(issue?.key ?? ''),
     summary: String(issue?.fields?.summary ?? ''),
     updated: String(issue?.fields?.updated ?? ''),
-    blockingCount,
+    blockingCount: blockingIssues.length,
+    blockingIssues,
+    blockedByIssues,
     status: {
       name: String(issue?.fields?.status?.name ?? 'Unknown'),
       statusCategory: issue?.fields?.status?.statusCategory
@@ -72,6 +80,183 @@ function normalizeJiraIssue(issue) {
       : undefined,
     issuelinks: issueLinks
   };
+}
+
+function getBlockingIssues(issue) {
+  return getIssueLinks(issue)
+    .filter((link) => getIssueRelationshipType(link) === 'blocks')
+    .map((link) => getRelatedIssue(link))
+    .filter((linkedIssue) => Boolean(linkedIssue.key));
+}
+
+function getBlockedByIssues(issue) {
+  return getIssueLinks(issue)
+    .filter((link) => getIssueRelationshipType(link) === 'blocked-by')
+    .map((link) => getRelatedIssue(link))
+    .filter((linkedIssue) => Boolean(linkedIssue.key));
+}
+
+function getIssueLinks(issue) {
+  return Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
+}
+
+function getIssueRelationshipType(link) {
+  if (link?.type?.name !== 'Blocks') {
+    return null;
+  }
+
+  const inwardLabel = String(link?.type?.inward ?? '').trim().toLowerCase();
+  const outwardLabel = String(link?.type?.outward ?? '').trim().toLowerCase();
+
+  if (outwardLabel === 'blocks') {
+    if (link?.inwardIssue) {
+      return 'blocks';
+    }
+
+    if (link?.outwardIssue) {
+      return 'blocked-by';
+    }
+  }
+
+  if (inwardLabel === 'is blocked by') {
+    if (link?.inwardIssue) {
+      return 'blocked-by';
+    }
+
+    if (link?.outwardIssue) {
+      return 'blocks';
+    }
+  }
+
+  if (link?.outwardIssue) {
+    return 'blocks';
+  }
+
+  if (link?.inwardIssue) {
+    return 'blocked-by';
+  }
+
+  return null;
+}
+
+function getRelatedIssue(link) {
+  const relationshipType = getIssueRelationshipType(link);
+  const linkedIssue =
+    relationshipType === 'blocks'
+      ? (link?.inwardIssue ?? link?.outwardIssue)
+      : (link?.outwardIssue ?? link?.inwardIssue);
+
+  return {
+    key: String(linkedIssue?.key ?? ''),
+    summary: linkedIssue?.fields?.summary,
+    status: linkedIssue?.fields?.status?.name,
+    assignee: linkedIssue?.fields?.assignee?.displayName
+  };
+}
+
+function getMissingBlockingIssueKeys(issues) {
+  const missingKeys = new Set();
+
+  issues.forEach((issue) => {
+    [...getBlockingIssues(issue), ...getBlockedByIssues(issue)].forEach((linkedIssue) => {
+      if (!linkedIssue.summary || !linkedIssue.status || !linkedIssue.assignee) {
+        missingKeys.add(linkedIssue.key);
+      }
+    });
+  });
+
+  return Array.from(missingKeys);
+}
+
+function escapeJqlValue(value) {
+  return String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function mergeBlockingIssueDetails(issues, issueDetailsByKey) {
+  return issues.map((issue) => {
+    const issueLinks = Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
+
+    return {
+      ...issue,
+      fields: {
+        ...issue.fields,
+        issuelinks: issueLinks.map((link) => {
+          const linkedIssue = getRelatedIssue(link);
+          if (!linkedIssue.key || !issueDetailsByKey[linkedIssue.key]) {
+            return link;
+          }
+
+          const linkedIssueKey = linkedIssue.key;
+          const relationshipType = getIssueRelationshipType(link);
+          const targetField =
+            relationshipType === 'blocks'
+              ? (link?.inwardIssue ? 'inwardIssue' : 'outwardIssue')
+              : (link?.outwardIssue ? 'outwardIssue' : 'inwardIssue');
+
+          return {
+            ...link,
+            [targetField]: {
+              ...link[targetField],
+              fields: {
+                ...link[targetField]?.fields,
+                ...issueDetailsByKey[linkedIssueKey]
+              }
+            }
+          };
+        })
+      }
+    };
+  });
+}
+
+async function fetchBlockingIssueDetails(jiraBaseUrl, auth, issueKeys) {
+  if (issueKeys.length === 0) {
+    return {};
+  }
+
+  const result = await fetchJira(`${jiraBaseUrl}/rest/api/3/search/jql`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      jql: `issuekey in (${issueKeys.map((issueKey) => `"${escapeJqlValue(issueKey)}"`).join(', ')})`,
+      fields: ['summary', 'status', 'assignee'],
+      maxResults: issueKeys.length
+    })
+  });
+
+  if (!result.success) {
+    return {};
+  }
+
+  const data = await result.response.json();
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+
+  return issues.reduce((accumulator, issue) => {
+    const issueKey = String(issue?.key ?? '');
+    if (!issueKey) {
+      return accumulator;
+    }
+
+    accumulator[issueKey] = {
+      summary: issue?.fields?.summary,
+      status: issue?.fields?.status
+        ? {
+            name: issue.fields.status.name
+          }
+        : undefined,
+      assignee: issue?.fields?.assignee
+        ? {
+            displayName: issue.fields.assignee.displayName
+          }
+        : undefined
+    };
+
+    return accumulator;
+  }, {});
 }
 
 async function fetchJira(endpoint, options) {
@@ -169,7 +354,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       const data = await result.response.json();
-      const issues = Array.isArray(data.issues) ? data.issues.map(normalizeJiraIssue) : [];
+      console.log('Jira search response:', data);
+      const fetchedIssues = Array.isArray(data.issues) ? data.issues : [];
+
+      fetchedIssues.forEach((issue) => {
+        console.log('Issue links:', {
+          key: issue?.key,
+          issuelinks: issue?.fields?.issuelinks
+        });
+      });
+
+      const missingBlockingIssueKeys = getMissingBlockingIssueKeys(fetchedIssues);
+      console.log('Missing blocking issue keys:', missingBlockingIssueKeys);
+      const blockingIssueDetailsByKey = await fetchBlockingIssueDetails(
+        jiraBaseUrl,
+        auth,
+        missingBlockingIssueKeys
+      );
+      console.log('Blocking issue details response:', blockingIssueDetailsByKey);
+      const issues = mergeBlockingIssueDetails(fetchedIssues, blockingIssueDetailsByKey).map(normalizeJiraIssue);
 
       await saveCachedJiraIssues(credentialsKey, issues);
       sendResponse({ success: true, issues });
