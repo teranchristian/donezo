@@ -262,6 +262,23 @@ export function DashboardPage({
     });
   }
 
+  const integrationSwitcher = (
+    <div className="flex flex-wrap items-center gap-2">
+      <IntegrationTabButton
+        label="GitHub"
+        isActive={activeIntegration === 'github'}
+        onClick={() => handleIntegrationChange('github')}
+      />
+      <IntegrationTabButton
+        label="Jira"
+        isActive={activeIntegration === 'jira'}
+        onClick={() => handleIntegrationChange('jira')}
+      />
+    </div>
+  );
+
+  const [primaryAlert, ...secondaryAlerts] = dashboardAlerts;
+
   return (
     <main className="min-h-screen py-6 text-stone-100 sm:py-8">
       <div className="dashboard-container flex flex-col gap-6">
@@ -271,10 +288,18 @@ export function DashboardPage({
         </div>
 
         <section className="main-content">
-          <div className="top-cards">
-            {dashboardAlerts.map((alert) => (
-              <DashboardAlert key={alert.title} alert={alert} />
-            ))}
+          <div className="main-grid top-grid">
+            <div className="left-column">
+              {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
+            </div>
+
+            <div className="right-column">
+              <div className="right-top-cards">
+                {secondaryAlerts.map((alert) => (
+                  <DashboardAlert key={alert.title} alert={alert} />
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="main-grid">
@@ -296,25 +321,13 @@ export function DashboardPage({
             </section>
 
             <section className="right-column">
-              <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[var(--card-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
-                <IntegrationTabButton
-                  label="GitHub"
-                  isActive={activeIntegration === 'github'}
-                  onClick={() => handleIntegrationChange('github')}
-                />
-                <IntegrationTabButton
-                  label="Jira"
-                  isActive={activeIntegration === 'jira'}
-                  onClick={() => handleIntegrationChange('jira')}
-                />
-              </div>
-
               <div className="relative flex min-h-0">
                 <div
                   className={`min-h-0 flex-1 ${activeIntegration === 'github' ? 'flex' : 'hidden'}`}
                   aria-hidden={activeIntegration !== 'github'}
                 >
                   <GitHubCard
+                    integrationSwitcher={integrationSwitcher}
                     data={gitHubData}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
@@ -334,6 +347,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'jira'}
                 >
                   <JiraCard
+                    integrationSwitcher={integrationSwitcher}
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
                     isLoading={isJiraLoading}

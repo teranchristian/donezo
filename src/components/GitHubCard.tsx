@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import {
   GitHubConnectionStatus,
   GitHubDashboardData,
@@ -21,6 +21,7 @@ import { CardShell } from './CardShell';
 import { TabButton } from './TabButton';
 
 type GitHubCardProps = {
+  integrationSwitcher?: ReactNode;
   data: GitHubDashboardData;
   username: string;
   token: string;
@@ -72,6 +73,7 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
 };
 
 export function GitHubCard({
+  integrationSwitcher,
   data,
   username,
   token,
@@ -268,6 +270,12 @@ export function GitHubCard({
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-[720px] flex-1 flex-col">
+        {integrationSwitcher ? (
+          <div className="-mx-5 -mt-4 mb-5 border-b border-white/[0.04] px-5 py-4">
+            {integrationSwitcher}
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">GitHub</p>
@@ -397,7 +405,7 @@ export function GitHubCard({
                 ))}
               </div>
             ) : filteredItems.length === 0 ? (
-              <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary">
+              <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
                 {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
             ) : (
@@ -469,7 +477,7 @@ function PullRequestRow({
       href={pullRequest.url}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 transition hover:bg-[var(--card-bg-strong)]"
+      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]"
     >
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -523,7 +531,7 @@ function NotificationRow({
       href={getNotificationUrl(notification)}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 transition hover:bg-[var(--card-bg-strong)]"
+      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -664,7 +672,7 @@ function Badge({
 
 function ListItemSkeleton() {
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="h-4 w-4/5 animate-pulse rounded bg-white/10" />

@@ -7,7 +7,7 @@ type CardShellProps = PropsWithChildren<{
 export function CardShell({ children, className = '' }: CardShellProps) {
   return (
     <section
-      className={`rounded-[var(--radius-card)] bg-[var(--card-bg)] px-5 py-4 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)] transition duration-200 hover:-translate-y-0.5 hover:bg-[var(--card-bg-strong)] ${className}`}
+      className={`rounded-[var(--radius-card)] bg-[var(--card-bg)] px-5 py-4 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)] ${className}`}
     >
       {children}
     </section>

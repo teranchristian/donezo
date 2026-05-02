@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { formatRelativeTime } from '../lib/date';
 import {
   getJiraBrowseUrl,
@@ -14,6 +14,7 @@ import { CardShell } from './CardShell';
 import { TabButton } from './TabButton';
 
 type JiraCardProps = {
+  integrationSwitcher?: ReactNode;
   baseUrl: string;
   data: JiraDashboardData;
   isLoading: boolean;
@@ -50,7 +51,15 @@ const STATUS_COPY: Record<JiraConnectionStatus, { label: string; tone: string; m
   }
 };
 
-export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onViewChange }: JiraCardProps) {
+export function JiraCard({
+  integrationSwitcher,
+  baseUrl,
+  data,
+  isLoading,
+  onRefresh,
+  activeView,
+  onViewChange
+}: JiraCardProps) {
   const copy = STATUS_COPY[data.connectionStatus];
   const counts = getJiraIssueCounts(data.issues);
   const viewAllUrl = baseUrl ? getJiraSearchUrl(baseUrl) : '';
@@ -73,6 +82,12 @@ export function JiraCard({ baseUrl, data, isLoading, onRefresh, activeView, onVi
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col">
+        {integrationSwitcher ? (
+          <div className="-mx-5 -mt-4 mb-5 border-b border-white/[0.04] px-5 py-4">
+            {integrationSwitcher}
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">Jira</p>
@@ -178,7 +193,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
       href={getJiraBrowseUrl(baseUrl, issue.key)}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 transition hover:bg-[var(--card-bg-strong)]"
+      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 shadow-[var(--shadow-card-soft)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -318,7 +333,7 @@ function PriorityIcon({ priorityName }: { priorityName?: string }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
       {message}
     </div>
   );
@@ -326,7 +341,7 @@ function EmptyState({ message }: { message: string }) {
 
 function ListItemSkeleton() {
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]">
       <div className="h-3 w-20 animate-pulse rounded bg-white/10" />
       <div className="mt-3 h-4 w-5/6 animate-pulse rounded bg-white/10" />
       <div className="mt-3 h-3 w-28 animate-pulse rounded bg-white/10" />
