@@ -297,13 +297,13 @@ export function GitHubCard({
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-[720px] flex-1 flex-col">
         {topBar ? (
-          <div className="-mx-5 -mt-4 mb-5 border-b border-white/[0.04] px-5 py-4">
+          <div className="-mx-5 -mt-4 mb-2 border-b border-white/[0.04] px-5 py-4">
             {topBar}
           </div>
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-4 flex min-w-0 items-end justify-between gap-3 overflow-hidden border-b border-white/[0.05]">
+          <div className="mb-2 flex min-w-0 items-end justify-between gap-3 overflow-hidden border-b border-white/[0.05]">
             <div className="min-w-0 flex-1">
               <CardTabMenu items={tabItems} className="border-b-0 pb-0.5" />
             </div>
@@ -371,7 +371,7 @@ export function GitHubCard({
             </div>
           </div>
 
-          <div className="dashboard-scrollbar mt-3 min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
+          <div className="dashboard-scrollbar min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
@@ -383,7 +383,7 @@ export function GitHubCard({
                 {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-white/[0.06]">
                 {filteredItems.map((item) =>
                   item.kind === 'notification' ? (
                     <NotificationRow
@@ -445,25 +445,37 @@ function PullRequestRow({
   pullRequest: GitHubPullRequestItem;
 }) {
   const reviewStatusLabel = getCompactReviewStatusLabel(pullRequest.reviewStatus);
+  const detailItems = [
+    pullRequest.repositoryName,
+    `opened ${formatRelativeTime(pullRequest.updatedAt)}`,
+    pullRequest.authorLogin ? `by ${pullRequest.authorLogin}` : '',
+    reviewStatusLabel
+  ].filter(Boolean);
 
   return (
     <a
       href={pullRequest.url}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]"
+      className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-2.5">
+        <GitHubItemIcon kind="pull-request" />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <GitHubItemIcon kind="pull-request" />
-            <p className="truncate text-sm font-medium text-primary">{pullRequest.title}</p>
+          <div className="inline-flex max-w-full items-start gap-2 align-top">
+            <p className="line-clamp-2 min-w-0 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+              {pullRequest.title}
+            </p>
             <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <p className="mt-2 truncate text-sm text-secondary">
-            {pullRequest.repositoryName} • opened {formatRelativeTime(pullRequest.updatedAt)}
-            {pullRequest.authorLogin ? ` by ${pullRequest.authorLogin}` : ''} • {reviewStatusLabel}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
+            {detailItems.map((item, index) => (
+              <span key={`${item}-${index}`} className="min-w-0 truncate">
+                {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
+                <span title={item}>{item}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </a>
@@ -505,33 +517,33 @@ function NotificationRow({
       href={getNotificationUrl(notification)}
       target="_blank"
       rel="noreferrer"
-      className="block rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]"
+      className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-2.5">
+        <GitHubItemIcon
+          kind={iconKind}
+          state={iconKind === 'pull-request' ? pullRequestState : undefined}
+        />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <GitHubItemIcon
-                kind={iconKind}
-                state={iconKind === 'pull-request' ? pullRequestState : undefined}
-              />
-              <p className="truncate text-sm font-medium text-primary">{notification.subject.title}</p>
-            </div>
-            <p className="shrink-0 text-xs font-medium uppercase tracking-[0.18em] text-secondary">
+          <div className="flex items-start gap-3">
+            <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+              {notification.subject.title}
+            </p>
+            <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-secondary">
               {notificationTypeLabel}
             </p>
           </div>
-          <p className="mt-1 text-sm text-secondary">{notification.repository.full_name}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
+            <span>{notification.repository.full_name}</span>
+            <span className="text-[var(--text-tertiary)]">•</span>
+            <span>updated {formatRelativeTime(notification.updated_at)}</span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-2">
             <Badge label={notification.reason} tone="gray" />
             {notification.unread ? <Badge label="Unread" tone="green" /> : null}
           </div>
         </div>
       </div>
-      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-        Updated{' '}
-        {new Date(notification.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-      </p>
     </a>
   );
 }

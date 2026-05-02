@@ -113,17 +113,17 @@ export function JiraCard({
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col">
         {topBar ? (
-          <div className="-mx-5 -mt-4 mb-5 border-b border-white/[0.04] px-5 py-4">
+          <div className="-mx-5 -mt-4 mb-2 border-b border-white/[0.04] px-5 py-4">
             {topBar}
           </div>
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-4 min-w-0">
+          <div className="mb-2 min-w-0">
             <CardTabMenu items={tabItems} />
           </div>
 
-          <div className="dashboard-scrollbar mt-3 min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
+          <div className="dashboard-scrollbar min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
@@ -137,7 +137,7 @@ export function JiraCard({
             ) : filteredIssues.length === 0 ? (
               <EmptyState message={getEmptyFilterMessage(activeView)} />
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-white/[0.06]">
                 {filteredIssues.map((issue) => (
                   <IssueRow key={issue.id} issue={issue} baseUrl={baseUrl} />
                 ))}
@@ -168,58 +168,53 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
   const blockedByIssues = issue.blockedByIssues;
   const issueUrl = getJiraBrowseUrl(baseUrl, issue.key);
   const projectName = issue.project?.name || issue.project?.key || '';
+  const detailItems = [
+    issue.key,
+    projectName,
+    `updated ${formatRelativeTime(issue.updated)}`,
+    issue.status.name
+  ].filter(Boolean);
 
   return (
-    <div className="relative rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 shadow-[var(--shadow-card-soft)]">
+    <div className="group relative -mx-2 px-2 py-2.5 transition hover:bg-white/[0.03]">
       <a
         href={issueUrl}
         target="_blank"
         rel="noreferrer"
         aria-label={`Open Jira issue ${issue.key}`}
-        className="absolute inset-0 rounded-[14px]"
+        className="absolute inset-0 rounded-[10px]"
       />
-      <div className="relative z-10 flex items-start justify-between gap-3">
+      <div className="relative z-10 flex items-start gap-2.5 pointer-events-none">
+        <PriorityIcon priorityName={issue.priority?.name} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-2">
-              <p className="line-clamp-2 min-w-0 text-sm font-medium text-primary">
-                <span className="mr-2 text-xs uppercase tracking-[0.16em] text-[var(--text-tertiary)]">{issue.key}</span>
-                {issue.summary}
-              </p>
-              <PriorityIcon priorityName={issue.priority?.name} />
-            </div>
-
-            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          <div className="flex items-start gap-3">
+            <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+              {issue.summary}
+            </p>
+            <div className="shrink-0">
               <StatusBadge label={issue.status.name} />
             </div>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-secondary">
-            <span className="flex min-w-0 flex-wrap items-center gap-2">
-              {projectName ? (
-                <span className="max-w-[14rem] truncate" title={projectName}>
-                  {projectName}
-                </span>
-              ) : null}
-              <span>
-                {projectName ? '• ' : ''}
-                updated {formatRelativeTime(issue.updated)} • {issue.status.name}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
+            {detailItems.map((item, index) => (
+              <span key={`${item}-${index}`} className="min-w-0 truncate">
+                {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
+                <span title={item}>{item}</span>
               </span>
-            </span>
-
+            ))}
             {blockingIssues.map((blockingIssue) => (
               <span
                 key={blockingIssue.key}
-                className="rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-amber-100"
+                className="pointer-events-auto rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.14em] text-amber-100"
               >
                 Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
               </span>
             ))}
-
             {blockedByIssues.map((blockedByIssue) => (
               <span
                 key={blockedByIssue.key}
-                className="rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-rose-100"
+                className="pointer-events-auto rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.14em] text-rose-100"
               >
                 Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
               </span>
@@ -265,7 +260,7 @@ function getRelatedIssueTooltip(issue: JiraIssue['blockingIssues'][number]) {
 
 function StatusBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full bg-sky-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-sky-100">
+    <span className="rounded-full bg-sky-300/10 px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-sky-100">
       {label}
     </span>
   );
@@ -366,7 +361,7 @@ function PriorityIcon({ priorityName }: { priorityName?: string }) {
     <span
       aria-label={priorityName}
       title={priorityName}
-      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/5 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
+      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/5 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
     >
       {priorityName.slice(0, 1)}
     </span>
@@ -383,10 +378,9 @@ function EmptyState({ message }: { message: string }) {
 
 function ListItemSkeleton() {
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 shadow-[var(--shadow-card-soft)]">
-      <div className="h-3 w-20 animate-pulse rounded bg-white/10" />
-      <div className="mt-3 h-4 w-5/6 animate-pulse rounded bg-white/10" />
-      <div className="mt-3 h-3 w-28 animate-pulse rounded bg-white/10" />
+    <div className="px-2 py-2.5">
+      <div className="h-4 w-5/6 animate-pulse rounded bg-white/10" />
+      <div className="mt-2 h-3 w-2/3 animate-pulse rounded bg-white/10" />
     </div>
   );
 }
