@@ -699,7 +699,6 @@ function getGitHubViewContent(
 ) {
   if (activeGitHubView === 'notifications') {
     return {
-      title: 'Notifications',
       count: notifications.length,
       countLabel: `${notifications.length} notifications`,
       itemLabel: 'notifications',
@@ -721,7 +720,6 @@ function getGitHubViewContent(
 
   if (activeGitHubView === 'review') {
     return {
-      title: 'Needs Review',
       count: data.reviewRequestedCount,
       countLabel: `${data.reviewRequestedCount} review requests`,
       itemLabel: 'PRs',
@@ -731,7 +729,6 @@ function getGitHubViewContent(
   }
 
   return {
-    title: 'Pull Requests',
     count: data.openPrsCount,
     countLabel: `${data.openPrsCount} open PRs`,
     itemLabel: 'PRs',

@@ -150,10 +150,6 @@ export function JiraCard({
             <CardTabMenu items={tabItems} />
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm uppercase tracking-[0.28em] text-[var(--text-tertiary)]">{getListTitle(activeView)}</p>
-          </div>
-
           <div className="dashboard-scrollbar mt-3 min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
@@ -449,22 +445,6 @@ function isInProgressIssue(issue: JiraIssue) {
 function isHighPriorityIssue(issue: JiraIssue) {
   const priorityName = issue.priority?.name?.toLowerCase() ?? '';
   return priorityName === 'highest' || priorityName === 'high';
-}
-
-function getListTitle(activeFilter: 'active' | 'in-progress' | 'blocking' | 'high-priority') {
-  if (activeFilter === 'in-progress') {
-    return 'In Progress Tickets';
-  }
-
-  if (activeFilter === 'blocking') {
-    return 'Blocking Tickets';
-  }
-
-  if (activeFilter === 'high-priority') {
-    return 'High Priority Tickets';
-  }
-
-  return 'My Active Tickets';
 }
 
 function getEmptyFilterMessage(activeFilter: 'active' | 'in-progress' | 'blocking' | 'high-priority') {
