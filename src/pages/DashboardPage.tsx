@@ -177,6 +177,22 @@ export function DashboardPage({
       navigateToJiraView('in-progress');
     }
   });
+  const jiraCounts = getJiraIssueCounts(jiraData.issues);
+  const dashboardAlerts = getDashboardAlerts({
+    gitHubMetrics: gitHubSummaryMetrics,
+    jiraCounts,
+    isGitHubLoading,
+    isJiraLoading,
+    onOpenReviewRequestedPrs: () => {
+      handleGitHubViewChange('review');
+    },
+    onOpenBlockedIssues: () => {
+      navigateToJiraView('blocking');
+    },
+    onOpenApprovedPrs: () => {
+      navigateToGitHubPrs('approved');
+    }
+  });
 
   function updateDashboardNavigation(nextState: {
     activeIntegration: ActiveIntegration;
@@ -254,72 +270,80 @@ export function DashboardPage({
           <HeaderMenu />
         </div>
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-          <section className="flex flex-col gap-6">
-            <SummaryCard summary={daySummary} />
-            <NotesCard />
-            <PlaceholderCard
-              title="Calendar"
-              subtitle="Placeholder"
-              description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
-              className="min-h-[220px]"
-            />
-            <PlaceholderCard
-              title="Workspace"
-              subtitle="Later"
-              description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
-              className="min-h-[220px]"
-            />
+        <section className="grid gap-6">
+          <section className="grid gap-3 rounded-[28px] border border-white/5 bg-panel/95 p-3 shadow-panel backdrop-blur-sm lg:grid-cols-3">
+            {dashboardAlerts.map((alert) => (
+              <DashboardAlert key={alert.title} alert={alert} />
+            ))}
           </section>
 
-          <section className="flex min-h-0 flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-white/5 bg-panel/95 p-3 shadow-panel backdrop-blur-sm">
-              <IntegrationTabButton
-                label="GitHub"
-                isActive={activeIntegration === 'github'}
-                onClick={() => handleIntegrationChange('github')}
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+            <section className="flex flex-col gap-6">
+              <SummaryCard summary={daySummary} />
+              <NotesCard />
+              <PlaceholderCard
+                title="Calendar"
+                subtitle="Placeholder"
+                description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
+                className="min-h-[220px]"
               />
-              <IntegrationTabButton
-                label="Jira"
-                isActive={activeIntegration === 'jira'}
-                onClick={() => handleIntegrationChange('jira')}
+              <PlaceholderCard
+                title="Workspace"
+                subtitle="Later"
+                description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
+                className="min-h-[220px]"
               />
-            </div>
+            </section>
 
-            <div className="relative flex min-h-0 flex-1">
-              <div
-                className={`min-h-0 flex-1 ${activeIntegration === 'github' ? 'flex' : 'hidden'}`}
-                aria-hidden={activeIntegration !== 'github'}
-              >
-                <GitHubCard
-                  data={gitHubData}
-                  username={settings.integrations.github.username}
-                  token={settings.integrations.github.token}
-                  isLoading={isGitHubLoading}
-                  isCheckingActivity={isCheckingGitHubActivity}
-                  lastActivityCheckAt={lastGitHubActivityCheckAt}
-                  onRefresh={onRefreshGitHub}
-                  onSummaryMetricsChange={setGitHubSummaryMetrics}
-                  activeView={activeGitHubView}
-                  prStatusFilter={githubPrStatusFilter}
-                  onViewChange={handleGitHubViewChange}
-                  onPrStatusFilterChange={handleGitHubPrStatusFilterChange}
+            <section className="flex min-h-0 flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-white/5 bg-panel/95 p-3 shadow-panel backdrop-blur-sm">
+                <IntegrationTabButton
+                  label="GitHub"
+                  isActive={activeIntegration === 'github'}
+                  onClick={() => handleIntegrationChange('github')}
+                />
+                <IntegrationTabButton
+                  label="Jira"
+                  isActive={activeIntegration === 'jira'}
+                  onClick={() => handleIntegrationChange('jira')}
                 />
               </div>
-              <div
-                className={`min-h-0 flex-1 ${activeIntegration === 'jira' ? 'flex' : 'hidden'}`}
-                aria-hidden={activeIntegration !== 'jira'}
-              >
-                <JiraCard
-                  baseUrl={settings.integrations.jira.baseUrl}
-                  data={jiraData}
-                  isLoading={isJiraLoading}
-                  onRefresh={onRefreshJira}
-                  activeView={activeJiraView}
-                  onViewChange={handleJiraViewChange}
-                />
+
+              <div className="relative flex min-h-0 flex-1">
+                <div
+                  className={`min-h-0 flex-1 ${activeIntegration === 'github' ? 'flex' : 'hidden'}`}
+                  aria-hidden={activeIntegration !== 'github'}
+                >
+                  <GitHubCard
+                    data={gitHubData}
+                    username={settings.integrations.github.username}
+                    token={settings.integrations.github.token}
+                    isLoading={isGitHubLoading}
+                    isCheckingActivity={isCheckingGitHubActivity}
+                    lastActivityCheckAt={lastGitHubActivityCheckAt}
+                    onRefresh={onRefreshGitHub}
+                    onSummaryMetricsChange={setGitHubSummaryMetrics}
+                    activeView={activeGitHubView}
+                    prStatusFilter={githubPrStatusFilter}
+                    onViewChange={handleGitHubViewChange}
+                    onPrStatusFilterChange={handleGitHubPrStatusFilterChange}
+                  />
+                </div>
+                <div
+                  className={`min-h-0 flex-1 ${activeIntegration === 'jira' ? 'flex' : 'hidden'}`}
+                  aria-hidden={activeIntegration !== 'jira'}
+                >
+                  <JiraCard
+                    baseUrl={settings.integrations.jira.baseUrl}
+                    data={jiraData}
+                    isLoading={isJiraLoading}
+                    onRefresh={onRefreshJira}
+                    activeView={activeJiraView}
+                    onViewChange={handleJiraViewChange}
+                  />
+                </div>
               </div>
-            </div>
+            </section>
           </section>
         </section>
       </div>
@@ -421,6 +445,136 @@ function getDaySummary(options: {
       }
     ]
   };
+}
+
+type DashboardAlertItem = {
+  title: string;
+  detail: string;
+  tone: 'amber' | 'rose' | 'emerald';
+  onClick?: () => void;
+};
+
+function getDashboardAlerts(options: {
+  gitHubMetrics: GitHubSummaryMetrics;
+  jiraCounts: ReturnType<typeof getJiraIssueCounts>;
+  isGitHubLoading: boolean;
+  isJiraLoading: boolean;
+  onOpenReviewRequestedPrs: () => void;
+  onOpenBlockedIssues: () => void;
+  onOpenApprovedPrs: () => void;
+}): DashboardAlertItem[] {
+  const {
+    gitHubMetrics,
+    jiraCounts,
+    isGitHubLoading,
+    isJiraLoading,
+    onOpenReviewRequestedPrs,
+    onOpenBlockedIssues,
+    onOpenApprovedPrs
+  } = options;
+
+  return [
+    {
+      title:
+        isGitHubLoading || gitHubMetrics.connectionStatus !== 'connected'
+          ? 'PR review queue'
+          : `${gitHubMetrics.reviewRequestedCount} PR${gitHubMetrics.reviewRequestedCount === 1 ? '' : 's'} ready for review`,
+      detail: getReviewAlertDetail(gitHubMetrics, isGitHubLoading),
+      tone: 'amber',
+      onClick:
+        gitHubMetrics.connectionStatus === 'connected' && !isGitHubLoading
+          ? onOpenReviewRequestedPrs
+          : undefined
+    },
+    {
+      title:
+        isJiraLoading ? 'Blocked work' : `${jiraCounts.blocking} blocked item${jiraCounts.blocking === 1 ? '' : 's'}`,
+      detail: isJiraLoading ? 'Checking Jira blockers.' : 'Needs your input.',
+      tone: 'rose',
+      onClick: !isJiraLoading ? onOpenBlockedIssues : undefined
+    },
+    {
+      title:
+        isGitHubLoading || gitHubMetrics.approvedPrCount === null
+          ? 'Approved PRs'
+          : `${gitHubMetrics.approvedPrCount} PR${gitHubMetrics.approvedPrCount === 1 ? '' : 's'} approved`,
+      detail:
+        gitHubMetrics.connectionStatus === 'connected'
+          ? 'Ready to merge or follow through.'
+          : 'Available once GitHub is connected.',
+      tone: 'emerald',
+      onClick:
+        gitHubMetrics.connectionStatus === 'connected' && gitHubMetrics.approvedPrCount !== null
+          ? onOpenApprovedPrs
+          : undefined
+    }
+  ];
+}
+
+function getReviewAlertDetail(
+  gitHubMetrics: GitHubSummaryMetrics,
+  isGitHubLoading: boolean
+) {
+  if (isGitHubLoading) {
+    return 'Loading GitHub review activity.';
+  }
+
+  if (gitHubMetrics.connectionStatus === 'invalid') {
+    return 'GitHub token needs attention.';
+  }
+
+  if (gitHubMetrics.connectionStatus === 'error') {
+    return 'GitHub is temporarily unavailable.';
+  }
+
+  if (gitHubMetrics.connectionStatus === 'not-connected') {
+    return 'Connect GitHub to load review requests.';
+  }
+
+  if (gitHubMetrics.missingUsername) {
+    return 'Add your GitHub username in Settings.';
+  }
+
+  return gitHubMetrics.reviewRequestedCount > 0 ? 'Waiting on your review.' : 'No review requests waiting.';
+}
+
+function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
+  const toneClass =
+    alert.tone === 'amber'
+      ? 'border-amber-300/12 bg-amber-300/8 text-amber-50'
+      : alert.tone === 'rose'
+        ? 'border-rose-300/12 bg-rose-300/8 text-rose-50'
+        : 'border-emerald-300/12 bg-emerald-300/8 text-emerald-50';
+  const iconClass =
+    alert.tone === 'amber'
+      ? 'bg-amber-400'
+      : alert.tone === 'rose'
+        ? 'bg-rose-400'
+        : 'bg-emerald-400';
+
+  const content = (
+    <div className={`flex h-full items-start gap-3 rounded-[22px] border px-4 py-4 ${toneClass}`}>
+      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${iconClass}`} aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-base font-semibold leading-6 text-stone-100">{alert.title}</p>
+        <p className="mt-1 text-sm text-stone-400">{alert.detail}</p>
+      </div>
+    </div>
+  );
+
+  if (!alert.onClick) {
+    return content;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={alert.onClick}
+      className="text-left transition hover:translate-y-[-1px] hover:opacity-100"
+    >
+      {content}
+    </button>
+  );
 }
 
 function IntegrationTabButton({
