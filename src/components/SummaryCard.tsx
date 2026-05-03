@@ -1,4 +1,4 @@
-import { FocusEvent, useState } from 'react';
+import { FocusEvent, useEffect, useState } from 'react';
 import { CardShell } from './CardShell';
 import { type FocusItem, type FocusJiraItem, type FocusPullRequestItem } from '../lib/storage';
 
@@ -251,6 +251,17 @@ function FocusJiraCard({
 }) {
   const statusToneClass = getStatusToneClass(item.statusTone);
   const [isNestTargetActive, setIsNestTargetActive] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const hasLinkedPrs = item.children.length > 0;
+  const shouldShowDropHint = isNestTargetActive || isHovered;
+  const shouldExpandList = hasLinkedPrs && (isExpanded || isNestTargetActive);
+
+  useEffect(() => {
+    if (!hasLinkedPrs) {
+      setIsExpanded(false);
+    }
+  }, [hasLinkedPrs]);
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     const payload = {
@@ -283,6 +294,9 @@ function FocusJiraCard({
 
     event.preventDefault();
     setIsNestTargetActive(true);
+    if (item.children.length > 0) {
+      setIsExpanded(true);
+    }
   }
 
   function handleNestDragLeave(event: React.DragEvent<HTMLDivElement>) {
@@ -298,6 +312,7 @@ function FocusJiraCard({
     const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
     if (internalDrag && internalDrag.source === 'top-level' && internalDrag.itemSource === 'github') {
       onNestExistingPullRequest(item.id, internalDrag.itemId);
+      setIsExpanded(true);
       onInternalDragEnd();
       return;
     }
@@ -305,6 +320,7 @@ function FocusJiraCard({
     const externalDrag = readExternalFocusItem(event.dataTransfer);
     if (externalDrag?.source === 'github') {
       onNestNewPullRequest(item.id, externalDrag);
+      setIsExpanded(true);
     }
   }
 
@@ -319,8 +335,12 @@ function FocusJiraCard({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={onInternalDragEnd}
-      className={`rounded-[16px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition ${
-        isNestTargetActive ? 'ring-1 ring-violet-400/45' : ''
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 ${
+        isNestTargetActive
+          ? 'border-violet-400/45 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(167,139,250,0.16),0_14px_30px_rgba(76,29,149,0.22)]'
+          : 'border-white/[0.05] bg-[var(--card-bg-soft)] hover:border-white/10'
       }`}
     >
       <div
@@ -357,39 +377,95 @@ function FocusJiraCard({
                 <p className="mt-1 line-clamp-2 text-[0.82rem] font-medium leading-4.5 text-primary">{item.title}</p>
               </div>
 
-              <span
-                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
-              >
-                {item.statusLabel}
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span
+                  className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
+                >
+                  {item.statusLabel}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasLinkedPrs) {
+                      setIsExpanded((value) => !value);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.68rem] font-semibold transition ${
+                    hasLinkedPrs
+                      ? 'border-white/10 bg-white/[0.04] text-white/72 hover:border-violet-300/35 hover:bg-violet-400/[0.08] hover:text-violet-100'
+                      : 'cursor-default border-white/[0.06] bg-white/[0.02] text-white/45'
+                  }`}
+                  aria-expanded={hasLinkedPrs ? shouldExpandList : false}
+                  aria-label={
+                    hasLinkedPrs
+                      ? `${shouldExpandList ? 'Collapse' : 'Expand'} linked pull requests for ${item.reference}`
+                      : `No linked pull requests for ${item.reference}`
+                  }
+                >
+                  <span>{getPullRequestCountLabel(item.children.length)}</span>
+                  {hasLinkedPrs ? <ChevronIcon isExpanded={shouldExpandList} /> : null}
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={`mt-2 flex items-center justify-between gap-2 rounded-[12px] border border-dashed px-2.5 py-2 transition duration-200 ${
+                isNestTargetActive
+                  ? 'border-violet-300/55 bg-violet-400/[0.09] text-violet-100'
+                  : shouldShowDropHint
+                    ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
+                    : 'border-white/[0.08] bg-black/10 text-white/38'
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="text-[0.72rem] font-semibold">
+                  {isNestTargetActive ? `Drop PR into ${item.reference}` : '+ Drop PR here'}
+                </p>
+                <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
+                  {isNestTargetActive ? 'Link it to this Jira ticket' : 'Hover or drag a PR onto this ticket'}
+                </p>
+              </div>
+              <span className="shrink-0 text-violet-200/85" aria-hidden="true">
+                <DropArrowIcon />
               </span>
             </div>
 
             {item.children.length > 0 ? (
-              <div className="relative mt-2 space-y-1.5 pl-4 before:absolute before:bottom-1 before:left-[0.35rem] before:top-1 before:w-px before:bg-white/10">
-                {item.children.map((child) => (
-                  <div key={child.id} className="space-y-1.5">
-                    <NestedPullRequestReorderSlot
-                      activeInternalDrag={activeInternalDrag}
-                      parentId={item.id}
-                      targetId={child.id}
-                      onReorder={onReorderNestedPullRequest}
-                    />
-                    <FocusPullRequestCard
-                      item={child}
-                      onRemove={() => onRemove(child.id)}
-                      isNested
-                      parentId={item.id}
-                      onInternalDragEnd={onInternalDragEnd}
-                      onInternalDragStart={onInternalDragStart}
-                    />
+              <div
+                className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
+                  shouldExpandList ? 'mt-2 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                }`}
+              >
+                <div className="overflow-hidden">
+                  <div className="rounded-[13px] border border-white/[0.06] bg-black/12 p-1.5">
+                    <div className="max-h-40 overflow-y-auto pr-1">
+                      {item.children.map((child) => (
+                        <div key={child.id} className="space-y-1">
+                          <NestedPullRequestReorderSlot
+                            activeInternalDrag={activeInternalDrag}
+                            parentId={item.id}
+                            targetId={child.id}
+                            onReorder={onReorderNestedPullRequest}
+                          />
+                          <FocusPullRequestCard
+                            item={child}
+                            onRemove={() => onRemove(child.id)}
+                            isNested
+                            parentId={item.id}
+                            onInternalDragEnd={onInternalDragEnd}
+                            onInternalDragStart={onInternalDragStart}
+                          />
+                        </div>
+                      ))}
+                      <NestedPullRequestReorderSlot
+                        activeInternalDrag={activeInternalDrag}
+                        parentId={item.id}
+                        targetId={getNestedEndTargetId(item.id)}
+                        onReorder={onReorderNestedPullRequest}
+                      />
+                    </div>
                   </div>
-                ))}
-                <NestedPullRequestReorderSlot
-                  activeInternalDrag={activeInternalDrag}
-                  parentId={item.id}
-                  targetId={getNestedEndTargetId(item.id)}
-                  onReorder={onReorderNestedPullRequest}
-                />
+                </div>
               </div>
             ) : null}
           </div>
@@ -437,40 +513,61 @@ function FocusPullRequestCard({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={onInternalDragEnd}
-      className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-[14px] pr-8 ${
-        isNested ? 'bg-white/[0.03] px-2.5 py-2' : 'bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]'
+      className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 pr-8 ${
+        isNested
+          ? 'rounded-[10px] border border-white/[0.04] bg-white/[0.03] px-2 py-1.5 transition hover:border-white/10 hover:bg-white/[0.05]'
+          : 'rounded-[14px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]'
       }`}
     >
       <button
         type="button"
         onClick={onRemove}
-        className="absolute right-2 top-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/70 shadow-[0_1px_8px_rgba(0,0,0,0.22)] transition hover:border-white/20 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+        className={`absolute z-10 inline-flex items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/70 shadow-[0_1px_8px_rgba(0,0,0,0.22)] transition hover:border-white/20 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 ${
+          isNested ? 'right-1.5 top-1.5 h-5 w-5' : 'right-2 top-2 h-6 w-6'
+        }`}
         aria-label={`Remove ${item.sourceLabel} ${item.reference} from Today focus`}
       >
         <CloseIcon />
       </button>
 
-      <span className={`mt-0.5 flex shrink-0 items-center justify-center ${isNested ? 'h-6 w-6' : 'h-7 w-7'}`} aria-hidden="true">
+      <span className={`mt-0.5 flex shrink-0 items-center justify-center ${isNested ? 'h-5 w-5' : 'h-7 w-7'}`} aria-hidden="true">
         <GitHubItemIcon />
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-start gap-2 pr-1">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="shrink-0 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-white/34">
-                {item.sourceLabel}
-              </span>
-              <span className="shrink-0 text-[0.68rem] font-semibold text-white/58">{item.reference}</span>
-            </div>
-            <p className="mt-1 line-clamp-2 text-[0.79rem] font-medium leading-4.5 text-primary">{item.title}</p>
+            {isNested ? (
+              <>
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 text-[0.69rem] font-semibold text-white/74">{item.reference}</span>
+                  <span className={`inline-flex h-2 w-2 shrink-0 rounded-full ${getStatusDotClass(item.statusTone)}`} aria-hidden="true" />
+                  <span className="truncate text-[0.61rem] font-medium uppercase tracking-[0.1em] text-white/42">
+                    {item.statusLabel}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[0.75rem] font-medium leading-4 text-primary">{item.title}</p>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="shrink-0 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-white/34">
+                    {item.sourceLabel}
+                  </span>
+                  <span className="shrink-0 text-[0.68rem] font-semibold text-white/58">{item.reference}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-[0.79rem] font-medium leading-4.5 text-primary">{item.title}</p>
+              </>
+            )}
           </div>
 
-          <span
-            className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
-          >
-            {item.statusLabel}
-          </span>
+          {!isNested ? (
+            <span
+              className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
+            >
+              {item.statusLabel}
+            </span>
+          ) : null}
         </div>
 
         {!isNested ? (
@@ -648,7 +745,8 @@ function isValidJiraNestTarget(dataTransfer: DataTransfer, activeInternalDrag: F
     return internalDrag.source === 'top-level' && internalDrag.itemSource === 'github';
   }
 
-  return dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME);
+  const externalDrag = readExternalFocusItem(dataTransfer);
+  return externalDrag?.source === 'github';
 }
 
 function readExternalFocusItem(dataTransfer: DataTransfer): FocusItem | null {
@@ -692,6 +790,18 @@ function getStatusToneClass(statusTone: FocusItem['statusTone']) {
     : statusTone === 'emerald'
       ? 'bg-emerald-500/16 text-emerald-100'
       : 'bg-amber-500/16 text-amber-100';
+}
+
+function getStatusDotClass(statusTone: FocusItem['statusTone']) {
+  return statusTone === 'violet'
+    ? 'bg-violet-300'
+    : statusTone === 'emerald'
+      ? 'bg-emerald-300'
+      : 'bg-amber-300';
+}
+
+function getPullRequestCountLabel(count: number) {
+  return `${count} PR${count === 1 ? '' : 's'}`;
 }
 
 function FocusTargetIcon() {
@@ -738,8 +848,32 @@ function GitHubItemIcon() {
 
 function CloseIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2">
+    <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="m6.5 6.5 11 11m0-11-11 11" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ isExpanded }: { isExpanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="m7 10 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DropArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M12 5.5v9.5" strokeLinecap="round" />
+      <path d="m7.5 11.5 4.5 4.5 4.5-4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 19h14" strokeLinecap="round" />
     </svg>
   );
 }
