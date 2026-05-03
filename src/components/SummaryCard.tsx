@@ -395,10 +395,10 @@ function FocusJiraCard({
                   setIsExpanded((value) => !value);
                 }
               }}
-              className={`inline-flex shrink-0 items-center gap-3 rounded-[12px] border px-4 py-2.5 text-left text-[0.72rem] font-semibold transition ${
+              className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-left text-[0.68rem] font-semibold transition ${
                 hasLinkedPrs
-                  ? 'border-violet-300/35 bg-violet-400/[0.08] text-white hover:border-violet-300/55 hover:bg-violet-400/[0.12]'
-                  : 'cursor-default border-violet-400/20 bg-violet-500/[0.03] text-white/48'
+                  ? 'border-white/10 bg-white/[0.04] text-white/88 hover:border-violet-300/35 hover:bg-violet-400/[0.08] hover:text-violet-100'
+                  : 'cursor-default border-white/[0.06] bg-white/[0.02] text-white/45'
               }`}
               aria-expanded={hasLinkedPrs ? shouldExpandList : false}
               aria-label={
