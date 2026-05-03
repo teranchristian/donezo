@@ -471,12 +471,12 @@ function PullRequestRow({
         <GitHubItemIcon kind="pull-request" />
         <div className="min-w-0 flex-1">
           <div className="inline-flex max-w-full items-start gap-2 align-top">
-            <p className="line-clamp-2 min-w-0 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+            <p className="line-clamp-2 min-w-0 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
               {pullRequest.title}
             </p>
             <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-secondary">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
                 {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
@@ -574,14 +574,14 @@ function NotificationRow({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+            <p className="line-clamp-2 min-w-0 flex-1 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
               {notification.subject.title}
             </p>
             <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-secondary">
               {notificationTypeLabel}
             </p>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-secondary">
             <span>{notification.repository.full_name}</span>
             <span className="text-[var(--text-tertiary)]">•</span>
             <span>updated {formatRelativeTime(notification.updated_at)}</span>

@@ -197,7 +197,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
         <PriorityIcon priorityName={issue.priority?.name} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+            <p className="line-clamp-2 min-w-0 flex-1 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
               {issue.summary}
             </p>
             <div className="shrink-0">
@@ -205,7 +205,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             </div>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-secondary">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
                 {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}

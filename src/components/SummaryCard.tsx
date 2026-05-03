@@ -72,26 +72,26 @@ export function SummaryCard({
 
   return (
     <CardShell className="overflow-hidden">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <span
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500/14 text-violet-300"
               aria-hidden="true"
             >
               <FocusTargetIcon />
             </span>
-            <h2 className="text-[1.08rem] font-semibold text-primary sm:text-[1.2rem]">Today focus</h2>
+            <h2 className="text-[0.95rem] font-medium text-primary sm:text-[1.02rem]">Today focus</h2>
           </div>
-          <p className="mt-4 text-sm leading-6 text-secondary">What do you want to close today?</p>
+          <p className="mt-2 text-[0.82rem] leading-5 text-secondary">What do you want to close today?</p>
         </div>
 
-        <span className="inline-flex shrink-0 items-center rounded-full bg-violet-500/16 px-3 py-1.5 text-sm font-semibold text-violet-100 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.18)]">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-violet-500/16 px-3 py-1.5 text-[0.82rem] font-semibold text-violet-100 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.18)]">
           {visibleItems.length} / {limit}
         </span>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-4 space-y-2.5">
         {visibleItems.map((item) => (
           <FocusItemCard key={item.id} item={item} onRemove={() => onRemoveItem(item.id)} />
         ))}
@@ -102,7 +102,7 @@ export function SummaryCard({
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onBlur={handleBlur}
-          className={`rounded-[16px] border px-4 py-4 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
+          className={`rounded-[16px] border px-4 py-3.5 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
             isDropTargetActive
               ? 'border-violet-400/40 bg-violet-500/[0.09]'
               : 'border-violet-500/18 bg-violet-500/[0.05]'
@@ -116,15 +116,15 @@ export function SummaryCard({
               <FocusDropZoneIcon />
             </span>
             <div className="min-w-0">
-              <p className="text-base font-medium text-violet-100">Drag Jira tickets or PRs here</p>
-              <p className="text-sm leading-6 text-violet-200/72">to focus on them today</p>
+              <p className="text-[0.95rem] font-medium text-violet-100">Drag Jira tickets or PRs here</p>
+              <p className="text-[0.82rem] leading-5 text-violet-200/72">to focus on them today</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-sm text-secondary">
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 text-[0.82rem] text-secondary">
           <span>Focus on up to {limit} items</span>
           <span className="text-[var(--text-tertiary)]" aria-hidden="true">
             <InfoIcon />
@@ -151,22 +151,22 @@ function FocusItemCard({
         : 'bg-amber-500/16 text-amber-100';
 
   return (
-    <div className="flex items-center gap-3 rounded-[16px] bg-[var(--card-bg-soft)] px-4 py-4 shadow-[var(--shadow-card-soft)]">
+    <div className="flex items-center gap-3 rounded-[16px] bg-[var(--card-bg-soft)] px-4 py-3.5 shadow-[var(--shadow-card-soft)]">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
         {item.source === 'jira' ? <JiraItemIcon /> : <GitHubItemIcon />}
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-sm font-medium text-primary">{item.sourceLabel}</span>
-          <span className="text-sm font-medium text-stone-200">{item.reference}</span>
+          <span className="text-[0.82rem] font-medium text-primary">{item.sourceLabel}</span>
+          <span className="text-[0.82rem] font-medium text-stone-200">{item.reference}</span>
         </div>
-        <p className="mt-0.5 truncate text-sm leading-6 text-secondary">{item.title}</p>
+        <p className="mt-0.5 truncate text-[0.8rem] leading-5 text-secondary">{item.title}</p>
       </div>
 
       <div className="flex items-center gap-3">
         <span
-          className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
+          className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
         >
           {item.statusLabel}
         </span>

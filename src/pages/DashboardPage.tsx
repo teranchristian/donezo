@@ -581,7 +581,7 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
 
   const content = (
     <div
-      className={`flex h-full min-h-[160px] items-start gap-5 rounded-[18px] border bg-[rgba(255,255,255,0.028)] px-6 py-6 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)] ${cardToneClass}`}
+      className={`flex h-full min-h-[136px] items-start gap-4 rounded-[18px] border bg-[rgba(255,255,255,0.028)] px-4 py-4 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)] ${cardToneClass}`}
     >
       <span
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
@@ -590,9 +590,9 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
         <DashboardAlertIcon tone={alert.tone} />
       </span>
       <div className="min-w-0">
-        <p className="text-[2.35rem] font-semibold leading-none tracking-[-0.04em] text-primary">{alert.value}</p>
-        <p className="mt-3 text-[1.05rem] font-semibold leading-6 text-primary">{alert.title}</p>
-        <p className="mt-2 text-sm leading-6 text-secondary">{alert.detail}</p>
+        <p className="text-[2rem] font-semibold leading-none tracking-[-0.04em] text-primary">{alert.value}</p>
+        <p className="mt-2 text-[0.95rem] font-medium leading-5 text-primary">{alert.title}</p>
+        <p className="mt-1 text-[0.8rem] leading-5 text-secondary">{alert.detail}</p>
       </div>
     </div>
   );

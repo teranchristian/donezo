@@ -18,7 +18,7 @@ export function PlaceholderCard({
     <CardShell className={className}>
       <SectionHeading eyebrow={subtitle} title={title} description={description} />
 
-      <div className="flex min-h-[140px] items-end rounded-[14px] bg-[var(--card-bg-soft)] p-4">
+      <div className="flex min-h-[116px] items-end rounded-[14px] bg-[var(--card-bg-soft)] p-3.5 shadow-[var(--shadow-card-soft)]">
         <p className="max-w-sm text-sm leading-6 text-secondary">
           Ready for future integration. The component boundary is already in place.
         </p>

@@ -48,7 +48,7 @@ body {
   min-height: 100vh;
   color: var(--text-primary);
   background-color: #0b0f14;
-  font-size: 15px;
+  font-size: 14px;
   transition: background 0.3s ease;
 }
 
@@ -81,7 +81,7 @@ body {
 
 @media (max-width: 640px) {
   body {
-    font-size: 14px;
+    font-size: 13px;
   }
 }
 
@@ -95,13 +95,13 @@ body {
 .summary-cards-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .dashboard-main-grid {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(0, 2.5fr);
-  gap: 14px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -121,7 +121,7 @@ body {
 .dashboard-side-column,
 .dashboard-panel-column {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-self: start;
   min-width: 0;
 }
@@ -173,7 +173,7 @@ body {
 
   .dashboard-main-grid {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 10px;
   }
 
   .dashboard-panel-column {

@@ -52,42 +52,42 @@ export function NotesCard() {
   }
 
   return (
-    <CardShell className="min-h-[420px]">
+    <CardShell className="min-h-[340px]">
       <SectionHeading
         eyebrow="Notes"
         title="Quick capture"
         description="Drop short notes here without switching apps. They stay in local extension storage."
       />
 
-      <form className="flex gap-3" onSubmit={handleAddNote}>
+      <form className="flex gap-2.5" onSubmit={handleAddNote}>
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onComposerKeyDown}
           placeholder="Add a short note..."
-          className="flex-1 rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3 text-sm text-primary outline-none transition placeholder:text-[var(--text-tertiary)] focus:bg-[var(--card-bg-strong)] focus:ring-1 focus:ring-white/10"
+          className="flex-1 rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 text-sm text-primary shadow-[var(--shadow-card-soft)] outline-none transition placeholder:text-[var(--text-tertiary)] focus:bg-[var(--card-bg-strong)] focus:ring-1 focus:ring-white/10"
           maxLength={160}
         />
         <button
           type="submit"
-          className="rounded-[14px] bg-accent px-4 py-3 text-sm font-medium text-stone-950 transition hover:-translate-y-0.5 hover:brightness-105"
+          className="rounded-[14px] bg-accent px-4 py-2.5 text-sm font-medium text-stone-950 transition hover:-translate-y-0.5 hover:brightness-105"
         >
           Add
         </button>
       </form>
 
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="mt-4 flex flex-col gap-2.5">
         {isLoading ? (
           <p className="text-sm text-secondary">Loading notes...</p>
         ) : notes.length === 0 ? (
-          <div className="rounded-[14px] bg-[var(--card-bg-soft)] p-5 text-sm text-secondary">
+          <div className="rounded-[14px] bg-[var(--card-bg-soft)] p-4 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
             No notes yet. Add one to start building your scratchpad for the day.
           </div>
         ) : (
           notes.map((note) => (
             <article
               key={note.id}
-              className="flex items-start justify-between gap-3 rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-3"
+              className="flex items-start justify-between gap-3 rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-2.5 shadow-[var(--shadow-card-soft)]"
             >
               <p className="text-sm leading-6 text-primary">{note.text}</p>
               <button
