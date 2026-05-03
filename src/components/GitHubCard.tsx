@@ -456,6 +456,7 @@ function PullRequestRow({
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
   const status = getPullRequestDisplayStatus(pullRequest);
+  const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
 
   return (
     <a
@@ -481,10 +482,13 @@ function PullRequestRow({
               <PullRequestTrailingIcon pullRequest={pullRequest} />
             </div>
             <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
-              <p className="truncate" title={`${pullRequest.repositoryName}${pullRequest.authorLogin ? ` • by ${pullRequest.authorLogin}` : ''}`}>
+              <p
+                className="truncate"
+                title={`${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
+              >
                 <span>{pullRequest.repositoryName}</span>
-                {pullRequest.authorLogin ? <span className="mx-1.5 text-white/22">•</span> : null}
-                {pullRequest.authorLogin ? <span>by {pullRequest.authorLogin}</span> : null}
+                {shouldShowAuthor ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {shouldShowAuthor ? <span>by {pullRequest.authorLogin}</span> : null}
               </p>
               {isOutOfDate ? (
                 <span
