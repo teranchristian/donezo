@@ -7,6 +7,8 @@
   --space-md: 16px;
   --space-grid: 20px;
   --space-lg: 24px;
+  --dashboard-column-width: clamp(360px, 24vw, 384px);
+  --dashboard-grid-gap: 12px;
   --radius-card: 16px;
   --radius-control: 999px;
   --container-width: 1760px;
@@ -94,15 +96,15 @@ body {
 
 .summary-cards-grid {
   display: grid;
-  grid-template-columns: 320px repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: var(--dashboard-column-width) repeat(3, minmax(0, 1fr));
+  gap: var(--dashboard-grid-gap);
   align-items: stretch;
 }
 
 .dashboard-main-grid {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: var(--dashboard-column-width) minmax(0, 1fr);
+  gap: var(--dashboard-grid-gap);
   align-items: start;
 }
 
@@ -122,7 +124,7 @@ body {
 .dashboard-side-column,
 .dashboard-panel-column {
   display: grid;
-  gap: 10px;
+  gap: var(--dashboard-grid-gap);
   align-self: start;
   min-width: 0;
 }
@@ -164,7 +166,7 @@ body {
 
 @media (min-width: 1600px) {
   .dashboard-main-grid {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: var(--dashboard-column-width) minmax(0, 1fr);
   }
 }
 

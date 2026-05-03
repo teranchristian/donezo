@@ -151,20 +151,22 @@ function FocusItemCard({
         : 'bg-amber-500/16 text-amber-100';
 
   return (
-    <div className="flex items-center gap-2.5 rounded-[16px] bg-[var(--card-bg-soft)] px-3.5 py-2.5 shadow-[var(--shadow-card-soft)]">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center" aria-hidden="true">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 rounded-[16px] bg-[var(--card-bg-soft)] px-3.5 py-2.5 shadow-[var(--shadow-card-soft)]">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center" aria-hidden="true">
         {item.source === 'jira' ? <JiraItemIcon /> : <GitHubItemIcon />}
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2.5">
-          <span className="shrink-0 text-[0.78rem] font-medium text-primary">{item.sourceLabel}</span>
-          <span className="shrink-0 text-[0.78rem] font-medium text-white/66">{item.reference}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="shrink-0 text-[0.74rem] font-medium uppercase tracking-[0.12em] text-white/44">
+            {item.sourceLabel}
+          </span>
+          <span className="shrink-0 text-[0.78rem] font-semibold text-primary">{item.reference}</span>
         </div>
-        <p className="mt-0.5 truncate text-[0.76rem] leading-4.5 text-white/44">{item.title}</p>
+        <p className="mt-1 line-clamp-2 text-[0.8rem] leading-5 text-white/72">{item.title}</p>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         <span
           className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
         >
@@ -173,7 +175,7 @@ function FocusItemCard({
         <button
           type="button"
           onClick={onRemove}
-          className="shrink-0 text-white/34 transition hover:text-white/62"
+          className="shrink-0 rounded-full p-1 text-white/34 transition hover:bg-white/[0.05] hover:text-white/62"
           aria-label={`Remove ${item.sourceLabel} ${item.reference} from Today focus`}
         >
           <CloseIcon />

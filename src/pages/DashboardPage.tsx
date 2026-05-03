@@ -334,14 +334,14 @@ export function DashboardPage({
   const [primaryAlert, ...secondaryAlerts] = dashboardAlerts;
 
   return (
-    <main className="min-h-screen py-6 text-stone-100 sm:py-8">
-      <div className="dashboard-container flex flex-col gap-6">
+    <main className="min-h-screen py-6 text-stone-100 sm:py-7">
+      <div className="dashboard-container flex flex-col gap-5">
         <div className="dashboard-header-row">
           <DashboardHeader name={settings.name} />
           <div className="dashboard-header-status">{integrationStatusBar}</div>
         </div>
 
-        <section className="main-content flex flex-col gap-[10px]">
+        <section className="main-content flex flex-col gap-3">
           <div className="summary-cards-grid">
             {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
             {secondaryAlerts.map((alert) => (
@@ -573,18 +573,22 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
 
   const content = (
     <div
-      className="flex h-full min-h-[136px] items-start gap-4 rounded-[var(--radius-card)] border border-white/[0.06] bg-[rgba(255,255,255,0.028)] px-4 py-4 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)]"
+      className="flex h-full min-h-[84px] items-center gap-2.5 rounded-[var(--radius-card)] border border-white/[0.06] bg-[rgba(255,255,255,0.028)] px-3 py-2.5 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)]"
     >
       <span
-        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
         aria-hidden="true"
       >
         <DashboardAlertIcon tone={alert.tone} />
       </span>
-      <div className="min-w-0">
-        <p className="text-[2rem] font-semibold leading-none tracking-[-0.04em] text-primary">{alert.value}</p>
-        <p className="mt-2 text-[0.95rem] font-medium leading-5 text-primary">{alert.title}</p>
-        <p className="mt-1 text-[0.8rem] leading-5 text-secondary">{alert.detail}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <p className="shrink-0 text-[1.7rem] font-semibold leading-none tracking-[-0.045em] text-primary">
+            {alert.value}
+          </p>
+          <p className="min-w-0 truncate text-[0.82rem] font-medium leading-4 text-primary">{alert.title}</p>
+        </div>
+        <p className="mt-0.5 text-[0.72rem] leading-4 text-secondary">{alert.detail}</p>
       </div>
     </div>
   );
@@ -611,7 +615,7 @@ function DashboardAlertIcon({
 }) {
   if (tone === 'amber') {
     return (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="12" cy="12" r="8" />
         <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -620,7 +624,7 @@ function DashboardAlertIcon({
 
   if (tone === 'rose') {
     return (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="12" cy="12" r="8" />
         <path d="M12 8v5" strokeLinecap="round" />
         <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
@@ -630,7 +634,7 @@ function DashboardAlertIcon({
 
   if (tone === 'emerald') {
     return (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
         <circle cx="12" cy="12" r="8" />
         <path d="m8.5 12 2.4 2.4L15.8 9.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -638,7 +642,7 @@ function DashboardAlertIcon({
   }
 
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="6.5" cy="6.5" r="1.6" />
       <circle cx="17.5" cy="6.5" r="1.6" />
       <circle cx="12" cy="17.5" r="1.6" />
