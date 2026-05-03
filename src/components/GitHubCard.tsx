@@ -465,18 +465,18 @@ function PullRequestRow({
         event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
         event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
       }}
-      className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
+      className="group -mx-2 block cursor-pointer px-2 py-2 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2">
         <GitHubItemIcon kind="pull-request" />
         <div className="min-w-0 flex-1">
-          <div className="inline-flex max-w-full items-start gap-2 align-top">
-            <p className="line-clamp-2 min-w-0 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
+          <div className="inline-flex max-w-full items-start gap-1.5 align-top">
+            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.5 text-primary transition group-hover:text-white">
               {pullRequest.title}
             </p>
             <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-white/42">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.68rem] text-white/42">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
                 {index > 0 ? <span className="mr-2 text-white/22">•</span> : null}
@@ -565,28 +565,28 @@ function NotificationRow({
       href={getNotificationUrl(notification)}
       target="_blank"
       rel="noreferrer"
-      className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
+      className="group -mx-2 block cursor-pointer px-2 py-2 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-2">
         <GitHubItemIcon
           kind={iconKind}
           state={iconKind === 'pull-request' ? pullRequestState : undefined}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
+          <div className="flex items-start gap-2">
+            <p className="line-clamp-2 min-w-0 flex-1 text-[0.78rem] font-medium leading-4.5 text-primary transition group-hover:text-white">
               {notification.subject.title}
             </p>
             <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-white/36">
               {notificationTypeLabel}
             </p>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-white/42">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.68rem] text-white/42">
             <span>{notification.repository.full_name}</span>
             <span className="text-white/22">•</span>
             <span>updated {formatRelativeTime(notification.updated_at)}</span>
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-1.5">
             <Badge label={notification.reason} tone="gray" />
             {notification.unread ? <Badge label="Unread" tone="green" /> : null}
           </div>

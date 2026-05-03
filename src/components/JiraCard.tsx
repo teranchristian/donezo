@@ -178,7 +178,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
 
   return (
     <div
-      className="group relative -mx-2 px-2 py-2.5 transition hover:bg-white/[0.03]"
+      className="group relative -mx-2 px-2 py-2 transition hover:bg-white/[0.03]"
       draggable
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'copy';
@@ -193,11 +193,11 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
         aria-label={`Open Jira issue ${issue.key}`}
         className="absolute inset-0 rounded-[10px]"
       />
-      <div className="relative z-10 flex items-start gap-2.5 pointer-events-none">
+      <div className="relative z-10 flex items-start gap-2 pointer-events-none">
         <PriorityIcon priorityName={issue.priority?.name} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
+          <div className="flex items-start gap-2">
+            <p className="line-clamp-2 min-w-0 flex-1 text-[0.78rem] font-medium leading-4.5 text-primary transition group-hover:text-white">
               {issue.summary}
             </p>
             <div className="shrink-0">
@@ -205,7 +205,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             </div>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-white/42">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.68rem] text-white/42">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
                 {index > 0 ? <span className="mr-2 text-white/22">•</span> : null}
@@ -215,7 +215,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             {blockingIssues.map((blockingIssue) => (
               <span
                 key={blockingIssue.key}
-                className="pointer-events-auto rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.14em] text-amber-100"
+                className="pointer-events-auto rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-amber-100"
               >
                 Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
               </span>
@@ -223,7 +223,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             {blockedByIssues.map((blockedByIssue) => (
               <span
                 key={blockedByIssue.key}
-                className="pointer-events-auto rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.14em] text-rose-100"
+                className="pointer-events-auto rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-rose-100"
               >
                 Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
               </span>
