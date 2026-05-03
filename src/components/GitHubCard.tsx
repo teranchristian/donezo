@@ -385,6 +385,12 @@ export function GitHubCard({
               <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
                 {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
+            ) : activeView === 'prs' ? (
+              <PullRequestList
+                pullRequests={filteredItems
+                  .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
+                  .map((item) => item.value)}
+              />
             ) : (
               <div className="divide-y divide-white/[0.06]">
                 {filteredItems.map((item) =>
@@ -447,13 +453,8 @@ function PullRequestRow({
 }: {
   pullRequest: GitHubPullRequestItem;
 }) {
-  const reviewStatusLabel = getCompactReviewStatusLabel(pullRequest.reviewStatus);
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
-  const detailItems = [
-    pullRequest.repositoryName,
-    `opened ${formatRelativeTime(pullRequest.updatedAt)}`,
-    pullRequest.authorLogin ? `by ${pullRequest.authorLogin}` : ''
-  ].filter(Boolean);
+  const status = getPullRequestDisplayStatus(pullRequest);
 
   return (
     <a
@@ -468,43 +469,75 @@ function PullRequestRow({
       }}
       className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-1.5">
-        <GitHubItemIcon kind="pull-request" />
-        <div className="min-w-0 flex-1">
-          <div className="inline-flex max-w-full items-start gap-1 align-top">
-            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
-              {pullRequest.title}
-            </p>
-            <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
-          </div>
-          <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
-            {detailItems.map((item, index) => (
-              <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
-                <span title={item}>{item}</span>
-              </span>
-            ))}
-            <span className="min-w-0 truncate whitespace-nowrap">
-              {detailItems.length > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
-              <span>{reviewStatusLabel}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-1.5">
+          <GitHubItemIcon kind="pull-request" />
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex max-w-full items-center gap-1 align-top">
+              <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+                {pullRequest.title}
+              </p>
+              <PullRequestTrailingIcon pullRequest={pullRequest} />
+            </div>
+            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
+              <p className="truncate" title={`${pullRequest.repositoryName}${pullRequest.authorLogin ? ` • by ${pullRequest.authorLogin}` : ''}`}>
+                <span>{pullRequest.repositoryName}</span>
+                {pullRequest.authorLogin ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {pullRequest.authorLogin ? <span>by {pullRequest.authorLogin}</span> : null}
+              </p>
               {isOutOfDate ? (
-                <>
-                  <span className="mx-1 text-white/22">·</span>
-                  <span
-                    title="This branch is out of date with the base branch. Update branch required."
-                    className="inline-flex items-center gap-0.5 text-[0.64rem] text-amber-300/70"
-                  >
-                    <span aria-hidden="true">⚠</span>
-                    <span>Out of date</span>
-                  </span>
-                </>
+                <span
+                  title="This branch is out of date with the base branch. Update branch required."
+                  className="ml-1.5 shrink-0 whitespace-nowrap text-amber-200/70"
+                >
+                  <span className="mr-1.5 text-white/22">•</span>
+                  <span aria-hidden="true">⚠</span>
+                  <span className="ml-1">Out of date</span>
+                </span>
               ) : null}
-            </span>
+            </div>
           </div>
+        </div>
+        <div className="flex w-[9.5rem] shrink-0 flex-col items-end text-right">
+          <PullRequestStatusPill label={status.label} tone={status.tone} />
+          <p className="mt-0.5 text-[0.64rem] leading-4 text-white/38">
+            updated {formatRelativeTime(pullRequest.updatedAt)}
+          </p>
         </div>
       </div>
     </a>
   );
+}
+
+function PullRequestStatusPill({
+  label,
+  tone
+}: {
+  label: string;
+  tone: 'green' | 'soft-green' | 'amber' | 'neutral';
+}) {
+  const toneClass = {
+    green: 'border-emerald-200/12 bg-emerald-300/8 text-emerald-100/78',
+    'soft-green': 'border-emerald-100/10 bg-white/[0.045] text-emerald-50/72',
+    amber: 'border-amber-200/12 bg-amber-200/8 text-amber-100/74',
+    neutral: 'border-white/[0.06] bg-white/[0.045] text-white/58'
+  }[tone];
+
+  return (
+    <span
+      className={`inline-flex h-5 items-center rounded-full border px-2 py-0 text-[0.56rem] font-medium uppercase tracking-[0.12em] ${toneClass}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function PullRequestTrailingIcon({
+  pullRequest
+}: {
+  pullRequest: GitHubPullRequestItem;
+}) {
+  return <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />;
 }
 
 function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusItem {
@@ -563,14 +596,46 @@ function PullRequestCheckStatusIcon({
   }
 
   if (ciStatus === 'failing') {
-    return <span className="shrink-0 text-sm leading-none text-rose-400">✕</span>;
+    return <span className="shrink-0 text-[0.76rem] leading-none text-rose-200/65">✕</span>;
   }
 
   if (ciStatus === 'pending') {
-    return <span className="shrink-0 text-sm leading-none text-amber-400">●</span>;
+    return <span className="shrink-0 text-[0.72rem] leading-none text-amber-100/60">●</span>;
   }
 
   return null;
+}
+
+function PullRequestList({
+  pullRequests
+}: {
+  pullRequests: GitHubPullRequestItem[];
+}) {
+  const readyToClose = pullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest));
+  const remainingPullRequests = pullRequests.filter((pullRequest) => !isPullRequestReadyToClose(pullRequest));
+
+  if (readyToClose.length === 0) {
+    return (
+      <div className="divide-y divide-white/[0.06]">
+        {remainingPullRequests.map((pullRequest) => (
+          <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-white/[0.06]">
+      {readyToClose.map((pullRequest) => (
+        <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+      ))}
+      {remainingPullRequests.length > 0 ? (
+        remainingPullRequests.map((pullRequest) => (
+          <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+        ))
+      ) : null}
+    </div>
+  );
 }
 
 function NotificationRow({
@@ -977,22 +1042,73 @@ function getNotificationUrl(notification: GitHubNotification) {
 
 function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
   if (reviewStatus === 'approved') {
-    return 'Approved';
+    return 'APPROVED';
   }
 
   if (reviewStatus === 'changes-requested') {
-    return 'Changes requested';
+    return 'CHANGES REQUESTED';
   }
 
   if (reviewStatus === 'draft') {
-    return 'Draft';
+    return 'DRAFT';
   }
 
   if (reviewStatus === 'open') {
-    return 'Open';
+    return 'OPEN';
   }
 
-  return 'Waiting for review';
+  return 'WAITING FOR REVIEW';
+}
+
+function getPullRequestDisplayStatus(pullRequest: GitHubPullRequestItem) {
+  if (isPullRequestReadyToClose(pullRequest)) {
+    return {
+      label: 'READY TO MERGE',
+      tone: 'green' as const
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'approved') {
+    return {
+      label: 'APPROVED',
+      tone: 'soft-green' as const
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'waiting-review') {
+    return {
+      label: 'WAITING FOR REVIEW',
+      tone: 'amber' as const
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'changes-requested') {
+    return {
+      label: 'CHANGES REQUESTED',
+      tone: 'neutral' as const
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'draft') {
+    return {
+      label: 'DRAFT',
+      tone: 'neutral' as const
+    };
+  }
+
+  return {
+    label: getCompactReviewStatusLabel(pullRequest.reviewStatus),
+    tone: 'neutral' as const
+  };
+}
+
+function isPullRequestReadyToClose(pullRequest: GitHubPullRequestItem) {
+  return (
+    pullRequest.reviewStatus === 'approved' &&
+    pullRequest.ciStatus === 'passing' &&
+    !isPullRequestOutOfDate(pullRequest) &&
+    pullRequest.mergeStateStatus === 'CLEAN'
+  );
 }
 
 function isPullRequestOutOfDate(pullRequest: GitHubPullRequestItem) {
