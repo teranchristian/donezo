@@ -32,6 +32,15 @@ export type GitHubPullRequestItem = {
   source: 'authored' | 'review-requested';
   reviewStatus: 'approved' | 'changes-requested' | 'waiting-review' | 'draft' | 'open';
   ciStatus: 'passing' | 'failing' | 'pending' | 'no-checks';
+  mergeStateStatus:
+    | 'BEHIND'
+    | 'BLOCKED'
+    | 'CLEAN'
+    | 'DIRTY'
+    | 'DRAFT'
+    | 'HAS_HOOKS'
+    | 'UNKNOWN'
+    | 'UNSTABLE';
   detailsLoaded: boolean;
 };
 
@@ -82,6 +91,15 @@ type GitHubGraphQlPullRequestNode = {
   isDraft: boolean;
   updatedAt: string;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+  mergeStateStatus:
+    | 'BEHIND'
+    | 'BLOCKED'
+    | 'CLEAN'
+    | 'DIRTY'
+    | 'DRAFT'
+    | 'HAS_HOOKS'
+    | 'UNKNOWN'
+    | 'UNSTABLE';
   author: {
     login: string;
   } | null;
@@ -179,6 +197,7 @@ const GITHUB_PULL_REQUESTS_QUERY = `
     isDraft
     updatedAt
     reviewDecision
+    mergeStateStatus
     author {
       login
     }
@@ -559,6 +578,7 @@ function mapGraphQlPullRequest(
     source,
     reviewStatus: getReviewStatusFromDecision(pullRequest.isDraft, pullRequest.reviewDecision),
     ciStatus: getCiStatusFromRollup(pullRequest.commits.nodes[0]?.commit?.statusCheckRollup ?? null),
+    mergeStateStatus: pullRequest.mergeStateStatus,
     detailsLoaded: true
   };
 }

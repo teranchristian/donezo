@@ -129,7 +129,7 @@ export function GitHubCard({
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
   const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
-    (pullRequest) => pullRequest.reviewStatus === 'approved'
+    (pullRequest) => pullRequest.reviewStatus === 'approved' && !isPullRequestOutOfDate(pullRequest)
   ).length;
   const currentView = getGitHubViewContent(
     activeView,
@@ -448,11 +448,11 @@ function PullRequestRow({
   pullRequest: GitHubPullRequestItem;
 }) {
   const reviewStatusLabel = getCompactReviewStatusLabel(pullRequest.reviewStatus);
+  const isOutOfDate = isPullRequestOutOfDate(pullRequest);
   const detailItems = [
     pullRequest.repositoryName,
     `opened ${formatRelativeTime(pullRequest.updatedAt)}`,
-    pullRequest.authorLogin ? `by ${pullRequest.authorLogin}` : '',
-    reviewStatusLabel
+    pullRequest.authorLogin ? `by ${pullRequest.authorLogin}` : ''
   ].filter(Boolean);
 
   return (
@@ -484,6 +484,22 @@ function PullRequestRow({
                 <span title={item}>{item}</span>
               </span>
             ))}
+            <span className="min-w-0 truncate whitespace-nowrap">
+              {detailItems.length > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
+              <span>{reviewStatusLabel}</span>
+              {isOutOfDate ? (
+                <>
+                  <span className="mx-1 text-white/22">·</span>
+                  <span
+                    title="This branch is out of date with the base branch. Update branch required."
+                    className="inline-flex items-center gap-0.5 text-[0.64rem] text-amber-300/70"
+                  >
+                    <span aria-hidden="true">⚠</span>
+                    <span>Out of date</span>
+                  </span>
+                </>
+              ) : null}
+            </span>
           </div>
         </div>
       </div>
@@ -977,6 +993,10 @@ function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['review
   }
 
   return 'Waiting for review';
+}
+
+function isPullRequestOutOfDate(pullRequest: GitHubPullRequestItem) {
+  return pullRequest.mergeStateStatus === 'BEHIND';
 }
 
 function getEmptyListMessage(data: GitHubDashboardData) {
