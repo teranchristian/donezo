@@ -4,6 +4,14 @@ import { type FocusItem, type FocusJiraItem, type FocusPullRequestItem } from '.
 
 export const TODAY_FOCUS_MAX_ITEMS = 3;
 export const TODAY_FOCUS_DRAG_MIME = 'application/x-dashboard-today-focus-item';
+export const TODAY_FOCUS_INTERNAL_DRAG_MIME = 'application/x-dashboard-today-focus-move';
+
+type FocusInternalDragPayload = {
+  itemId: string;
+  parentId?: string;
+  source: 'top-level' | 'child';
+  itemSource: FocusItem['source'];
+};
 
 type SummaryCardProps = {
   items: FocusItem[];
@@ -11,6 +19,11 @@ type SummaryCardProps = {
   warning?: string | null;
   onRemoveItem: (itemId: string) => void;
   onAddItem: (item: FocusItem) => void;
+  onNestNewPullRequest: (parentId: string, item: FocusPullRequestItem) => void;
+  onNestExistingPullRequest: (parentId: string, itemId: string) => void;
+  onReorderTopLevelItem: (itemId: string, targetId: string) => void;
+  onMoveTopLevelItemToEnd: (itemId: string) => void;
+  onReorderNestedPullRequest: (parentId: string, itemId: string, targetId: string) => void;
 };
 
 export function SummaryCard({
@@ -18,39 +31,48 @@ export function SummaryCard({
   limit = TODAY_FOCUS_MAX_ITEMS,
   warning,
   onRemoveItem,
-  onAddItem
+  onAddItem,
+  onNestNewPullRequest,
+  onNestExistingPullRequest,
+  onReorderTopLevelItem,
+  onMoveTopLevelItemToEnd,
+  onReorderNestedPullRequest
 }: SummaryCardProps) {
   const [isDropTargetActive, setIsDropTargetActive] = useState(false);
+  const [activeInternalDrag, setActiveInternalDrag] = useState<FocusInternalDragPayload | null>(null);
   const visibleItems = items.slice(0, limit);
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDropTargetActive(false);
 
-    const payload = event.dataTransfer.getData(TODAY_FOCUS_DRAG_MIME);
-    if (!payload) {
+    const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (internalDrag?.source === 'top-level') {
+      onMoveTopLevelItemToEnd(internalDrag.itemId);
+      setActiveInternalDrag(null);
       return;
     }
 
-    try {
-      const parsedItem = JSON.parse(payload) as FocusItem;
-      onAddItem(parsedItem);
-    } catch {
+    const externalDrag = readExternalFocusItem(event.dataTransfer);
+    if (!externalDrag) {
       return;
     }
+
+    onAddItem(normalizeDroppedItem(externalDrag));
+    setActiveInternalDrag(null);
   }
 
   function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    if (!event.dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME)) {
+    if (!isValidRootDrop(event.dataTransfer, activeInternalDrag)) {
       return;
     }
 
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
+    event.dataTransfer.dropEffect = activeInternalDrag ? 'move' : 'copy';
   }
 
   function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
-    if (!event.dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME)) {
+    if (!isValidRootDrop(event.dataTransfer, activeInternalDrag)) {
       return;
     }
 
@@ -68,6 +90,11 @@ export function SummaryCard({
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setIsDropTargetActive(false);
     }
+  }
+
+  function handleInternalDragEnd() {
+    setActiveInternalDrag(null);
+    setIsDropTargetActive(false);
   }
 
   return (
@@ -91,9 +118,25 @@ export function SummaryCard({
         </span>
       </div>
 
-      <div className="mt-3.5 space-y-2">
+      <div className="mt-3.5 space-y-1.5">
         {visibleItems.map((item) => (
-          <FocusItemCard key={item.id} item={item} onRemove={onRemoveItem} />
+          <div key={item.id} className="space-y-1.5">
+            <TopLevelReorderSlot
+              activeInternalDrag={activeInternalDrag}
+              targetId={item.id}
+              onReorder={onReorderTopLevelItem}
+            />
+            <FocusItemCard
+              item={item}
+              onRemove={onRemoveItem}
+              activeInternalDrag={activeInternalDrag}
+              onInternalDragEnd={handleInternalDragEnd}
+              onInternalDragStart={setActiveInternalDrag}
+              onNestNewPullRequest={onNestNewPullRequest}
+              onNestExistingPullRequest={onNestExistingPullRequest}
+              onReorderNestedPullRequest={onReorderNestedPullRequest}
+            />
+          </div>
         ))}
 
         <div
@@ -144,30 +187,150 @@ export function SummaryCard({
 
 function FocusItemCard({
   item,
-  onRemove
+  onRemove,
+  activeInternalDrag,
+  onInternalDragEnd,
+  onInternalDragStart,
+  onNestNewPullRequest,
+  onNestExistingPullRequest,
+  onReorderNestedPullRequest
 }: {
   item: FocusItem;
   onRemove: (itemId: string) => void;
+  activeInternalDrag: FocusInternalDragPayload | null;
+  onInternalDragEnd: () => void;
+  onInternalDragStart: (payload: FocusInternalDragPayload) => void;
+  onNestNewPullRequest: (parentId: string, item: FocusPullRequestItem) => void;
+  onNestExistingPullRequest: (parentId: string, itemId: string) => void;
+  onReorderNestedPullRequest: (parentId: string, itemId: string, targetId: string) => void;
 }) {
   if (item.source === 'jira') {
-    return <FocusJiraCard item={item} onRemove={onRemove} />;
+    return (
+      <FocusJiraCard
+        item={item}
+        onRemove={onRemove}
+        activeInternalDrag={activeInternalDrag}
+        onInternalDragEnd={onInternalDragEnd}
+        onInternalDragStart={onInternalDragStart}
+        onNestNewPullRequest={onNestNewPullRequest}
+        onNestExistingPullRequest={onNestExistingPullRequest}
+        onReorderNestedPullRequest={onReorderNestedPullRequest}
+      />
+    );
   }
 
-  return <FocusPullRequestCard item={item} onRemove={() => onRemove(item.id)} isNested={false} />;
+  return (
+    <FocusPullRequestCard
+      item={item}
+      onRemove={() => onRemove(item.id)}
+      isNested={false}
+      onInternalDragEnd={onInternalDragEnd}
+      onInternalDragStart={onInternalDragStart}
+    />
+  );
 }
 
 function FocusJiraCard({
   item,
-  onRemove
+  onRemove,
+  activeInternalDrag,
+  onInternalDragEnd,
+  onInternalDragStart,
+  onNestNewPullRequest,
+  onNestExistingPullRequest,
+  onReorderNestedPullRequest
 }: {
   item: FocusJiraItem;
   onRemove: (itemId: string) => void;
+  activeInternalDrag: FocusInternalDragPayload | null;
+  onInternalDragEnd: () => void;
+  onInternalDragStart: (payload: FocusInternalDragPayload) => void;
+  onNestNewPullRequest: (parentId: string, item: FocusPullRequestItem) => void;
+  onNestExistingPullRequest: (parentId: string, itemId: string) => void;
+  onReorderNestedPullRequest: (parentId: string, itemId: string, targetId: string) => void;
 }) {
   const statusToneClass = getStatusToneClass(item.statusTone);
+  const [isNestTargetActive, setIsNestTargetActive] = useState(false);
+
+  function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
+    const payload = {
+      itemId: item.id,
+      source: 'top-level',
+      itemSource: item.source
+    } satisfies FocusInternalDragPayload;
+    onInternalDragStart(payload);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(
+      TODAY_FOCUS_INTERNAL_DRAG_MIME,
+      JSON.stringify(payload)
+    );
+    event.dataTransfer.setData('text/plain', item.reference);
+  }
+
+  function handleNestDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!isValidJiraNestTarget(event.dataTransfer, activeInternalDrag)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = activeInternalDrag ? 'move' : 'copy';
+  }
+
+  function handleNestDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    if (!isValidJiraNestTarget(event.dataTransfer, activeInternalDrag)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsNestTargetActive(true);
+  }
+
+  function handleNestDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsNestTargetActive(false);
+    }
+  }
+
+  function handleNestDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsNestTargetActive(false);
+
+    const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (internalDrag && internalDrag.source === 'top-level' && internalDrag.itemSource === 'github') {
+      onNestExistingPullRequest(item.id, internalDrag.itemId);
+      onInternalDragEnd();
+      return;
+    }
+
+    const externalDrag = readExternalFocusItem(event.dataTransfer);
+    if (externalDrag?.source === 'github') {
+      onNestNewPullRequest(item.id, externalDrag);
+    }
+  }
+
+  function handleNestBlur(event: FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsNestTargetActive(false);
+    }
+  }
 
   return (
-    <div className="group rounded-[16px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]">
-      <div className="relative pr-8">
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={onInternalDragEnd}
+      className={`rounded-[16px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition ${
+        isNestTargetActive ? 'ring-1 ring-violet-400/45' : ''
+      }`}
+    >
+      <div
+        className="relative pr-8"
+        onDrop={handleNestDrop}
+        onDragOver={handleNestDragOver}
+        onDragEnter={handleNestDragEnter}
+        onDragLeave={handleNestDragLeave}
+        onBlur={handleNestBlur}
+      >
         <button
           type="button"
           onClick={() => onRemove(item.id)}
@@ -194,24 +357,39 @@ function FocusJiraCard({
                 <p className="mt-1 line-clamp-2 text-[0.82rem] font-medium leading-4.5 text-primary">{item.title}</p>
               </div>
 
-              {!item.isPlaceholder ? (
-                <span
-                  className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
-                >
-                  {item.statusLabel}
-                </span>
-              ) : null}
+              <span
+                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
+              >
+                {item.statusLabel}
+              </span>
             </div>
-
-            {item.isPlaceholder ? (
-              <p className="mt-1 text-[0.68rem] text-amber-100/72">Parent created from linked PR</p>
-            ) : null}
 
             {item.children.length > 0 ? (
               <div className="relative mt-2 space-y-1.5 pl-4 before:absolute before:bottom-1 before:left-[0.35rem] before:top-1 before:w-px before:bg-white/10">
                 {item.children.map((child) => (
-                  <FocusPullRequestCard key={child.id} item={child} onRemove={() => onRemove(child.id)} isNested />
+                  <div key={child.id} className="space-y-1.5">
+                    <NestedPullRequestReorderSlot
+                      activeInternalDrag={activeInternalDrag}
+                      parentId={item.id}
+                      targetId={child.id}
+                      onReorder={onReorderNestedPullRequest}
+                    />
+                    <FocusPullRequestCard
+                      item={child}
+                      onRemove={() => onRemove(child.id)}
+                      isNested
+                      parentId={item.id}
+                      onInternalDragEnd={onInternalDragEnd}
+                      onInternalDragStart={onInternalDragStart}
+                    />
+                  </div>
                 ))}
+                <NestedPullRequestReorderSlot
+                  activeInternalDrag={activeInternalDrag}
+                  parentId={item.id}
+                  targetId={getNestedEndTargetId(item.id)}
+                  onReorder={onReorderNestedPullRequest}
+                />
               </div>
             ) : null}
           </div>
@@ -224,17 +402,42 @@ function FocusJiraCard({
 function FocusPullRequestCard({
   item,
   onRemove,
-  isNested
+  isNested,
+  parentId,
+  onInternalDragEnd,
+  onInternalDragStart
 }: {
   item: FocusPullRequestItem;
   onRemove: () => void;
   isNested: boolean;
+  parentId?: string;
+  onInternalDragEnd: () => void;
+  onInternalDragStart: (payload: FocusInternalDragPayload) => void;
 }) {
   const statusToneClass = getStatusToneClass(item.statusTone);
 
+  function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
+    const payload = {
+      itemId: item.id,
+      source: isNested ? 'child' : 'top-level',
+      parentId,
+      itemSource: item.source
+    } satisfies FocusInternalDragPayload;
+    onInternalDragStart(payload);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(
+      TODAY_FOCUS_INTERNAL_DRAG_MIME,
+      JSON.stringify(payload)
+    );
+    event.dataTransfer.setData('text/plain', item.reference);
+  }
+
   return (
     <div
-      className={`group relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-[14px] pr-8 ${
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={onInternalDragEnd}
+      className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-[14px] pr-8 ${
         isNested ? 'bg-white/[0.03] px-2.5 py-2' : 'bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]'
       }`}
     >
@@ -270,7 +473,7 @@ function FocusPullRequestCard({
           </span>
         </div>
 
-        {!item.jiraKey && !isNested ? (
+        {!isNested ? (
           <div className="mt-1.5 flex items-center gap-1 text-[0.68rem] text-amber-100/72">
             <span className="shrink-0 text-amber-300/80" aria-hidden="true">
               <WarningIcon />
@@ -281,6 +484,206 @@ function FocusPullRequestCard({
       </div>
     </div>
   );
+}
+
+function TopLevelReorderSlot({
+  activeInternalDrag,
+  targetId,
+  onReorder
+}: {
+  activeInternalDrag: FocusInternalDragPayload | null;
+  targetId: string;
+  onReorder: (itemId: string, targetId: string) => void;
+}) {
+  const [isActive, setIsActive] = useState(false);
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsActive(true);
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsActive(false);
+    }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsActive(false);
+
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+      return;
+    }
+
+    onReorder(dragPayload.itemId, targetId);
+  }
+
+  return (
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      className={`h-2 rounded-full transition ${isActive ? 'bg-violet-400/40' : 'bg-transparent'}`}
+      aria-hidden="true"
+    />
+  );
+}
+
+function NestedPullRequestReorderSlot({
+  activeInternalDrag,
+  parentId,
+  targetId,
+  onReorder
+}: {
+  activeInternalDrag: FocusInternalDragPayload | null;
+  parentId: string;
+  targetId: string;
+  onReorder: (parentId: string, itemId: string, targetId: string) => void;
+}) {
+  const [isActive, setIsActive] = useState(false);
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (
+      !dragPayload ||
+      dragPayload.source !== 'child' ||
+      dragPayload.parentId !== parentId ||
+      dragPayload.itemId === targetId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (
+      !dragPayload ||
+      dragPayload.source !== 'child' ||
+      dragPayload.parentId !== parentId ||
+      dragPayload.itemId === targetId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsActive(true);
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsActive(false);
+    }
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsActive(false);
+
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (
+      !dragPayload ||
+      dragPayload.source !== 'child' ||
+      dragPayload.parentId !== parentId ||
+      dragPayload.itemId === targetId
+    ) {
+      return;
+    }
+
+    onReorder(parentId, dragPayload.itemId, targetId);
+  }
+
+  return (
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      className={`h-1.5 rounded-full transition ${isActive ? 'bg-violet-400/35' : 'bg-transparent'}`}
+      aria-hidden="true"
+    />
+  );
+}
+
+function getNestedEndTargetId(parentId: string) {
+  return `__end__:${parentId}`;
+}
+
+function isValidRootDrop(dataTransfer: DataTransfer, activeInternalDrag: FocusInternalDragPayload | null) {
+  if (dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME)) {
+    return true;
+  }
+
+  const internalDrag = activeInternalDrag ?? readInternalDragPayload(dataTransfer);
+  if (internalDrag) {
+    return internalDrag.source === 'top-level';
+  }
+
+  return false;
+}
+
+function isValidJiraNestTarget(dataTransfer: DataTransfer, activeInternalDrag: FocusInternalDragPayload | null) {
+  const internalDrag = activeInternalDrag ?? readInternalDragPayload(dataTransfer);
+  if (internalDrag) {
+    return internalDrag.source === 'top-level' && internalDrag.itemSource === 'github';
+  }
+
+  return dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME);
+}
+
+function readExternalFocusItem(dataTransfer: DataTransfer): FocusItem | null {
+  const payload = dataTransfer.getData(TODAY_FOCUS_DRAG_MIME);
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(payload) as FocusItem;
+  } catch {
+    return null;
+  }
+}
+
+function readInternalDragPayload(dataTransfer: DataTransfer): FocusInternalDragPayload | null {
+  const payload = dataTransfer.getData(TODAY_FOCUS_INTERNAL_DRAG_MIME);
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(payload) as FocusInternalDragPayload;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeDroppedItem(item: FocusItem): FocusItem {
+  return item.source === 'jira'
+    ? {
+        ...item,
+        children: item.children ?? []
+      }
+    : item;
 }
 
 function getStatusToneClass(statusTone: FocusItem['statusTone']) {

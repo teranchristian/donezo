@@ -14,7 +14,6 @@ import {
 import {
   DashboardSettings,
   FocusItem,
-  FocusJiraItem,
   FocusPullRequestItem,
   getStoredActiveGitHubView,
   getStoredActiveIntegration,
@@ -297,6 +296,47 @@ export function DashboardPage({
     void saveStoredTodayFocusItems(nextItems);
   }
 
+  function handleNestNewTodayFocusPullRequest(parentId: string, item: FocusPullRequestItem) {
+    setTodayFocusWarning(null);
+
+    const nextState = nestNewPullRequestUnderJira(todayFocusItems, parentId, item);
+    if (nextState.warning) {
+      setTodayFocusWarning(nextState.warning);
+      return;
+    }
+
+    setTodayFocusItems(nextState.items);
+    void saveStoredTodayFocusItems(nextState.items);
+  }
+
+  function handleNestExistingTodayFocusPullRequest(parentId: string, itemId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = moveStandalonePullRequestUnderJira(todayFocusItems, parentId, itemId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleReorderTopLevelTodayFocusItem(itemId: string, targetId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = reorderTopLevelTodayFocusItems(todayFocusItems, itemId, targetId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleMoveTopLevelTodayFocusItemToEnd(itemId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = moveTopLevelTodayFocusItemToEnd(todayFocusItems, itemId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleReorderNestedTodayFocusPullRequest(parentId: string, itemId: string, targetId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = reorderNestedPullRequests(todayFocusItems, parentId, itemId, targetId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
   const integrationSwitcher = (
     <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-white/[0.035] bg-white/[0.025] p-1">
       <IntegrationTabButton
@@ -353,7 +393,12 @@ export function DashboardPage({
                 items={todayFocusItems}
                 warning={todayFocusWarning}
                 onAddItem={handleAddTodayFocusItem}
+                onNestNewPullRequest={handleNestNewTodayFocusPullRequest}
+                onNestExistingPullRequest={handleNestExistingTodayFocusPullRequest}
                 onRemoveItem={handleRemoveTodayFocusItem}
+                onReorderTopLevelItem={handleReorderTopLevelTodayFocusItem}
+                onMoveTopLevelItemToEnd={handleMoveTopLevelTodayFocusItemToEnd}
+                onReorderNestedPullRequest={handleReorderNestedTodayFocusPullRequest}
               />
               <NotesCard />
               <PlaceholderCard
@@ -465,83 +510,16 @@ type DashboardAlertItem = {
 };
 
 function addTodayFocusItem(items: FocusItem[], item: FocusItem) {
-  if (item.source === 'jira') {
-    const existingParentIndex = items.findIndex(
-      (currentItem) => currentItem.source === 'jira' && currentItem.jiraKey === item.jiraKey
-    );
-
-    if (existingParentIndex >= 0) {
-      const existingParent = items[existingParentIndex] as FocusJiraItem;
-      if (!existingParent.isPlaceholder) {
-        return { items, warning: 'That item is already in Today focus.' };
-      }
-
-      const nextItems = [...items];
-      nextItems[existingParentIndex] = {
-        ...item,
-        children: existingParent.children,
-        isPlaceholder: false
-      };
-
-      return { items: nextItems, warning: null };
-    }
-
-    if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
-      return { items, warning: 'Today focus already has 3 items.' };
-    }
-
-    return {
-      items: [...items, { ...item, children: item.children ?? [], isPlaceholder: item.isPlaceholder ?? false }],
-      warning: null
-    };
-  }
-
   if (hasTodayFocusItem(items, item.id)) {
     return { items, warning: 'That item is already in Today focus.' };
-  }
-
-  if (!item.jiraKey) {
-    if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
-      return { items, warning: 'Today focus already has 3 items.' };
-    }
-
-    return { items: [...items, item], warning: null };
-  }
-
-  const parentIndex = items.findIndex(
-    (currentItem) => currentItem.source === 'jira' && currentItem.jiraKey === item.jiraKey
-  );
-
-  if (parentIndex >= 0) {
-    const parent = items[parentIndex] as FocusJiraItem;
-    const nextItems = [...items];
-    nextItems[parentIndex] = {
-      ...parent,
-      children: [...parent.children, item]
-    };
-
-    return { items: nextItems, warning: null };
   }
 
   if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
     return { items, warning: 'Today focus already has 3 items.' };
   }
 
-  const placeholderParent: FocusJiraItem = {
-    id: `jira:${item.jiraKey}`,
-    source: 'jira',
-    sourceLabel: 'Jira',
-    reference: item.jiraKey,
-    jiraKey: item.jiraKey,
-    title: 'Linked Jira ticket',
-    statusLabel: 'Linked PR',
-    statusTone: 'amber',
-    isPlaceholder: true,
-    children: [item]
-  };
-
   return {
-    items: [...items, placeholderParent],
+    items: [...items, normalizeTopLevelTodayFocusItem(item)],
     warning: null
   };
 }
@@ -556,10 +534,6 @@ function removeTodayFocusItem(items: FocusItem[], itemId: string) {
 
     if (item.source === 'jira') {
       const nextChildren = item.children.filter((child) => child.id !== itemId);
-      if (nextChildren.length === 0 && item.isPlaceholder) {
-        continue;
-      }
-
       nextItems.push(
         nextChildren.length === item.children.length
           ? item
@@ -579,6 +553,131 @@ function removeTodayFocusItem(items: FocusItem[], itemId: string) {
 
 function hasTodayFocusItem(items: FocusItem[], itemId: string) {
   return items.some((item) => item.id === itemId || (item.source === 'jira' && item.children.some((child) => child.id === itemId)));
+}
+
+function nestNewPullRequestUnderJira(items: FocusItem[], parentId: string, pullRequest: FocusPullRequestItem) {
+  if (hasTodayFocusItem(items, pullRequest.id)) {
+    return { items, warning: 'That item is already in Today focus.' };
+  }
+
+  if (!items.some((item) => item.id === parentId && item.source === 'jira')) {
+    return { items, warning: null };
+  }
+
+  return {
+    items: items.map((item) =>
+      item.id === parentId && item.source === 'jira'
+        ? {
+            ...item,
+            children: [...item.children, pullRequest]
+          }
+        : item
+    ),
+    warning: null
+  };
+}
+
+function moveStandalonePullRequestUnderJira(items: FocusItem[], parentId: string, itemId: string) {
+  const standalonePullRequest = items.find(
+    (item): item is FocusPullRequestItem => item.id === itemId && item.source === 'github'
+  );
+
+  if (!standalonePullRequest || !items.some((item) => item.id === parentId && item.source === 'jira')) {
+    return items;
+  }
+
+  return items.reduce<FocusItem[]>((nextItems, item) => {
+    if (item.id === itemId) {
+      return nextItems;
+    }
+
+    if (item.id === parentId && item.source === 'jira') {
+      nextItems.push({
+        ...item,
+        children: [...item.children, standalonePullRequest]
+      });
+      return nextItems;
+    }
+
+    nextItems.push(item);
+    return nextItems;
+  }, []);
+}
+
+function reorderTopLevelTodayFocusItems(items: FocusItem[], itemId: string, targetId: string) {
+  if (itemId === targetId) {
+    return items;
+  }
+
+  const sourceIndex = items.findIndex((item) => item.id === itemId);
+  const targetIndex = items.findIndex((item) => item.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(sourceIndex, 1);
+  const insertIndex = nextItems.findIndex((item) => item.id === targetId);
+  nextItems.splice(insertIndex, 0, movedItem);
+  return nextItems;
+}
+
+function moveTopLevelTodayFocusItemToEnd(items: FocusItem[], itemId: string) {
+  const sourceIndex = items.findIndex((item) => item.id === itemId);
+  if (sourceIndex < 0 || sourceIndex === items.length - 1) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(sourceIndex, 1);
+  nextItems.push(movedItem);
+  return nextItems;
+}
+
+function reorderNestedPullRequests(items: FocusItem[], parentId: string, itemId: string, targetId: string) {
+  if (itemId === targetId) {
+    return items;
+  }
+
+  return items.map((item) => {
+    if (item.id !== parentId || item.source !== 'jira') {
+      return item;
+    }
+
+    const sourceIndex = item.children.findIndex((child) => child.id === itemId);
+    if (sourceIndex < 0) {
+      return item;
+    }
+
+    const nextChildren = [...item.children];
+    const [movedChild] = nextChildren.splice(sourceIndex, 1);
+    const insertIndex =
+      targetId === getNestedPullRequestEndTargetId(parentId)
+        ? nextChildren.length
+        : nextChildren.findIndex((child) => child.id === targetId);
+    if (insertIndex < 0) {
+      return item;
+    }
+    nextChildren.splice(insertIndex, 0, movedChild);
+
+    return {
+      ...item,
+      children: nextChildren
+    };
+  });
+}
+
+function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
+  return item.source === 'jira'
+    ? {
+        ...item,
+        children: item.children ?? []
+      }
+    : item;
+}
+
+function getNestedPullRequestEndTargetId(parentId: string) {
+  return `__end__:${parentId}`;
 }
 
 function getDashboardAlerts(options: {
