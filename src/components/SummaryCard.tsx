@@ -381,6 +381,11 @@ function FocusJiraCard({
                 >
                   {item.statusLabel}
                 </span>
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <div className="mb-2 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -388,10 +393,10 @@ function FocusJiraCard({
                       setIsExpanded((value) => !value);
                     }
                   }}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.68rem] font-semibold transition ${
+                  className={`inline-flex shrink-0 items-center gap-3 rounded-[12px] border px-4 py-2.5 text-left text-[0.72rem] font-semibold transition ${
                     hasLinkedPrs
-                      ? 'border-white/10 bg-white/[0.04] text-white/72 hover:border-violet-300/35 hover:bg-violet-400/[0.08] hover:text-violet-100'
-                      : 'cursor-default border-white/[0.06] bg-white/[0.02] text-white/45'
+                      ? 'border-violet-300/35 bg-violet-400/[0.08] text-white hover:border-violet-300/55 hover:bg-violet-400/[0.12]'
+                      : 'cursor-default border-violet-400/20 bg-violet-500/[0.03] text-white/48'
                   }`}
                   aria-expanded={hasLinkedPrs ? shouldExpandList : false}
                   aria-label={
@@ -400,19 +405,10 @@ function FocusJiraCard({
                       : `No linked pull requests for ${item.reference}`
                   }
                 >
-                  <span>{getPullRequestCountLabel(item.children.length)}</span>
-                  {hasLinkedPrs ? <ChevronIcon isExpanded={shouldExpandList} /> : null}
+                  {hasLinkedPrs ? <ChevronIcon isExpanded={shouldExpandList} /> : <span className="w-4" aria-hidden="true" />}
+                  <span>{`Linked PRs (${item.children.length})`}</span>
                 </button>
-              </div>
-            </div>
-
-            <div className="mt-2">
-              <div className="mb-2 flex items-center gap-3 text-[0.72rem]">
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="shrink-0 font-medium text-white/52">{`Linked PRs (${item.children.length})`}</span>
-                  <span className="h-px flex-1 bg-white/[0.08]" aria-hidden="true" />
-                </div>
-                <span className="shrink-0 font-semibold text-violet-200/88">+ Drop PR here</span>
+                <span className="h-px min-w-0 flex-1 border-t border-dashed border-white/20" aria-hidden="true" />
               </div>
 
               <div
@@ -800,10 +796,6 @@ function getStatusDotClass(statusTone: FocusItem['statusTone']) {
     : statusTone === 'emerald'
       ? 'bg-emerald-300'
       : 'bg-amber-300';
-}
-
-function getPullRequestCountLabel(count: number) {
-  return `${count} PR${count === 1 ? '' : 's'}`;
 }
 
 function FocusTargetIcon() {
