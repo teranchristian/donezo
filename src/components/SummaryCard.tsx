@@ -252,9 +252,7 @@ function FocusJiraCard({
   const statusToneClass = getStatusToneClass(item.statusTone);
   const [isNestTargetActive, setIsNestTargetActive] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const hasLinkedPrs = item.children.length > 0;
-  const shouldShowDropHint = isNestTargetActive || isHovered;
   const shouldExpandList = hasLinkedPrs && (isExpanded || isNestTargetActive);
 
   useEffect(() => {
@@ -340,8 +338,6 @@ function FocusJiraCard({
       onDragEnter={handleNestDragEnter}
       onDragLeave={handleNestDragLeave}
       onBlur={handleNestBlur}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       className={`rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 ${
         isNestTargetActive
           ? 'border-dashed border-violet-400/45 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(167,139,250,0.16),0_14px_30px_rgba(76,29,149,0.22)]'
@@ -413,29 +409,10 @@ function FocusJiraCard({
             <span className="h-px min-w-0 flex-1 border-t border-dashed border-white/20" aria-hidden="true" />
           </div>
 
-          <div
-            className={`flex min-h-[3.9rem] items-center justify-between gap-2 rounded-[12px] border border-dashed px-2.5 py-2 transition duration-200 ${
-              isNestTargetActive
-                ? 'border-violet-300/55 bg-violet-400/[0.09] text-violet-100'
-                : shouldShowDropHint
-                  ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
-                  : 'border-violet-400/20 bg-violet-500/[0.03] text-white/38'
-            }`}
-          >
-            <div className="min-w-0">
-              <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
-                {isNestTargetActive ? `Drop PR into ${item.reference}` : 'Hover or drag a PR onto this ticket'}
-              </p>
-            </div>
-            <span className="shrink-0 text-violet-200/85" aria-hidden="true">
-              <DropArrowIcon />
-            </span>
-          </div>
-
           {item.children.length > 0 ? (
             <div
               className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
-                shouldExpandList ? 'mt-2 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                shouldExpandList ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
               }`}
             >
               <div className="overflow-hidden">
@@ -858,16 +835,6 @@ function ChevronIcon({ isExpanded }: { isExpanded: boolean }) {
       strokeWidth="2"
     >
       <path d="m7 10 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function DropArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <path d="M12 5.5v9.5" strokeLinecap="round" />
-      <path d="m7.5 11.5 4.5 4.5 4.5-4.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 19h14" strokeLinecap="round" />
     </svg>
   );
 }
