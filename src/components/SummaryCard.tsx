@@ -335,6 +335,11 @@ function FocusJiraCard({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={onInternalDragEnd}
+      onDrop={handleNestDrop}
+      onDragOver={handleNestDragOver}
+      onDragEnter={handleNestDragEnter}
+      onDragLeave={handleNestDragLeave}
+      onBlur={handleNestBlur}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 ${
@@ -418,11 +423,6 @@ function FocusJiraCard({
                       ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
                       : 'border-violet-400/20 bg-violet-500/[0.03] text-white/38'
                 }`}
-                onDrop={handleNestDrop}
-                onDragOver={handleNestDragOver}
-                onDragEnter={handleNestDragEnter}
-                onDragLeave={handleNestDragLeave}
-                onBlur={handleNestBlur}
               >
                 <div className="min-w-0">
                   <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
@@ -443,14 +443,7 @@ function FocusJiraCard({
               >
                 <div className="overflow-hidden">
                   <div className="rounded-[13px] border border-white/[0.06] bg-black/12 p-1.5">
-                    <div
-                      className="max-h-40 overflow-y-auto pr-1"
-                      onDrop={handleNestDrop}
-                      onDragOver={handleNestDragOver}
-                      onDragEnter={handleNestDragEnter}
-                      onDragLeave={handleNestDragLeave}
-                      onBlur={handleNestBlur}
-                    >
+                    <div className="max-h-40 overflow-y-auto pr-1">
                       {item.children.map((child) => (
                         <div key={child.id} className="space-y-1">
                           <NestedPullRequestReorderSlot
