@@ -439,7 +439,7 @@ function FocusJiraCard({
               }`}
             >
               <div className="overflow-hidden">
-                <div className="rounded-[13px] border border-white/[0.06] bg-black/12">
+                <div>
                   <div className="max-h-40 overflow-y-auto">
                     {item.children.map((child) => (
                       <div key={child.id} className="space-y-1">
