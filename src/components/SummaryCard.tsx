@@ -401,31 +401,38 @@ function FocusJiraCard({
               </div>
             </div>
 
-            <div
-              className={`mt-2 flex items-center justify-between gap-2 rounded-[12px] border border-dashed px-2.5 py-2 transition duration-200 ${
-                isNestTargetActive
-                  ? 'border-violet-300/55 bg-violet-400/[0.09] text-violet-100'
-                  : shouldShowDropHint
-                    ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
-                    : 'border-white/[0.08] bg-black/10 text-white/38'
-              }`}
-              onDrop={handleNestDrop}
-              onDragOver={handleNestDragOver}
-              onDragEnter={handleNestDragEnter}
-              onDragLeave={handleNestDragLeave}
-              onBlur={handleNestBlur}
-            >
-              <div className="min-w-0">
-                <p className="text-[0.72rem] font-semibold">
-                  {isNestTargetActive ? `Drop PR into ${item.reference}` : '+ Drop PR here'}
-                </p>
-                <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
-                  {isNestTargetActive ? 'Link it to this Jira ticket' : 'Hover or drag a PR onto this ticket'}
-                </p>
+            <div className="mt-2">
+              <div className="mb-2 flex items-center gap-3 text-[0.72rem]">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="shrink-0 font-medium text-white/52">{`Linked PRs (${item.children.length})`}</span>
+                  <span className="h-px flex-1 bg-white/[0.08]" aria-hidden="true" />
+                </div>
+                <span className="shrink-0 font-semibold text-violet-200/88">+ Drop PR here</span>
               </div>
-              <span className="shrink-0 text-violet-200/85" aria-hidden="true">
-                <DropArrowIcon />
-              </span>
+
+              <div
+                className={`flex min-h-[3.9rem] items-center justify-between gap-2 rounded-[12px] border border-dashed px-2.5 py-2 transition duration-200 ${
+                  isNestTargetActive
+                    ? 'border-violet-300/55 bg-violet-400/[0.09] text-violet-100'
+                    : shouldShowDropHint
+                      ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
+                      : 'border-violet-400/20 bg-violet-500/[0.03] text-white/38'
+                }`}
+                onDrop={handleNestDrop}
+                onDragOver={handleNestDragOver}
+                onDragEnter={handleNestDragEnter}
+                onDragLeave={handleNestDragLeave}
+                onBlur={handleNestBlur}
+              >
+                <div className="min-w-0">
+                  <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
+                    {isNestTargetActive ? `Drop PR into ${item.reference}` : 'Hover or drag a PR onto this ticket'}
+                  </p>
+                </div>
+                <span className="shrink-0 text-violet-200/85" aria-hidden="true">
+                  <DropArrowIcon />
+                </span>
+              </div>
             </div>
 
             {item.children.length > 0 ? (
