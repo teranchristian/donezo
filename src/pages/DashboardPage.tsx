@@ -4,7 +4,7 @@ import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard'
 import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
-import { SummaryCard, type SummaryContent } from '../components/SummaryCard';
+import { SummaryCard, type FocusItem } from '../components/SummaryCard';
 import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
 import { getJiraIssueCounts, JiraConnectionStatus, JiraDashboardData } from '../lib/jiraApi';
 import {
@@ -161,21 +161,7 @@ export function DashboardPage({
     }));
   }, [gitHubData.connectionStatus, gitHubData.missingUsername]);
 
-  const daySummary = getDaySummary({
-    gitHubMetrics: gitHubSummaryMetrics,
-    jiraData,
-    isGitHubLoading,
-    isJiraLoading,
-    onOpenGitHubPrs: () => {
-      navigateToGitHubPrs('all');
-    },
-    onOpenApprovedPrs: () => {
-      navigateToGitHubPrs('approved');
-    },
-    onOpenJiraInProgress: () => {
-      navigateToJiraView('in-progress');
-    }
-  });
+  const todayFocusItems = getTodayFocusItems();
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
   const dashboardAlerts = getDashboardAlerts({
     gitHubMetrics: gitHubSummaryMetrics,
@@ -316,7 +302,7 @@ export function DashboardPage({
 
           <div className="dashboard-main-grid">
             <section className="dashboard-side-column">
-              <SummaryCard summary={daySummary} />
+              <SummaryCard items={todayFocusItems} />
               <NotesCard />
               <PlaceholderCard
                 title="Calendar"
@@ -391,86 +377,27 @@ function replaceDashboardHash(nextState: {
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
 }
 
-function getDaySummary(options: {
-  gitHubMetrics: GitHubSummaryMetrics;
-  jiraData: JiraDashboardData;
-  isGitHubLoading: boolean;
-  isJiraLoading: boolean;
-  onOpenGitHubPrs: () => void;
-  onOpenApprovedPrs: () => void;
-  onOpenJiraInProgress: () => void;
-}): SummaryContent {
-  const {
-    gitHubMetrics,
-    jiraData,
-    isGitHubLoading,
-    isJiraLoading,
-    onOpenGitHubPrs,
-    onOpenApprovedPrs,
-    onOpenJiraInProgress
-  } = options;
-
-  if (isGitHubLoading || isJiraLoading) {
-    return { type: 'text', lines: ['Loading your latest work summary...'] };
-  }
-
-  const jiraTicketCount = getJiraIssueCounts(jiraData.issues).inProgress;
-
-  if (gitHubMetrics.connectionStatus === 'invalid') {
-    return {
-      type: 'text',
-      lines: ['GitHub token is invalid. Update it in Settings.', `You're working on ${jiraTicketCount} Jira tickets.`]
-    };
-  }
-
-  if (gitHubMetrics.connectionStatus === 'error') {
-    return {
-      type: 'text',
-      lines: ['GitHub data is temporarily unavailable.', `You're working on ${jiraTicketCount} Jira tickets.`]
-    };
-  }
-
-  if (gitHubMetrics.missingUsername) {
-    return {
-      type: 'text',
-      lines: [
-        'GitHub is connected, but your username is missing in Settings.',
-        `You're working on ${jiraTicketCount} Jira tickets.`
-      ]
-    };
-  }
-
-  if (gitHubMetrics.connectionStatus === 'not-connected') {
-    return {
-      type: 'text',
-      lines: ['Connect GitHub to load pull request activity.', `You're working on ${jiraTicketCount} Jira tickets.`]
-    };
-  }
-
-  if (gitHubMetrics.relevantPrCount === 0 && jiraTicketCount === 0) {
-    return { type: 'text', lines: ['All clear: no pending PRs or tickets.'] };
-  }
-
-  return {
-    type: 'segments',
-    items: [
-      {
-        value: gitHubMetrics.relevantPrCount,
-        label: gitHubMetrics.relevantPrCount === 1 ? 'PR open' : 'PRs open',
-        onClick: onOpenGitHubPrs
-      },
-      {
-        value: gitHubMetrics.approvedPrCount ?? 'Loading…',
-        label: 'approved',
-        onClick: onOpenApprovedPrs
-      },
-      {
-        value: jiraTicketCount,
-        label: jiraTicketCount === 1 ? 'Jira ticket in progress' : 'Jira tickets in progress',
-        onClick: onOpenJiraInProgress
-      }
-    ]
-  };
+function getTodayFocusItems(): FocusItem[] {
+  return [
+    {
+      id: 'focus-jira-clk-112',
+      source: 'jira',
+      sourceLabel: 'Jira',
+      reference: 'CLK-112',
+      title: 'Fix lead status bug in dashboard',
+      statusLabel: 'In Progress',
+      statusTone: 'violet'
+    },
+    {
+      id: 'focus-github-142',
+      source: 'github',
+      sourceLabel: 'GitHub',
+      reference: '#142',
+      title: 'Fix venue provision defaults',
+      statusLabel: 'Approved',
+      statusTone: 'emerald'
+    }
+  ];
 }
 
 type DashboardAlertItem = {

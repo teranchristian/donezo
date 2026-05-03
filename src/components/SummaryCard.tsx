@@ -1,99 +1,167 @@
 import { CardShell } from './CardShell';
 
-export type SummaryContent =
-  | {
-      type: 'segments';
-      items: Array<{
-        value: number | string;
-        label: string;
-        onClick?: () => void;
-      }>;
-    }
-  | {
-      type: 'text';
-      lines: string[];
-    };
-
-type SummaryCardProps = {
-  summary: SummaryContent;
+export type FocusItem = {
+  id: string;
+  source: 'jira' | 'github';
+  sourceLabel: string;
+  reference: string;
+  title: string;
+  statusLabel: string;
+  statusTone: 'violet' | 'emerald' | 'amber';
 };
 
-export function SummaryCard({ summary }: SummaryCardProps) {
+type SummaryCardProps = {
+  items: FocusItem[];
+  limit?: number;
+};
+
+export function SummaryCard({ items, limit = 3 }: SummaryCardProps) {
+  const visibleItems = items.slice(0, limit);
+
   return (
     <CardShell className="overflow-hidden">
-      <div className="mb-4">
-        <h2 className="text-[1.05rem] font-semibold text-primary sm:text-[1.2rem]">A clear start to the day</h2>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500/14 text-violet-300"
+              aria-hidden="true"
+            >
+              <FocusTargetIcon />
+            </span>
+            <h2 className="text-[1.08rem] font-semibold text-primary sm:text-[1.2rem]">Today focus</h2>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-secondary">What do you want to close today?</p>
+        </div>
+
+        <span className="inline-flex shrink-0 items-center rounded-full bg-violet-500/16 px-3 py-1.5 text-sm font-semibold text-violet-100 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.18)]">
+          {visibleItems.length} / {limit}
+        </span>
       </div>
 
-      <div className="rounded-[calc(var(--radius-card)-4px)] bg-[var(--card-bg-soft)] px-4 py-4">
-        {summary.type === 'segments' ? (
-          <div className="flex flex-col gap-1 text-sm sm:text-base">
-            <div className="font-medium text-primary">
-              <SummarySegment item={summary.items[0]} />
-              <span className="mx-2 text-secondary">/</span>
-              <SummarySegment item={summary.items[1]} />
-            </div>
+      <div className="mt-5 space-y-3">
+        {visibleItems.map((item) => (
+          <FocusItemCard key={item.id} item={item} />
+        ))}
 
-            <div className="text-secondary">
-              <SummarySegment item={summary.items[2]} />
+        <div className="rounded-[16px] border border-violet-500/18 bg-violet-500/[0.05] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)]">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-violet-500/14 text-violet-200"
+              aria-hidden="true"
+            >
+              <FocusDropZoneIcon />
+            </span>
+            <div className="min-w-0">
+              <p className="text-base font-medium text-violet-100">Drag Jira tickets or PRs here</p>
+              <p className="text-sm leading-6 text-violet-200/72">to focus on them today</p>
             </div>
           </div>
-        ) : (
-          <div className="space-y-1.5 text-base leading-7 text-primary">
-            {summary.lines.map((line) => (
-              <p key={line}>{renderSummaryLine(line)}</p>
-            ))}
-          </div>
-        )}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-1.5 text-sm text-secondary">
+        <span>Focus on up to {limit} items</span>
+        <span className="text-[var(--text-tertiary)]" aria-hidden="true">
+          <InfoIcon />
+        </span>
       </div>
     </CardShell>
   );
 }
 
-function SummarySegment({
-  item
-}: {
-  item?: {
-    value: number | string;
-    label: string;
-    onClick?: () => void;
-  };
-}) {
-  if (!item) {
-    return null;
-  }
-
-  const content = (
-    <>
-      <span className="font-semibold text-primary">{item.value}</span> {item.label}
-    </>
-  );
-
-  if (!item.onClick) {
-    return <span className="summary-item whitespace-nowrap">{content}</span>;
-  }
+function FocusItemCard({ item }: { item: FocusItem }) {
+  const statusToneClass =
+    item.statusTone === 'violet'
+      ? 'bg-violet-500/16 text-violet-100'
+      : item.statusTone === 'emerald'
+        ? 'bg-emerald-500/16 text-emerald-100'
+        : 'bg-amber-500/16 text-amber-100';
 
   return (
-    <button
-      type="button"
-      onClick={item.onClick}
-      className="summary-item cursor-pointer whitespace-nowrap text-left transition hover:text-primary hover:underline"
-    >
-      {content}
-    </button>
+    <div className="flex items-center gap-3 rounded-[16px] bg-[var(--card-bg-soft)] px-4 py-4 shadow-[var(--shadow-card-soft)]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+        {item.source === 'jira' ? <JiraItemIcon /> : <GitHubItemIcon />}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-sm font-medium text-primary">{item.sourceLabel}</span>
+          <span className="text-sm font-medium text-stone-200">{item.reference}</span>
+        </div>
+        <p className="mt-0.5 truncate text-sm leading-6 text-secondary">{item.title}</p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <span
+          className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
+        >
+          {item.statusLabel}
+        </span>
+        <span className="shrink-0 text-secondary" aria-hidden="true">
+          <CloseIcon />
+        </span>
+      </div>
+    </div>
   );
 }
 
-function renderSummaryLine(line: string) {
-  return line.split(/(\d+)/).map((segment, index) => {
-    if (/^\d+$/.test(segment)) {
-      return (
-        <span key={`${segment}-${index}`} className="font-semibold text-primary">
-          {segment}
-        </span>
-      );
-    }
+function FocusTargetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <circle cx="12" cy="12" r="6.6" />
+      <circle cx="12" cy="12" r="1.8" />
+      <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
-    return <span key={`${segment}-${index}`}>{segment}</span>;
-  });
+function FocusDropZoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+      <circle cx="7" cy="7" r="1.7" />
+      <circle cx="12" cy="7" r="1.7" />
+      <circle cx="17" cy="7" r="1.7" />
+      <circle cx="7" cy="12" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="17" cy="12" r="1.7" />
+      <circle cx="7" cy="17" r="1.7" />
+      <circle cx="12" cy="17" r="1.7" />
+      <circle cx="17" cy="17" r="1.7" />
+    </svg>
+  );
+}
+
+function JiraItemIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6 text-sky-500" fill="currentColor">
+      <path d="M12 3 21 12l-9 9-9-9 9-9Zm0 4.2L7.2 12 12 16.8 16.8 12 12 7.2Zm0 2.8 2 2-2 2-2-2 2-2Z" />
+    </svg>
+  );
+}
+
+function GitHubItemIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6 text-white" fill="currentColor">
+      <path d="M12 .7a11.3 11.3 0 0 0-3.57 22.03c.57.1.78-.25.78-.55v-2.15c-3.18.69-3.85-1.35-3.85-1.35-.52-1.3-1.28-1.65-1.28-1.65-1.04-.7.08-.68.08-.68 1.15.08 1.75 1.17 1.75 1.17 1.02 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.53-2.54-.29-5.22-1.28-5.22-5.68 0-1.26.45-2.3 1.17-3.1-.12-.29-.5-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.24 2.77.12 3.06.73.8 1.17 1.84 1.17 3.1 0 4.41-2.69 5.39-5.25 5.67.42.36.78 1.06.78 2.15v3.18c0 .3.2.66.79.55A11.3 11.3 0 0 0 12 .7Z" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="m6.5 6.5 11 11m0-11-11 11" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 10v5" strokeLinecap="round" />
+      <circle cx="12" cy="7.2" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
 }
