@@ -300,7 +300,7 @@ export function DashboardPage({
   }
 
   const integrationSwitcher = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-white/[0.035] bg-white/[0.025] p-1">
       <IntegrationTabButton
         label="GitHub"
         isActive={activeIntegration === 'github'}
@@ -666,10 +666,10 @@ function IntegrationTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm transition ${
+      className={`rounded-full px-3 py-1.5 text-[0.82rem] font-medium transition ${
         isActive
-          ? 'bg-white/10 text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
-          : 'bg-white/[0.035] text-secondary hover:bg-white/[0.07] hover:text-primary'
+          ? 'bg-white/[0.12] text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]'
+          : 'bg-transparent text-secondary hover:bg-white/[0.045] hover:text-primary'
       }`}
     >
       {label}

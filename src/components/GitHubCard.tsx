@@ -90,8 +90,9 @@ export function GitHubCard({
   onPrStatusFilterChange
 }: GitHubCardProps) {
   const filterControlClass =
-    'flex h-10 min-w-0 items-center gap-1.5 rounded-[8px] border border-white/[0.06] bg-[#121820] px-3 text-[0.82rem] text-white/46 shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]';
-  const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-[0.82rem] text-white/78 outline-none';
+    'flex h-9 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.035] bg-white/[0.025] px-2.5 text-[0.8rem] text-white/40 transition hover:bg-white/[0.04] hover:text-white/54';
+  const filterSelectClass =
+    'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
@@ -299,17 +300,17 @@ export function GitHubCard({
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-[720px] flex-1 flex-col">
         {topBar ? (
-          <div className="-mx-5 -mt-4 mb-2 border-b border-white/[0.04] px-5 py-4">
+          <div className="-mx-4 -mt-3.5 mb-1.5 border-b border-white/[0.035] px-4 py-2.5">
             {topBar}
           </div>
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-2 flex min-w-0 items-end justify-between gap-3 overflow-hidden border-b border-white/[0.05]">
+          <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 overflow-hidden border-b border-white/[0.035] pb-1.5">
             <div className="min-w-0 flex-1">
-              <CardTabMenu items={tabItems} className="border-b-0 pb-0.5" />
+              <CardTabMenu items={tabItems} className="border-b-0" />
             </div>
-            <div className="flex shrink-0 items-center gap-2 pb-2">
+            <div className="flex shrink-0 items-center gap-2">
               <label className={`${filterControlClass} w-[188px]`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
                 <select
@@ -465,21 +466,21 @@ function PullRequestRow({
         event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
         event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
       }}
-      className="group -mx-2 block cursor-pointer px-2 py-2 transition hover:bg-white/[0.03]"
+      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-1.5">
         <GitHubItemIcon kind="pull-request" />
         <div className="min-w-0 flex-1">
-          <div className="inline-flex max-w-full items-start gap-1.5 align-top">
-            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.5 text-primary transition group-hover:text-white">
+          <div className="inline-flex max-w-full items-start gap-1 align-top">
+            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
               {pullRequest.title}
             </p>
             <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.68rem] text-white/42">
+          <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-2 text-white/22">•</span> : null}
+                {index > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
                 <span title={item}>{item}</span>
               </span>
             ))}
@@ -565,28 +566,28 @@ function NotificationRow({
       href={getNotificationUrl(notification)}
       target="_blank"
       rel="noreferrer"
-      className="group -mx-2 block cursor-pointer px-2 py-2 transition hover:bg-white/[0.03]"
+      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-1.5">
         <GitHubItemIcon
           kind={iconKind}
           state={iconKind === 'pull-request' ? pullRequestState : undefined}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
-            <p className="line-clamp-2 min-w-0 flex-1 text-[0.78rem] font-medium leading-4.5 text-primary transition group-hover:text-white">
+          <div className="flex items-start gap-1.5">
+            <p className="line-clamp-2 min-w-0 flex-1 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
               {notification.subject.title}
             </p>
-            <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-white/36">
+            <p className="shrink-0 pt-0.5 text-[0.58rem] font-medium uppercase tracking-[0.12em] text-white/36">
               {notificationTypeLabel}
             </p>
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.68rem] text-white/42">
+          <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
             <span>{notification.repository.full_name}</span>
             <span className="text-white/22">•</span>
             <span>updated {formatRelativeTime(notification.updated_at)}</span>
           </div>
-          <div className="mt-1 flex flex-wrap gap-1.5">
+          <div className="mt-0.75 flex flex-wrap gap-1">
             <Badge label={notification.reason} tone="gray" />
             {notification.unread ? <Badge label="Unread" tone="green" /> : null}
           </div>
@@ -697,7 +698,7 @@ function Badge({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
+      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[0.6rem] uppercase tracking-[0.14em] ${toneClass}`}
     >
       {label}
     </span>
