@@ -348,7 +348,7 @@ function FocusJiraCard({
           : 'border-white/[0.05] bg-[var(--card-bg-soft)] hover:border-white/10'
       }`}
     >
-      <div className="relative pr-8">
+      <div className="relative">
         <button
           type="button"
           onClick={() => onRemove(item.id)}
@@ -358,7 +358,7 @@ function FocusJiraCard({
           <CloseIcon />
         </button>
 
-        <div className="flex items-start gap-2.5">
+        <div className="flex items-start gap-2.5 pr-8">
           <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center" aria-hidden="true">
             <JiraItemIcon />
           </span>
@@ -383,93 +383,93 @@ function FocusJiraCard({
                 </span>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="mt-2">
-              <div className="mb-2 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (hasLinkedPrs) {
-                      setIsExpanded((value) => !value);
-                    }
-                  }}
-                  className={`inline-flex shrink-0 items-center gap-3 rounded-[12px] border px-4 py-2.5 text-left text-[0.72rem] font-semibold transition ${
-                    hasLinkedPrs
-                      ? 'border-violet-300/35 bg-violet-400/[0.08] text-white hover:border-violet-300/55 hover:bg-violet-400/[0.12]'
-                      : 'cursor-default border-violet-400/20 bg-violet-500/[0.03] text-white/48'
-                  }`}
-                  aria-expanded={hasLinkedPrs ? shouldExpandList : false}
-                  aria-label={
-                    hasLinkedPrs
-                      ? `${shouldExpandList ? 'Collapse' : 'Expand'} linked pull requests for ${item.reference}`
-                      : `No linked pull requests for ${item.reference}`
-                  }
-                >
-                  {hasLinkedPrs ? <ChevronIcon isExpanded={shouldExpandList} /> : <span className="w-4" aria-hidden="true" />}
-                  <span>{`Linked PRs (${item.children.length})`}</span>
-                </button>
-                <span className="h-px min-w-0 flex-1 border-t border-dashed border-white/20" aria-hidden="true" />
-              </div>
+        <div className="mt-2">
+          <div className="mb-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (hasLinkedPrs) {
+                  setIsExpanded((value) => !value);
+                }
+              }}
+              className={`inline-flex shrink-0 items-center gap-3 rounded-[12px] border px-4 py-2.5 text-left text-[0.72rem] font-semibold transition ${
+                hasLinkedPrs
+                  ? 'border-violet-300/35 bg-violet-400/[0.08] text-white hover:border-violet-300/55 hover:bg-violet-400/[0.12]'
+                  : 'cursor-default border-violet-400/20 bg-violet-500/[0.03] text-white/48'
+              }`}
+              aria-expanded={hasLinkedPrs ? shouldExpandList : false}
+              aria-label={
+                hasLinkedPrs
+                  ? `${shouldExpandList ? 'Collapse' : 'Expand'} linked pull requests for ${item.reference}`
+                  : `No linked pull requests for ${item.reference}`
+              }
+            >
+              {hasLinkedPrs ? <ChevronIcon isExpanded={shouldExpandList} /> : <span className="w-4" aria-hidden="true" />}
+              <span>{`Linked PRs (${item.children.length})`}</span>
+            </button>
+            <span className="h-px min-w-0 flex-1 border-t border-dashed border-white/20" aria-hidden="true" />
+          </div>
 
-              <div
-                className={`flex min-h-[3.9rem] items-center justify-between gap-2 rounded-[12px] border border-dashed px-2.5 py-2 transition duration-200 ${
-                  isNestTargetActive
-                    ? 'border-violet-300/55 bg-violet-400/[0.09] text-violet-100'
-                    : shouldShowDropHint
-                      ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
-                      : 'border-violet-400/20 bg-violet-500/[0.03] text-white/38'
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
-                    {isNestTargetActive ? `Drop PR into ${item.reference}` : 'Hover or drag a PR onto this ticket'}
-                  </p>
-                </div>
-                <span className="shrink-0 text-violet-200/85" aria-hidden="true">
-                  <DropArrowIcon />
-                </span>
-              </div>
+          <div
+            className={`flex min-h-[3.9rem] items-center justify-between gap-2 rounded-[12px] border border-dashed px-2.5 py-2 transition duration-200 ${
+              isNestTargetActive
+                ? 'border-violet-300/55 bg-violet-400/[0.09] text-violet-100'
+                : shouldShowDropHint
+                  ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
+                  : 'border-violet-400/20 bg-violet-500/[0.03] text-white/38'
+            }`}
+          >
+            <div className="min-w-0">
+              <p className={`text-[0.64rem] ${isNestTargetActive ? 'text-violet-100/72' : shouldShowDropHint ? 'text-violet-100/60' : 'text-white/28'}`}>
+                {isNestTargetActive ? `Drop PR into ${item.reference}` : 'Hover or drag a PR onto this ticket'}
+              </p>
             </div>
+            <span className="shrink-0 text-violet-200/85" aria-hidden="true">
+              <DropArrowIcon />
+            </span>
+          </div>
 
-            {item.children.length > 0 ? (
-              <div
-                className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
-                  shouldExpandList ? 'mt-2 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <div className="rounded-[13px] border border-white/[0.06] bg-black/12 p-1.5">
-                    <div className="max-h-40 overflow-y-auto pr-1">
-                      {item.children.map((child) => (
-                        <div key={child.id} className="space-y-1">
-                          <NestedPullRequestReorderSlot
-                            activeInternalDrag={activeInternalDrag}
-                            parentId={item.id}
-                            targetId={child.id}
-                            onReorder={onReorderNestedPullRequest}
-                          />
-                          <FocusPullRequestCard
-                            item={child}
-                            onRemove={() => onRemove(child.id)}
-                            isNested
-                            parentId={item.id}
-                            onInternalDragEnd={onInternalDragEnd}
-                            onInternalDragStart={onInternalDragStart}
-                          />
-                        </div>
-                      ))}
-                      <NestedPullRequestReorderSlot
-                        activeInternalDrag={activeInternalDrag}
-                        parentId={item.id}
-                        targetId={getNestedEndTargetId(item.id)}
-                        onReorder={onReorderNestedPullRequest}
-                      />
-                    </div>
+          {item.children.length > 0 ? (
+            <div
+              className={`grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out ${
+                shouldExpandList ? 'mt-2 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="overflow-hidden">
+                <div className="rounded-[13px] border border-white/[0.06] bg-black/12">
+                  <div className="max-h-40 overflow-y-auto">
+                    {item.children.map((child) => (
+                      <div key={child.id} className="space-y-1">
+                        <NestedPullRequestReorderSlot
+                          activeInternalDrag={activeInternalDrag}
+                          parentId={item.id}
+                          targetId={child.id}
+                          onReorder={onReorderNestedPullRequest}
+                        />
+                        <FocusPullRequestCard
+                          item={child}
+                          onRemove={() => onRemove(child.id)}
+                          isNested
+                          parentId={item.id}
+                          onInternalDragEnd={onInternalDragEnd}
+                          onInternalDragStart={onInternalDragStart}
+                        />
+                      </div>
+                    ))}
+                    <NestedPullRequestReorderSlot
+                      activeInternalDrag={activeInternalDrag}
+                      parentId={item.id}
+                      targetId={getNestedEndTargetId(item.id)}
+                      onReorder={onReorderNestedPullRequest}
+                    />
                   </div>
                 </div>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
