@@ -243,7 +243,9 @@ function mapIssueToFocusItem(issue: JiraIssue): FocusItem {
     reference: issue.key,
     title: issue.summary,
     statusLabel: issue.status.name,
-    statusTone: getIssueFocusTone(issue)
+    statusTone: getIssueFocusTone(issue),
+    jiraKey: issue.key,
+    children: []
   };
 }
 

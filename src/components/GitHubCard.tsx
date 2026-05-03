@@ -499,8 +499,14 @@ function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusIte
     reference: `#${pullRequest.pullNumber}`,
     title: pullRequest.title,
     statusLabel: getFocusStatusLabel(pullRequest.reviewStatus),
-    statusTone: getFocusStatusTone(pullRequest.reviewStatus)
+    statusTone: getFocusStatusTone(pullRequest.reviewStatus),
+    jiraKey: extractJiraKey(pullRequest.title)
   };
+}
+
+function extractJiraKey(value: string) {
+  const match = value.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  return match ? match[1].toUpperCase() : null;
 }
 
 function getFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {

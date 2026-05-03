@@ -4,14 +4,39 @@ export type Note = {
   createdAt: number;
 };
 
-export type FocusItem = {
+export type FocusStatusTone = 'violet' | 'emerald' | 'amber';
+
+type FocusItemBase = {
+  id: string;
+  sourceLabel: string;
+  reference: string;
+  title: string;
+  statusLabel: string;
+  statusTone: FocusStatusTone;
+};
+
+export type FocusPullRequestItem = FocusItemBase & {
+  source: 'github';
+  jiraKey: string | null;
+};
+
+export type FocusJiraItem = FocusItemBase & {
+  source: 'jira';
+  jiraKey: string;
+  children: FocusPullRequestItem[];
+  isPlaceholder?: boolean;
+};
+
+export type FocusItem = FocusJiraItem | FocusPullRequestItem;
+
+type LegacyFocusItem = {
   id: string;
   source: 'jira' | 'github';
   sourceLabel: string;
   reference: string;
   title: string;
   statusLabel: string;
-  statusTone: 'violet' | 'emerald' | 'amber';
+  statusTone: FocusStatusTone;
 };
 
 const NOTES_STORAGE_KEY = 'dashboard-notes';
@@ -449,31 +474,63 @@ function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
     : DEFAULT_ACTIVE_JIRA_VIEW;
 }
 
-function mergeFocusItems(items?: FocusItem[] | null) {
+function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
   if (!Array.isArray(items)) {
     return null;
   }
 
   return items
-    .filter((item): item is FocusItem => {
-      return Boolean(
-        item &&
-        typeof item.id === 'string' &&
-        (item.source === 'jira' || item.source === 'github') &&
-        typeof item.sourceLabel === 'string' &&
-        typeof item.reference === 'string' &&
-        typeof item.title === 'string' &&
-        typeof item.statusLabel === 'string' &&
-        (item.statusTone === 'violet' || item.statusTone === 'emerald' || item.statusTone === 'amber')
-      );
-    })
-    .map((item) => ({
-      id: item.id,
-      source: item.source,
-      sourceLabel: item.sourceLabel.trim(),
-      reference: item.reference.trim(),
-      title: item.title.trim(),
-      statusLabel: item.statusLabel.trim(),
-      statusTone: item.statusTone
-    }));
+    .map((item) => normalizeFocusItem(item))
+    .filter((item): item is FocusItem => item !== null);
+}
+
+function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined): FocusItem | null {
+  if (
+    !item ||
+    typeof item.id !== 'string' ||
+    (item.source !== 'jira' && item.source !== 'github') ||
+    typeof item.sourceLabel !== 'string' ||
+    typeof item.reference !== 'string' ||
+    typeof item.title !== 'string' ||
+    typeof item.statusLabel !== 'string' ||
+    (item.statusTone !== 'violet' && item.statusTone !== 'emerald' && item.statusTone !== 'amber')
+  ) {
+    return null;
+  }
+
+  const normalizedBase = {
+    id: item.id,
+    sourceLabel: item.sourceLabel.trim(),
+    reference: item.reference.trim(),
+    title: item.title.trim(),
+    statusLabel: item.statusLabel.trim(),
+    statusTone: item.statusTone
+  };
+
+  if (item.source === 'github') {
+    return {
+      ...normalizedBase,
+      source: 'github',
+      jiraKey: normalizeJiraKey('jiraKey' in item ? item.jiraKey : null)
+    };
+  }
+
+  const rawChildren = 'children' in item && Array.isArray(item.children) ? item.children : [];
+  const children = rawChildren
+    .map((child) => normalizeFocusItem(child))
+    .filter((child): child is FocusPullRequestItem => child?.source === 'github');
+  const normalizedJiraKey =
+    normalizeJiraKey('jiraKey' in item ? item.jiraKey : item.reference) ?? item.reference.trim();
+
+  return {
+    ...normalizedBase,
+    source: 'jira',
+    jiraKey: normalizedJiraKey,
+    children,
+    isPlaceholder: 'isPlaceholder' in item ? Boolean(item.isPlaceholder) : false
+  };
+}
+
+function normalizeJiraKey(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim().toUpperCase() : null;
 }

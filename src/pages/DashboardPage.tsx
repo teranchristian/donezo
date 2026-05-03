@@ -14,6 +14,8 @@ import {
 import {
   DashboardSettings,
   FocusItem,
+  FocusJiraItem,
+  FocusPullRequestItem,
   getStoredActiveGitHubView,
   getStoredActiveIntegration,
   getStoredActiveJiraView,
@@ -277,24 +279,20 @@ export function DashboardPage({
   function handleAddTodayFocusItem(item: FocusItem) {
     setTodayFocusWarning(null);
 
-    if (todayFocusItems.some((currentItem) => currentItem.id === item.id)) {
-      setTodayFocusWarning('That item is already in Today focus.');
+    const addResult = addTodayFocusItem(todayFocusItems, item);
+    if (addResult.warning) {
+      setTodayFocusWarning(addResult.warning);
       return;
     }
 
-    if (todayFocusItems.length >= TODAY_FOCUS_MAX_ITEMS) {
-      setTodayFocusWarning('Today focus already has 3 items.');
-      return;
-    }
-
-    const nextItems = [...todayFocusItems, item];
+    const nextItems = addResult.items;
     setTodayFocusItems(nextItems);
     void saveStoredTodayFocusItems(nextItems);
   }
 
   function handleRemoveTodayFocusItem(itemId: string) {
     setTodayFocusWarning(null);
-    const nextItems = todayFocusItems.filter((item) => item.id !== itemId);
+    const nextItems = removeTodayFocusItem(todayFocusItems, itemId);
     setTodayFocusItems(nextItems);
     void saveStoredTodayFocusItems(nextItems);
   }
@@ -434,22 +432,26 @@ function replaceDashboardHash(nextState: {
 function getDefaultTodayFocusItems(): FocusItem[] {
   return [
     {
-      id: 'focus-jira-clk-112',
+      id: 'jira:CLK-112',
       source: 'jira',
       sourceLabel: 'Jira',
       reference: 'CLK-112',
+      jiraKey: 'CLK-112',
       title: 'Fix lead status bug in dashboard',
       statusLabel: 'In Progress',
-      statusTone: 'violet'
-    },
-    {
-      id: 'focus-github-142',
-      source: 'github',
-      sourceLabel: 'GitHub',
-      reference: '#142',
-      title: 'Fix venue provision defaults',
-      statusLabel: 'Approved',
-      statusTone: 'emerald'
+      statusTone: 'violet',
+      children: [
+        {
+          id: 'github:dashboard#142',
+          source: 'github',
+          sourceLabel: 'GitHub',
+          reference: '#142',
+          title: 'CLK-112 Fix venue provision defaults',
+          statusLabel: 'Approved',
+          statusTone: 'emerald',
+          jiraKey: 'CLK-112'
+        }
+      ]
     }
   ];
 }
@@ -461,6 +463,123 @@ type DashboardAlertItem = {
   tone: 'amber' | 'rose' | 'emerald' | 'blue';
   onClick?: () => void;
 };
+
+function addTodayFocusItem(items: FocusItem[], item: FocusItem) {
+  if (item.source === 'jira') {
+    const existingParentIndex = items.findIndex(
+      (currentItem) => currentItem.source === 'jira' && currentItem.jiraKey === item.jiraKey
+    );
+
+    if (existingParentIndex >= 0) {
+      const existingParent = items[existingParentIndex] as FocusJiraItem;
+      if (!existingParent.isPlaceholder) {
+        return { items, warning: 'That item is already in Today focus.' };
+      }
+
+      const nextItems = [...items];
+      nextItems[existingParentIndex] = {
+        ...item,
+        children: existingParent.children,
+        isPlaceholder: false
+      };
+
+      return { items: nextItems, warning: null };
+    }
+
+    if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
+      return { items, warning: 'Today focus already has 3 items.' };
+    }
+
+    return {
+      items: [...items, { ...item, children: item.children ?? [], isPlaceholder: item.isPlaceholder ?? false }],
+      warning: null
+    };
+  }
+
+  if (hasTodayFocusItem(items, item.id)) {
+    return { items, warning: 'That item is already in Today focus.' };
+  }
+
+  if (!item.jiraKey) {
+    if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
+      return { items, warning: 'Today focus already has 3 items.' };
+    }
+
+    return { items: [...items, item], warning: null };
+  }
+
+  const parentIndex = items.findIndex(
+    (currentItem) => currentItem.source === 'jira' && currentItem.jiraKey === item.jiraKey
+  );
+
+  if (parentIndex >= 0) {
+    const parent = items[parentIndex] as FocusJiraItem;
+    const nextItems = [...items];
+    nextItems[parentIndex] = {
+      ...parent,
+      children: [...parent.children, item]
+    };
+
+    return { items: nextItems, warning: null };
+  }
+
+  if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
+    return { items, warning: 'Today focus already has 3 items.' };
+  }
+
+  const placeholderParent: FocusJiraItem = {
+    id: `jira:${item.jiraKey}`,
+    source: 'jira',
+    sourceLabel: 'Jira',
+    reference: item.jiraKey,
+    jiraKey: item.jiraKey,
+    title: 'Linked Jira ticket',
+    statusLabel: 'Linked PR',
+    statusTone: 'amber',
+    isPlaceholder: true,
+    children: [item]
+  };
+
+  return {
+    items: [...items, placeholderParent],
+    warning: null
+  };
+}
+
+function removeTodayFocusItem(items: FocusItem[], itemId: string) {
+  const nextItems: FocusItem[] = [];
+
+  for (const item of items) {
+    if (item.id === itemId) {
+      continue;
+    }
+
+    if (item.source === 'jira') {
+      const nextChildren = item.children.filter((child) => child.id !== itemId);
+      if (nextChildren.length === 0 && item.isPlaceholder) {
+        continue;
+      }
+
+      nextItems.push(
+        nextChildren.length === item.children.length
+          ? item
+          : {
+              ...item,
+              children: nextChildren
+            }
+      );
+      continue;
+    }
+
+    nextItems.push(item);
+  }
+
+  return nextItems;
+}
+
+function hasTodayFocusItem(items: FocusItem[], itemId: string) {
+  return items.some((item) => item.id === itemId || (item.source === 'jira' && item.children.some((child) => child.id === itemId)));
+}
 
 function getDashboardAlerts(options: {
   gitHubMetrics: GitHubSummaryMetrics;
