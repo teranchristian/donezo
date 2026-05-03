@@ -83,7 +83,7 @@ export function SummaryCard({
             </span>
             <h2 className="text-[0.95rem] font-medium text-primary sm:text-[1.02rem]">Today focus</h2>
           </div>
-          <p className="mt-2 text-[0.82rem] leading-5 text-secondary">What do you want to close today?</p>
+          <p className="mt-2 text-[0.82rem] leading-5 text-white/42">What do you want to close today?</p>
         </div>
 
         <span className="inline-flex shrink-0 items-center rounded-full bg-violet-500/16 px-3 py-1.5 text-[0.82rem] font-semibold text-violet-100 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.18)]">
@@ -116,15 +116,15 @@ export function SummaryCard({
               <FocusDropZoneIcon />
             </span>
             <div className="min-w-0">
-              <p className="text-[0.95rem] font-medium text-violet-100">Drag Jira tickets or PRs here</p>
-              <p className="text-[0.82rem] leading-5 text-violet-200/72">to focus on them today</p>
+              <p className="text-[0.95rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
+              <p className="text-[0.82rem] leading-5 text-violet-200/50">to focus on them today</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 text-[0.82rem] text-secondary">
+        <div className="flex items-center gap-1.5 text-[0.82rem] text-white/40">
           <span>Focus on up to {limit} items</span>
           <span className="text-[var(--text-tertiary)]" aria-hidden="true">
             <InfoIcon />
@@ -159,9 +159,9 @@ function FocusItemCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[0.82rem] font-medium text-primary">{item.sourceLabel}</span>
-          <span className="text-[0.82rem] font-medium text-stone-200">{item.reference}</span>
+          <span className="text-[0.82rem] font-medium text-white/66">{item.reference}</span>
         </div>
-        <p className="mt-0.5 truncate text-[0.8rem] leading-5 text-secondary">{item.title}</p>
+        <p className="mt-0.5 truncate text-[0.8rem] leading-5 text-white/44">{item.title}</p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -173,7 +173,7 @@ function FocusItemCard({
         <button
           type="button"
           onClick={onRemove}
-          className="shrink-0 text-secondary transition hover:text-primary"
+          className="shrink-0 text-white/34 transition hover:text-white/62"
           aria-label={`Remove ${item.sourceLabel} ${item.reference} from Today focus`}
         >
           <CloseIcon />

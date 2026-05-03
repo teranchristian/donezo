@@ -90,8 +90,8 @@ export function GitHubCard({
   onPrStatusFilterChange
 }: GitHubCardProps) {
   const filterControlClass =
-    'flex h-10 min-w-0 items-center gap-1.5 rounded-[8px] border border-white/[0.07] bg-[#121820] px-3 text-sm text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]';
-  const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-sm text-primary outline-none';
+    'flex h-10 min-w-0 items-center gap-1.5 rounded-[8px] border border-white/[0.06] bg-[#121820] px-3 text-[0.82rem] text-white/46 shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]';
+  const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-[0.82rem] text-white/78 outline-none';
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
@@ -476,10 +476,10 @@ function PullRequestRow({
             </p>
             <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-secondary">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-white/42">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
+                {index > 0 ? <span className="mr-2 text-white/22">•</span> : null}
                 <span title={item}>{item}</span>
               </span>
             ))}
@@ -577,13 +577,13 @@ function NotificationRow({
             <p className="line-clamp-2 min-w-0 flex-1 text-[0.82rem] font-medium leading-5 text-primary transition group-hover:text-white">
               {notification.subject.title}
             </p>
-            <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-secondary">
+            <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-white/36">
               {notificationTypeLabel}
             </p>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-secondary">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-white/42">
             <span>{notification.repository.full_name}</span>
-            <span className="text-[var(--text-tertiary)]">•</span>
+            <span className="text-white/22">•</span>
             <span>updated {formatRelativeTime(notification.updated_at)}</span>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-2">
@@ -688,11 +688,11 @@ function Badge({
   tone: 'default' | 'green' | 'red' | 'yellow' | 'gray';
 }) {
   const toneClass = {
-    default: 'bg-white/5 text-stone-300',
-    green: 'bg-emerald-200/10 text-emerald-100',
-    red: 'bg-rose-200/10 text-rose-100',
-    yellow: 'bg-amber-200/10 text-amber-100',
-    gray: 'bg-white/5 text-stone-400'
+    default: 'bg-white/[0.05] text-white/50',
+    green: 'bg-emerald-400/16 text-emerald-100',
+    red: 'bg-rose-400/16 text-rose-100',
+    yellow: 'bg-amber-400/16 text-amber-100',
+    gray: 'bg-white/[0.045] text-white/42'
   }[tone];
 
   return (

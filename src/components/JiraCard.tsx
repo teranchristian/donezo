@@ -205,10 +205,10 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
             </div>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-secondary">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.72rem] text-white/42">
             {detailItems.map((item, index) => (
               <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
+                {index > 0 ? <span className="mr-2 text-white/22">•</span> : null}
                 <span title={item}>{item}</span>
               </span>
             ))}
@@ -273,8 +273,8 @@ function RelatedIssueLink({
 }) {
   const toneClass =
     tone === 'amber'
-      ? 'text-amber-50 decoration-amber-100/70 hover:text-white hover:decoration-amber-50'
-      : 'text-rose-50 decoration-rose-100/70 hover:text-white hover:decoration-rose-50';
+      ? 'text-amber-100/80 decoration-amber-100/45 hover:text-white hover:decoration-amber-100/70'
+      : 'text-rose-100/80 decoration-rose-100/45 hover:text-white hover:decoration-rose-100/70';
 
   return (
     <a
@@ -296,7 +296,7 @@ function getRelatedIssueTooltip(issue: JiraIssue['blockingIssues'][number]) {
 
 function StatusBadge({ label }: { label: string }) {
   return (
-    <span className="rounded-full bg-sky-300/10 px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-sky-100">
+    <span className="rounded-full bg-sky-400/16 px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-sky-100">
       {label}
     </span>
   );
@@ -397,16 +397,16 @@ function PriorityIcon({ priorityName }: { priorityName?: string }) {
     <span
       aria-label={priorityName}
       title={priorityName}
-      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/5 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
-    >
-      {priorityName.slice(0, 1)}
-    </span>
+        className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.045] px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-white/44"
+      >
+        {priorityName.slice(0, 1)}
+      </span>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-white/44 shadow-[var(--shadow-card-soft)]">
       {message}
     </div>
   );

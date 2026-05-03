@@ -708,14 +708,14 @@ function GitHubIntegrationStatusBar({
             : 'Not connected';
 
   return (
-    <div className="ml-auto flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="ml-auto flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         <TopBarBadge className={toneClass}>{label}</TopBarBadge>
         <TopBarButton onClick={onRefresh} disabled={isLoading}>
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </TopBarButton>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[0.68rem] text-white/32">
         <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
         <span>·</span>
         <span>
@@ -758,14 +758,14 @@ function JiraIntegrationStatusBar({
             : 'Not connected';
 
   return (
-    <div className="ml-auto flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="ml-auto flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         <TopBarBadge className={toneClass}>{label}</TopBarBadge>
         <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus === 'not-connected'}>
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </TopBarButton>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[0.68rem] text-white/32">
         <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
       </div>
     </div>
@@ -781,7 +781,7 @@ function TopBarBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${className}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] ${className}`}
     >
       {children}
     </span>
@@ -802,7 +802,7 @@ function TopBarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex items-center rounded-full bg-white/[0.045] px-2.5 py-0.5 text-[0.62rem] uppercase tracking-[0.16em] text-white/48 transition hover:bg-white/[0.08] hover:text-white/72 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>
