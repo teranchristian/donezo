@@ -517,9 +517,9 @@ function PullRequestStatusPill({
   tone: 'green' | 'soft-green' | 'amber' | 'neutral';
 }) {
   const toneClass = {
-    green: 'border-emerald-200/12 bg-emerald-300/8 text-emerald-100/78',
-    'soft-green': 'border-emerald-100/10 bg-white/[0.045] text-emerald-50/72',
-    amber: 'border-amber-200/12 bg-amber-200/8 text-amber-100/74',
+    green: 'border-white/[0.06] bg-white/[0.045] text-white/58',
+    'soft-green': 'border-white/[0.06] bg-white/[0.045] text-white/58',
+    amber: 'border-white/[0.06] bg-white/[0.045] text-white/58',
     neutral: 'border-white/[0.06] bg-white/[0.045] text-white/58'
   }[tone];
 
