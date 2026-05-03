@@ -91,7 +91,7 @@ export function SummaryCard({
         </span>
       </div>
 
-      <div className="mt-4 space-y-2.5">
+      <div className="mt-3.5 space-y-2">
         {visibleItems.map((item) => (
           <FocusItemCard key={item.id} item={item} onRemove={() => onRemoveItem(item.id)} />
         ))}
@@ -102,22 +102,22 @@ export function SummaryCard({
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onBlur={handleBlur}
-          className={`rounded-[16px] border px-4 py-3.5 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
+          className={`rounded-[16px] border px-3.5 py-3 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
             isDropTargetActive
               ? 'border-violet-400/40 bg-violet-500/[0.09]'
               : 'border-violet-500/18 bg-violet-500/[0.05]'
           }`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-violet-500/14 text-violet-200"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-violet-500/14 text-violet-200"
               aria-hidden="true"
             >
               <FocusDropZoneIcon />
             </span>
             <div className="min-w-0">
-              <p className="text-[0.95rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
-              <p className="text-[0.82rem] leading-5 text-violet-200/50">to focus on them today</p>
+              <p className="text-[0.9rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
+              <p className="text-[0.78rem] leading-4.5 text-violet-200/50">to focus on them today</p>
             </div>
           </div>
         </div>
@@ -151,22 +151,22 @@ function FocusItemCard({
         : 'bg-amber-500/16 text-amber-100';
 
   return (
-    <div className="flex items-center gap-3 rounded-[16px] bg-[var(--card-bg-soft)] px-4 py-3.5 shadow-[var(--shadow-card-soft)]">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden="true">
+    <div className="flex items-center gap-2.5 rounded-[16px] bg-[var(--card-bg-soft)] px-3.5 py-2.5 shadow-[var(--shadow-card-soft)]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center" aria-hidden="true">
         {item.source === 'jira' ? <JiraItemIcon /> : <GitHubItemIcon />}
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-[0.82rem] font-medium text-primary">{item.sourceLabel}</span>
-          <span className="text-[0.82rem] font-medium text-white/66">{item.reference}</span>
+        <div className="flex items-center gap-2.5">
+          <span className="shrink-0 text-[0.78rem] font-medium text-primary">{item.sourceLabel}</span>
+          <span className="shrink-0 text-[0.78rem] font-medium text-white/66">{item.reference}</span>
         </div>
-        <p className="mt-0.5 truncate text-[0.8rem] leading-5 text-white/44">{item.title}</p>
+        <p className="mt-0.5 truncate text-[0.76rem] leading-4.5 text-white/44">{item.title}</p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <span
-          className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
+          className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
         >
           {item.statusLabel}
         </span>
@@ -195,7 +195,7 @@ function FocusTargetIcon() {
 
 function FocusDropZoneIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="currentColor">
       <circle cx="7" cy="7" r="1.7" />
       <circle cx="12" cy="7" r="1.7" />
       <circle cx="17" cy="7" r="1.7" />
@@ -211,7 +211,7 @@ function FocusDropZoneIcon() {
 
 function JiraItemIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6 text-sky-500" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-5 w-5 text-sky-500" fill="currentColor">
       <path d="M12 3 21 12l-9 9-9-9 9-9Zm0 4.2L7.2 12 12 16.8 16.8 12 12 7.2Zm0 2.8 2 2-2 2-2-2 2-2Z" />
     </svg>
   );
@@ -219,7 +219,7 @@ function JiraItemIcon() {
 
 function GitHubItemIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6 text-white" fill="currentColor">
+    <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="currentColor">
       <path d="M12 .7a11.3 11.3 0 0 0-3.57 22.03c.57.1.78-.25.78-.55v-2.15c-3.18.69-3.85-1.35-3.85-1.35-.52-1.3-1.28-1.65-1.28-1.65-1.04-.7.08-.68.08-.68 1.15.08 1.75 1.17 1.75 1.17 1.02 1.76 2.69 1.25 3.35.95.1-.74.4-1.25.72-1.53-2.54-.29-5.22-1.28-5.22-5.68 0-1.26.45-2.3 1.17-3.1-.12-.29-.5-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.24 2.77.12 3.06.73.8 1.17 1.84 1.17 3.1 0 4.41-2.69 5.39-5.25 5.67.42.36.78 1.06.78 2.15v3.18c0 .3.2.66.79.55A11.3 11.3 0 0 0 12 .7Z" />
     </svg>
   );
@@ -227,7 +227,7 @@ function GitHubItemIcon() {
 
 function CloseIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="m6.5 6.5 11 11m0-11-11 11" strokeLinecap="round" />
     </svg>
   );
