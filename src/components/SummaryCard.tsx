@@ -343,14 +343,7 @@ function FocusJiraCard({
           : 'border-white/[0.05] bg-[var(--card-bg-soft)] hover:border-white/10'
       }`}
     >
-      <div
-        className="relative pr-8"
-        onDrop={handleNestDrop}
-        onDragOver={handleNestDragOver}
-        onDragEnter={handleNestDragEnter}
-        onDragLeave={handleNestDragLeave}
-        onBlur={handleNestBlur}
-      >
+      <div className="relative pr-8">
         <button
           type="button"
           onClick={() => onRemove(item.id)}
@@ -416,6 +409,11 @@ function FocusJiraCard({
                     ? 'border-violet-400/30 bg-violet-500/[0.04] text-violet-100/88'
                     : 'border-white/[0.08] bg-black/10 text-white/38'
               }`}
+              onDrop={handleNestDrop}
+              onDragOver={handleNestDragOver}
+              onDragEnter={handleNestDragEnter}
+              onDragLeave={handleNestDragLeave}
+              onBlur={handleNestBlur}
             >
               <div className="min-w-0">
                 <p className="text-[0.72rem] font-semibold">
@@ -438,7 +436,14 @@ function FocusJiraCard({
               >
                 <div className="overflow-hidden">
                   <div className="rounded-[13px] border border-white/[0.06] bg-black/12 p-1.5">
-                    <div className="max-h-40 overflow-y-auto pr-1">
+                    <div
+                      className="max-h-40 overflow-y-auto pr-1"
+                      onDrop={handleNestDrop}
+                      onDragOver={handleNestDragOver}
+                      onDragEnter={handleNestDragEnter}
+                      onDragLeave={handleNestDragLeave}
+                      onBlur={handleNestBlur}
+                    >
                       {item.children.map((child) => (
                         <div key={child.id} className="space-y-1">
                           <NestedPullRequestReorderSlot
@@ -514,9 +519,7 @@ function FocusPullRequestCard({
       onDragStart={handleDragStart}
       onDragEnd={onInternalDragEnd}
       className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 pr-8 ${
-        isNested
-          ? 'rounded-[10px] border border-white/[0.04] bg-white/[0.03] px-2 py-1.5 transition hover:border-white/10 hover:bg-white/[0.05]'
-          : 'rounded-[14px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]'
+        isNested ? 'rounded-[10px] border border-white/[0.04] bg-white/[0.03] px-2 py-1.5 transition hover:border-white/10 hover:bg-white/[0.05]' : 'rounded-[14px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]'
       }`}
     >
       <button
@@ -745,8 +748,7 @@ function isValidJiraNestTarget(dataTransfer: DataTransfer, activeInternalDrag: F
     return internalDrag.source === 'top-level' && internalDrag.itemSource === 'github';
   }
 
-  const externalDrag = readExternalFocusItem(dataTransfer);
-  return externalDrag?.source === 'github';
+  return dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME);
 }
 
 function readExternalFocusItem(dataTransfer: DataTransfer): FocusItem | null {
