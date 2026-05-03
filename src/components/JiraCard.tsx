@@ -177,8 +177,12 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
   ].filter(Boolean);
 
   return (
-    <div
-      className="group relative -mx-2 px-2 py-1.5 transition hover:bg-white/[0.03]"
+    <a
+      href={issueUrl}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open Jira issue ${issue.key}`}
+      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
       draggable
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'copy';
@@ -186,14 +190,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
         event.dataTransfer.setData('text/plain', issue.key);
       }}
     >
-      <a
-        href={issueUrl}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Open Jira issue ${issue.key}`}
-        className="absolute inset-0 rounded-[10px]"
-      />
-      <div className="relative z-10 flex items-start gap-1.5 pointer-events-none">
+      <div className="flex items-start gap-1.5">
         <PriorityIcon priorityName={issue.priority?.name} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1.5">
@@ -231,7 +228,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
           </div>
         </div>
       </div>
-    </div>
+    </a>
   );
 }
 
