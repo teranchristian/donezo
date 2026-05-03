@@ -12,6 +12,7 @@ import {
 import { type ActiveJiraView, type FocusItem } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
+import { StatusBadge } from './StatusBadge';
 import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 
 type JiraCardProps = {
@@ -291,14 +292,6 @@ function RelatedIssueLink({
 function getRelatedIssueTooltip(issue: JiraIssue['blockingIssues'][number]) {
   const parts = [issue.summary, issue.status, issue.assignee ? `Owner: ${issue.assignee}` : undefined].filter(Boolean);
   return parts.join(' • ');
-}
-
-function StatusBadge({ label }: { label: string }) {
-  return (
-    <span className="rounded-full bg-sky-400/16 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-sky-100">
-      {label}
-    </span>
-  );
 }
 
 function PriorityIcon({ priorityName }: { priorityName?: string }) {

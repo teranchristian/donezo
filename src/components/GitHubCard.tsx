@@ -20,6 +20,7 @@ import {
 } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
+import { StatusBadge } from './StatusBadge';
 import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 
 type GitHubCardProps = {
@@ -469,8 +470,8 @@ function PullRequestRow({
       }}
       className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-1.5">
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
+        <div className="row-span-2 flex min-w-0 items-start gap-1.5">
           <GitHubItemIcon kind="pull-request" />
           <div className="min-w-0 flex-1">
             <div className="inline-flex max-w-full items-center gap-1 align-top">
@@ -498,37 +499,14 @@ function PullRequestRow({
             </div>
           </div>
         </div>
-        <div className="flex w-[9.5rem] shrink-0 flex-col items-end text-right">
-          <PullRequestStatusPill label={status.label} tone={status.tone} />
-          <p className="mt-0.5 text-[0.64rem] leading-4 text-white/38">
-            updated {formatRelativeTime(pullRequest.updatedAt)}
-          </p>
+        <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
+          <StatusBadge label={status.label} />
         </div>
+        <p className="col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 text-white/38">
+          updated {formatRelativeTime(pullRequest.updatedAt)}
+        </p>
       </div>
     </a>
-  );
-}
-
-function PullRequestStatusPill({
-  label,
-  tone
-}: {
-  label: string;
-  tone: 'green' | 'soft-green' | 'amber' | 'neutral';
-}) {
-  const toneClass = {
-    green: 'border-white/[0.06] bg-white/[0.045] text-white/58',
-    'soft-green': 'border-white/[0.06] bg-white/[0.045] text-white/58',
-    amber: 'border-white/[0.06] bg-white/[0.045] text-white/58',
-    neutral: 'border-white/[0.06] bg-white/[0.045] text-white/58'
-  }[tone];
-
-  return (
-    <span
-      className={`inline-flex h-5 items-center rounded-full border px-2 py-0 text-[0.56rem] font-medium uppercase tracking-[0.12em] ${toneClass}`}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -1063,42 +1041,36 @@ function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['review
 function getPullRequestDisplayStatus(pullRequest: GitHubPullRequestItem) {
   if (isPullRequestReadyToClose(pullRequest)) {
     return {
-      label: 'READY TO MERGE',
-      tone: 'green' as const
+      label: 'READY TO MERGE'
     };
   }
 
   if (pullRequest.reviewStatus === 'approved') {
     return {
-      label: 'APPROVED',
-      tone: 'soft-green' as const
+      label: 'APPROVED'
     };
   }
 
   if (pullRequest.reviewStatus === 'waiting-review') {
     return {
-      label: 'WAITING FOR REVIEW',
-      tone: 'amber' as const
+      label: 'WAITING FOR REVIEW'
     };
   }
 
   if (pullRequest.reviewStatus === 'changes-requested') {
     return {
-      label: 'CHANGES REQUESTED',
-      tone: 'neutral' as const
+      label: 'CHANGES REQUESTED'
     };
   }
 
   if (pullRequest.reviewStatus === 'draft') {
     return {
-      label: 'DRAFT',
-      tone: 'neutral' as const
+      label: 'DRAFT'
     };
   }
 
   return {
-    label: getCompactReviewStatusLabel(pullRequest.reviewStatus),
-    tone: 'neutral' as const
+    label: getCompactReviewStatusLabel(pullRequest.reviewStatus)
   };
 }
 
