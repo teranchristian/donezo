@@ -157,18 +157,18 @@ function FocusItemCard({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="shrink-0 text-[0.74rem] font-medium uppercase tracking-[0.12em] text-white/44">
+        <p className="line-clamp-2 text-[0.88rem] font-medium leading-5 text-primary">{item.title}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="shrink-0 text-[0.68rem] font-medium uppercase tracking-[0.12em] text-white/34">
             {item.sourceLabel}
           </span>
-          <span className="shrink-0 text-[0.78rem] font-semibold text-primary">{item.reference}</span>
+          <span className="shrink-0 text-[0.74rem] font-semibold text-white/62">{item.reference}</span>
         </div>
-        <p className="mt-1 line-clamp-2 text-[0.8rem] leading-5 text-white/72">{item.title}</p>
       </div>
 
       <div className="flex items-start gap-2">
         <span
-          className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.12em] ${statusToneClass}`}
+          className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[0.58rem] font-medium uppercase tracking-[0.1em] ${statusToneClass}`}
         >
           {item.statusLabel}
         </span>

@@ -7,8 +7,9 @@
   --space-md: 16px;
   --space-grid: 20px;
   --space-lg: 24px;
-  --dashboard-column-width: clamp(360px, 24vw, 384px);
+  --dashboard-column-width: clamp(380px, 25vw, 380px);
   --dashboard-grid-gap: 12px;
+  --dashboard-panel-max-width: 1280px;
   --radius-card: 16px;
   --radius-control: 999px;
   --container-width: 1760px;
@@ -142,7 +143,7 @@ body {
 }
 
 .dashboard-panel-column {
-  max-width: none;
+  max-width: min(100%, var(--dashboard-panel-max-width));
   width: 100%;
 }
 
