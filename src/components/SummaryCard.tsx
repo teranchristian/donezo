@@ -1,22 +1,74 @@
+import { FocusEvent, useState } from 'react';
 import { CardShell } from './CardShell';
+import { type FocusItem } from '../lib/storage';
 
-export type FocusItem = {
-  id: string;
-  source: 'jira' | 'github';
-  sourceLabel: string;
-  reference: string;
-  title: string;
-  statusLabel: string;
-  statusTone: 'violet' | 'emerald' | 'amber';
-};
+export const TODAY_FOCUS_MAX_ITEMS = 3;
+export const TODAY_FOCUS_DRAG_MIME = 'application/x-dashboard-today-focus-item';
 
 type SummaryCardProps = {
   items: FocusItem[];
   limit?: number;
+  warning?: string | null;
+  onRemoveItem: (itemId: string) => void;
+  onAddItem: (item: FocusItem) => void;
 };
 
-export function SummaryCard({ items, limit = 3 }: SummaryCardProps) {
+export function SummaryCard({
+  items,
+  limit = TODAY_FOCUS_MAX_ITEMS,
+  warning,
+  onRemoveItem,
+  onAddItem
+}: SummaryCardProps) {
+  const [isDropTargetActive, setIsDropTargetActive] = useState(false);
   const visibleItems = items.slice(0, limit);
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDropTargetActive(false);
+
+    const payload = event.dataTransfer.getData(TODAY_FOCUS_DRAG_MIME);
+    if (!payload) {
+      return;
+    }
+
+    try {
+      const parsedItem = JSON.parse(payload) as FocusItem;
+      onAddItem(parsedItem);
+    } catch {
+      return;
+    }
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!event.dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    if (!event.dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME)) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsDropTargetActive(true);
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDropTargetActive(false);
+    }
+  }
+
+  function handleBlur(event: FocusEvent<HTMLDivElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDropTargetActive(false);
+    }
+  }
 
   return (
     <CardShell className="overflow-hidden">
@@ -41,10 +93,21 @@ export function SummaryCard({ items, limit = 3 }: SummaryCardProps) {
 
       <div className="mt-5 space-y-3">
         {visibleItems.map((item) => (
-          <FocusItemCard key={item.id} item={item} />
+          <FocusItemCard key={item.id} item={item} onRemove={() => onRemoveItem(item.id)} />
         ))}
 
-        <div className="rounded-[16px] border border-violet-500/18 bg-violet-500/[0.05] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)]">
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onBlur={handleBlur}
+          className={`rounded-[16px] border px-4 py-4 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
+            isDropTargetActive
+              ? 'border-violet-400/40 bg-violet-500/[0.09]'
+              : 'border-violet-500/18 bg-violet-500/[0.05]'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-violet-500/14 text-violet-200"
@@ -60,17 +123,26 @@ export function SummaryCard({ items, limit = 3 }: SummaryCardProps) {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-1.5 text-sm text-secondary">
-        <span>Focus on up to {limit} items</span>
-        <span className="text-[var(--text-tertiary)]" aria-hidden="true">
-          <InfoIcon />
-        </span>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 text-sm text-secondary">
+          <span>Focus on up to {limit} items</span>
+          <span className="text-[var(--text-tertiary)]" aria-hidden="true">
+            <InfoIcon />
+          </span>
+        </div>
+        {warning ? <p className="text-right text-xs font-medium text-amber-200">{warning}</p> : null}
       </div>
     </CardShell>
   );
 }
 
-function FocusItemCard({ item }: { item: FocusItem }) {
+function FocusItemCard({
+  item,
+  onRemove
+}: {
+  item: FocusItem;
+  onRemove: () => void;
+}) {
   const statusToneClass =
     item.statusTone === 'violet'
       ? 'bg-violet-500/16 text-violet-100'
@@ -98,9 +170,14 @@ function FocusItemCard({ item }: { item: FocusItem }) {
         >
           {item.statusLabel}
         </span>
-        <span className="shrink-0 text-secondary" aria-hidden="true">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="shrink-0 text-secondary transition hover:text-primary"
+          aria-label={`Remove ${item.sourceLabel} ${item.reference} from Today focus`}
+        >
           <CloseIcon />
-        </span>
+        </button>
       </div>
     </div>
   );

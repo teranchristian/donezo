@@ -4,7 +4,7 @@ import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard'
 import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
-import { SummaryCard, type FocusItem } from '../components/SummaryCard';
+import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
 import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
 import { getJiraIssueCounts, JiraConnectionStatus, JiraDashboardData } from '../lib/jiraApi';
 import {
@@ -13,14 +13,17 @@ import {
 } from '../lib/dashboardRouting';
 import {
   DashboardSettings,
+  FocusItem,
   getStoredActiveGitHubView,
   getStoredActiveIntegration,
   getStoredActiveJiraView,
   getStoredGitHubPrStatusFilter,
+  getStoredTodayFocusItems,
   saveStoredActiveIntegration,
   saveStoredActiveGitHubView,
   saveStoredActiveJiraView,
   saveStoredGitHubPrStatusFilter,
+  saveStoredTodayFocusItems,
   type ActiveGitHubView,
   type ActiveIntegration,
   type ActiveJiraView,
@@ -55,6 +58,8 @@ export function DashboardPage({
   const [githubPrStatusFilter, setGitHubPrStatusFilter] = useState<GitHubPrStatusFilter>('all');
   const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
   const [hasLoadedNavigation, setHasLoadedNavigation] = useState(false);
+  const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
+  const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(null);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
@@ -154,6 +159,26 @@ export function DashboardPage({
   ]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    getStoredTodayFocusItems().then((storedItems) => {
+      if (!isMounted) {
+        return;
+      }
+
+      const nextItems = storedItems ?? getDefaultTodayFocusItems();
+      setTodayFocusItems(nextItems);
+      if (storedItems === null) {
+        void saveStoredTodayFocusItems(nextItems);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     setGitHubSummaryMetrics((current) => ({
       ...current,
       connectionStatus: gitHubData.connectionStatus,
@@ -161,7 +186,6 @@ export function DashboardPage({
     }));
   }, [gitHubData.connectionStatus, gitHubData.missingUsername]);
 
-  const todayFocusItems = getTodayFocusItems();
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
   const dashboardAlerts = getDashboardAlerts({
     gitHubMetrics: gitHubSummaryMetrics,
@@ -250,6 +274,31 @@ export function DashboardPage({
     });
   }
 
+  function handleAddTodayFocusItem(item: FocusItem) {
+    setTodayFocusWarning(null);
+
+    if (todayFocusItems.some((currentItem) => currentItem.id === item.id)) {
+      setTodayFocusWarning('That item is already in Today focus.');
+      return;
+    }
+
+    if (todayFocusItems.length >= TODAY_FOCUS_MAX_ITEMS) {
+      setTodayFocusWarning('Today focus already has 3 items.');
+      return;
+    }
+
+    const nextItems = [...todayFocusItems, item];
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleRemoveTodayFocusItem(itemId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = todayFocusItems.filter((item) => item.id !== itemId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
   const integrationSwitcher = (
     <div className="flex flex-wrap items-center gap-2">
       <IntegrationTabButton
@@ -302,7 +351,12 @@ export function DashboardPage({
 
           <div className="dashboard-main-grid">
             <section className="dashboard-side-column">
-              <SummaryCard items={todayFocusItems} />
+              <SummaryCard
+                items={todayFocusItems}
+                warning={todayFocusWarning}
+                onAddItem={handleAddTodayFocusItem}
+                onRemoveItem={handleRemoveTodayFocusItem}
+              />
               <NotesCard />
               <PlaceholderCard
                 title="Calendar"
@@ -377,7 +431,7 @@ function replaceDashboardHash(nextState: {
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
 }
 
-function getTodayFocusItems(): FocusItem[] {
+function getDefaultTodayFocusItems(): FocusItem[] {
   return [
     {
       id: 'focus-jira-clk-112',

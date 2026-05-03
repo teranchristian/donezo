@@ -7,6 +7,7 @@ import {
   getGitHubPullRequestState,
   type GitHubPullRequestState
 } from '../lib/githubApi';
+import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
 import {
   getStoredGitHubOwnerFilter,
@@ -19,6 +20,7 @@ import {
 } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
+import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 
 type GitHubCardProps = {
   topBar?: ReactNode;
@@ -457,6 +459,12 @@ function PullRequestRow({
       href={pullRequest.url}
       target="_blank"
       rel="noreferrer"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
+        event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
+      }}
       className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
     >
       <div className="flex items-start gap-2.5">
@@ -480,6 +488,46 @@ function PullRequestRow({
       </div>
     </a>
   );
+}
+
+function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusItem {
+  return {
+    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
+    source: 'github',
+    sourceLabel: 'GitHub',
+    reference: `#${pullRequest.pullNumber}`,
+    title: pullRequest.title,
+    statusLabel: getFocusStatusLabel(pullRequest.reviewStatus),
+    statusTone: getFocusStatusTone(pullRequest.reviewStatus)
+  };
+}
+
+function getFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
+  if (reviewStatus === 'approved') {
+    return 'Approved';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'Changes Requested';
+  }
+
+  if (reviewStatus === 'draft') {
+    return 'Draft';
+  }
+
+  return 'Open';
+}
+
+function getFocusStatusTone(reviewStatus: GitHubPullRequestItem['reviewStatus']): FocusItem['statusTone'] {
+  if (reviewStatus === 'approved') {
+    return 'emerald';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'amber';
+  }
+
+  return 'violet';
 }
 
 function PullRequestCheckStatusIcon({

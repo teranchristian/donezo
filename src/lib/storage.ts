@@ -4,7 +4,18 @@ export type Note = {
   createdAt: number;
 };
 
+export type FocusItem = {
+  id: string;
+  source: 'jira' | 'github';
+  sourceLabel: string;
+  reference: string;
+  title: string;
+  statusLabel: string;
+  statusTone: 'violet' | 'emerald' | 'amber';
+};
+
 const NOTES_STORAGE_KEY = 'dashboard-notes';
+const TODAY_FOCUS_ITEMS_STORAGE_KEY = 'today-focus-items';
 const SETTINGS_STORAGE_KEY = 'dashboard-settings';
 const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
 const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
@@ -96,6 +107,35 @@ export async function getStoredNotes() {
 }
 
 export { saveStoredNotes };
+
+export async function getStoredTodayFocusItems() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get(TODAY_FOCUS_ITEMS_STORAGE_KEY);
+    return mergeFocusItems(result[TODAY_FOCUS_ITEMS_STORAGE_KEY] as FocusItem[] | undefined);
+  }
+
+  const raw = localStorage.getItem(TODAY_FOCUS_ITEMS_STORAGE_KEY);
+  if (raw === null) {
+    return null;
+  }
+
+  try {
+    return mergeFocusItems(JSON.parse(raw) as FocusItem[]);
+  } catch {
+    return [];
+  }
+}
+
+export async function saveStoredTodayFocusItems(items: FocusItem[]) {
+  const normalizedItems = mergeFocusItems(items) ?? [];
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [TODAY_FOCUS_ITEMS_STORAGE_KEY]: normalizedItems });
+    return;
+  }
+
+  localStorage.setItem(TODAY_FOCUS_ITEMS_STORAGE_KEY, JSON.stringify(normalizedItems));
+}
 
 export async function getStoredSettings() {
   if (hasChromeStorage()) {
@@ -407,4 +447,33 @@ function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
     activeJiraView === 'active'
     ? activeJiraView
     : DEFAULT_ACTIVE_JIRA_VIEW;
+}
+
+function mergeFocusItems(items?: FocusItem[] | null) {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+
+  return items
+    .filter((item): item is FocusItem => {
+      return Boolean(
+        item &&
+        typeof item.id === 'string' &&
+        (item.source === 'jira' || item.source === 'github') &&
+        typeof item.sourceLabel === 'string' &&
+        typeof item.reference === 'string' &&
+        typeof item.title === 'string' &&
+        typeof item.statusLabel === 'string' &&
+        (item.statusTone === 'violet' || item.statusTone === 'emerald' || item.statusTone === 'amber')
+      );
+    })
+    .map((item) => ({
+      id: item.id,
+      source: item.source,
+      sourceLabel: item.sourceLabel.trim(),
+      reference: item.reference.trim(),
+      title: item.title.trim(),
+      statusLabel: item.statusLabel.trim(),
+      statusTone: item.statusTone
+    }));
 }

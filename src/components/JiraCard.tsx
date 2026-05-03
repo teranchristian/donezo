@@ -9,9 +9,10 @@ import {
   type JiraDashboardData,
   type JiraIssue
 } from '../lib/jiraApi';
-import { type ActiveJiraView } from '../lib/storage';
+import { type ActiveJiraView, type FocusItem } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
+import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 
 type JiraCardProps = {
   topBar?: ReactNode;
@@ -176,7 +177,15 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
   ].filter(Boolean);
 
   return (
-    <div className="group relative -mx-2 px-2 py-2.5 transition hover:bg-white/[0.03]">
+    <div
+      className="group relative -mx-2 px-2 py-2.5 transition hover:bg-white/[0.03]"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapIssueToFocusItem(issue)));
+        event.dataTransfer.setData('text/plain', issue.key);
+      }}
+    >
       <a
         href={issueUrl}
         target="_blank"
@@ -224,6 +233,33 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
       </div>
     </div>
   );
+}
+
+function mapIssueToFocusItem(issue: JiraIssue): FocusItem {
+  return {
+    id: `jira:${issue.key}`,
+    source: 'jira',
+    sourceLabel: 'Jira',
+    reference: issue.key,
+    title: issue.summary,
+    statusLabel: issue.status.name,
+    statusTone: getIssueFocusTone(issue)
+  };
+}
+
+function getIssueFocusTone(issue: JiraIssue): FocusItem['statusTone'] {
+  const statusCategoryKey = issue.status.statusCategory?.key;
+  const normalizedStatus = issue.status.name.toLowerCase();
+
+  if (statusCategoryKey === 'done' || normalizedStatus.includes('done') || normalizedStatus.includes('closed')) {
+    return 'emerald';
+  }
+
+  if (statusCategoryKey === 'new' || normalizedStatus.includes('to do') || normalizedStatus.includes('todo')) {
+    return 'amber';
+  }
+
+  return 'violet';
 }
 
 function RelatedIssueLink({
