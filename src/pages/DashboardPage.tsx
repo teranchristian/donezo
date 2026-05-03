@@ -341,7 +341,7 @@ export function DashboardPage({
           <div className="dashboard-header-status">{integrationStatusBar}</div>
         </div>
 
-        <section className="main-content flex flex-col gap-4">
+        <section className="main-content flex flex-col gap-[10px]">
           <div className="summary-cards-grid">
             {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
             {secondaryAlerts.map((alert) => (
@@ -562,14 +562,6 @@ function getReviewAlertDetail(
 }
 
 function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
-  const cardToneClass =
-    alert.tone === 'amber'
-      ? 'border-amber-400/10'
-      : alert.tone === 'rose'
-        ? 'border-rose-400/10'
-        : alert.tone === 'emerald'
-          ? 'border-emerald-400/10'
-          : 'border-sky-400/10';
   const iconWrapClass =
     alert.tone === 'amber'
       ? 'bg-amber-500/14 text-amber-300'
@@ -581,7 +573,7 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
 
   const content = (
     <div
-      className={`flex h-full min-h-[136px] items-start gap-4 rounded-[18px] border bg-[rgba(255,255,255,0.028)] px-4 py-4 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)] ${cardToneClass}`}
+      className="flex h-full min-h-[136px] items-start gap-4 rounded-[var(--radius-card)] border border-white/[0.06] bg-[rgba(255,255,255,0.028)] px-4 py-4 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)]"
     >
       <span
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
@@ -605,7 +597,7 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
     <button
       type="button"
       onClick={alert.onClick}
-      className="text-left transition hover:translate-y-[-1px] hover:opacity-100"
+      className="dashboard-summary-button text-left transition hover:translate-y-[-1px] hover:opacity-100"
     >
       {content}
     </button>
