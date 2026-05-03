@@ -344,7 +344,7 @@ function FocusJiraCard({
       onMouseLeave={() => setIsHovered(false)}
       className={`rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 ${
         isNestTargetActive
-          ? 'border-violet-400/45 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(167,139,250,0.16),0_14px_30px_rgba(76,29,149,0.22)]'
+          ? 'border-dashed border-violet-400/45 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(167,139,250,0.16),0_14px_30px_rgba(76,29,149,0.22)]'
           : 'border-white/[0.05] bg-[var(--card-bg-soft)] hover:border-white/10'
       }`}
     >
