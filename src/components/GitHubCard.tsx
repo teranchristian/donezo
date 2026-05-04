@@ -10,9 +10,7 @@ import {
 import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
 import {
-  getStoredGitHubOwnerFilter,
   getStoredGitHubSortOrder,
-  saveStoredGitHubOwnerFilter,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
   type GitHubPrStatusFilter,
@@ -28,6 +26,7 @@ type GitHubCardProps = {
   data: GitHubDashboardData;
   username: string;
   token: string;
+  ownerFilter: string;
   isLoading: boolean;
   isCheckingActivity: boolean;
   lastActivityCheckAt: number | null;
@@ -80,6 +79,7 @@ export function GitHubCard({
   data,
   username,
   token,
+  ownerFilter,
   isLoading,
   isCheckingActivity,
   lastActivityCheckAt,
@@ -94,14 +94,13 @@ export function GitHubCard({
     'flex h-9 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.035] bg-white/[0.025] px-2.5 text-[0.8rem] text-white/40 transition hover:bg-white/[0.04] hover:text-white/54';
   const filterSelectClass =
     'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
-  const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
-  const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
   const [isResolvingNotificationStates, setIsResolvingNotificationStates] = useState(false);
   const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
     Record<string, GitHubPullRequestState>
   >({});
+  const organizationFilter = ownerFilter.trim() || 'all';
   const resolvedPullRequests = data.pullRequests;
   const myOpenPRs = resolvedPullRequests.filter((pullRequest) => pullRequest.source === 'authored');
   const reviewRequestedPRs = resolvedPullRequests.filter(
@@ -109,7 +108,6 @@ export function GitHubCard({
   );
   const notifications = (data.notifications ?? []).filter(shouldDisplayNotification);
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
-  const ownerOptions = getOwnerOptions(data, username, organizationFilter);
   const notificationItems = notifications.map((notification) => ({
     kind: 'notification' as const,
     key: notification.id,
@@ -181,15 +179,6 @@ export function GitHubCard({
   useEffect(() => {
     let isMounted = true;
 
-    getStoredGitHubOwnerFilter().then((storedOwnerFilter) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setOrganizationFilter(storedOwnerFilter);
-      setHasLoadedOwnerFilter(true);
-    });
-
     getStoredGitHubSortOrder().then((storedSortOrder) => {
       if (!isMounted) {
         return;
@@ -203,14 +192,6 @@ export function GitHubCard({
       isMounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!hasLoadedOwnerFilter) {
-      return;
-    }
-
-    void saveStoredGitHubOwnerFilter(organizationFilter);
-  }, [hasLoadedOwnerFilter, organizationFilter]);
 
   useEffect(() => {
     if (!hasLoadedSortOrder) {
@@ -316,22 +297,6 @@ export function GitHubCard({
               <CardTabMenu items={tabItems} className="border-b-0" />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:max-w-[100%] xl:justify-end">
-              <label className={`${filterControlClass} min-w-[180px] flex-1 xl:w-[188px] xl:flex-none`}>
-                <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
-                <select
-                  aria-label="Owner"
-                  value={organizationFilter}
-                  onChange={(event) => setOrganizationFilter(event.target.value)}
-                  className={`${filterSelectClass} flex-1`}
-                >
-                  {ownerOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-panel text-stone-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
               {activeView === 'prs' ? (
                 <label className={`${filterControlClass} min-w-[160px] flex-1 xl:w-[168px] xl:flex-none`}>
                   <span className="shrink-0 text-[var(--text-tertiary)]">Status:</span>
@@ -858,42 +823,6 @@ function mapPullRequestViewItem(pullRequest: GitHubPullRequestItem): GitHubViewI
     updatedAt: pullRequest.updatedAt,
     value: pullRequest
   };
-}
-
-function getOwnerOptions(data: GitHubDashboardData, username: string, selectedOwner: string) {
-  const owners = new Set<string>();
-
-  for (const pullRequest of data.pullRequests) {
-    owners.add(getOwnerFromRepositoryName(pullRequest.repositoryName));
-  }
-
-  for (const notification of data.notifications ?? []) {
-    owners.add(getOwnerFromRepositoryName(notification.repository.full_name));
-  }
-
-  const trimmedUsername = username.trim();
-  const sortedOwners = [...owners].filter(Boolean).sort((left, right) => left.localeCompare(right));
-  const options = [{ value: 'all', label: 'All' }];
-
-  if (trimmedUsername) {
-    options.push({ value: trimmedUsername, label: trimmedUsername });
-  }
-
-  for (const owner of sortedOwners) {
-    if (owner !== trimmedUsername) {
-      options.push({ value: owner, label: owner });
-    }
-  }
-
-  if (
-    selectedOwner !== 'all' &&
-    selectedOwner.trim() &&
-    !options.some((option) => option.value === selectedOwner)
-  ) {
-    options.push({ value: selectedOwner, label: selectedOwner });
-  }
-
-  return options;
 }
 
 function getOwnerFromRepositoryName(repositoryName: string) {

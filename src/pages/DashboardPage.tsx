@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard';
+import { HeaderMenu } from '../components/HeaderMenu';
 import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
@@ -376,7 +377,10 @@ export function DashboardPage({
       <div className="dashboard-container flex flex-col gap-5">
         <div className="dashboard-header-row">
           <DashboardHeader name={settings.name} />
-          <div className="dashboard-header-status">{integrationStatusBar}</div>
+          <div className="dashboard-header-status gap-3">
+            {integrationStatusBar}
+            <HeaderMenu />
+          </div>
         </div>
 
         <section className="main-content flex flex-col gap-3">
@@ -426,6 +430,7 @@ export function DashboardPage({
                     data={gitHubData}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
+                    ownerFilter={settings.integrations.github.ownerFilter}
                     isLoading={isGitHubLoading}
                     isCheckingActivity={isCheckingGitHubActivity}
                     lastActivityCheckAt={lastGitHubActivityCheckAt}

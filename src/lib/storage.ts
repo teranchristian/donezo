@@ -58,6 +58,7 @@ export type DashboardSettings = {
     github: {
       username: string;
       token: string;
+      ownerFilter: string;
     };
     jira: {
       baseUrl: string;
@@ -83,7 +84,8 @@ const DEFAULT_SETTINGS: DashboardSettings = {
   integrations: {
     github: {
       username: '',
-      token: ''
+      token: '',
+      ownerFilter: ''
     },
     jira: {
       baseUrl: '',
@@ -166,12 +168,14 @@ export async function getStoredSettings() {
   if (hasChromeStorage()) {
     const result = await chrome.storage.local.get([
       SETTINGS_STORAGE_KEY,
+      GITHUB_OWNER_FILTER_STORAGE_KEY,
       JIRA_BASE_URL_STORAGE_KEY,
       JIRA_EMAIL_STORAGE_KEY,
       JIRA_API_TOKEN_STORAGE_KEY
     ]);
 
     return mergeSettings(result[SETTINGS_STORAGE_KEY] as Partial<DashboardSettings> | undefined, {
+      ownerFilter: result[GITHUB_OWNER_FILTER_STORAGE_KEY] as string | undefined,
       baseUrl: result[JIRA_BASE_URL_STORAGE_KEY] as string | undefined,
       email: result[JIRA_EMAIL_STORAGE_KEY] as string | undefined,
       apiToken: result[JIRA_API_TOKEN_STORAGE_KEY] as string | undefined
@@ -179,17 +183,20 @@ export async function getStoredSettings() {
   }
 
   const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+  const gitHubOwnerFilter = localStorage.getItem(GITHUB_OWNER_FILTER_STORAGE_KEY) ?? undefined;
   const jiraBaseUrl = localStorage.getItem(JIRA_BASE_URL_STORAGE_KEY) ?? undefined;
   const jiraEmail = localStorage.getItem(JIRA_EMAIL_STORAGE_KEY) ?? undefined;
   const jiraApiToken = localStorage.getItem(JIRA_API_TOKEN_STORAGE_KEY) ?? undefined;
   try {
     return mergeSettings(raw ? (JSON.parse(raw) as Partial<DashboardSettings>) : undefined, {
+      ownerFilter: gitHubOwnerFilter ?? undefined,
       baseUrl: jiraBaseUrl ?? undefined,
       email: jiraEmail ?? undefined,
       apiToken: jiraApiToken ?? undefined
     });
   } catch {
     return mergeSettings(undefined, {
+      ownerFilter: gitHubOwnerFilter ?? undefined,
       baseUrl: jiraBaseUrl ?? undefined,
       email: jiraEmail ?? undefined,
       apiToken: jiraApiToken ?? undefined
@@ -201,6 +208,7 @@ export async function saveStoredSettings(settings: DashboardSettings) {
   if (hasChromeStorage()) {
     await chrome.storage.local.set({
       [SETTINGS_STORAGE_KEY]: settings,
+      [GITHUB_OWNER_FILTER_STORAGE_KEY]: settings.integrations.github.ownerFilter.trim(),
       [JIRA_BASE_URL_STORAGE_KEY]: normalizeBaseUrl(settings.integrations.jira.baseUrl),
       [JIRA_EMAIL_STORAGE_KEY]: settings.integrations.jira.email.trim(),
       [JIRA_API_TOKEN_STORAGE_KEY]: settings.integrations.jira.apiToken.trim()
@@ -209,36 +217,10 @@ export async function saveStoredSettings(settings: DashboardSettings) {
   }
 
   localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  localStorage.setItem(GITHUB_OWNER_FILTER_STORAGE_KEY, settings.integrations.github.ownerFilter.trim());
   localStorage.setItem(JIRA_BASE_URL_STORAGE_KEY, normalizeBaseUrl(settings.integrations.jira.baseUrl));
   localStorage.setItem(JIRA_EMAIL_STORAGE_KEY, settings.integrations.jira.email.trim());
   localStorage.setItem(JIRA_API_TOKEN_STORAGE_KEY, settings.integrations.jira.apiToken.trim());
-}
-
-export async function getStoredGitHubOwnerFilter() {
-  if (hasChromeStorage()) {
-    const result = await chrome.storage.local.get([GITHUB_OWNER_FILTER_STORAGE_KEY]);
-    return mergeGitHubOwnerFilter(result[GITHUB_OWNER_FILTER_STORAGE_KEY] as string | undefined);
-  }
-
-  const raw = localStorage.getItem(GITHUB_OWNER_FILTER_STORAGE_KEY);
-  if (!raw) {
-    return DEFAULT_GITHUB_OWNER_FILTER;
-  }
-
-  try {
-    return mergeGitHubOwnerFilter(JSON.parse(raw) as string);
-  } catch {
-    return DEFAULT_GITHUB_OWNER_FILTER;
-  }
-}
-
-export async function saveStoredGitHubOwnerFilter(filter: GitHubListOrganizationFilter) {
-  if (hasChromeStorage()) {
-    await chrome.storage.local.set({ [GITHUB_OWNER_FILTER_STORAGE_KEY]: filter });
-    return;
-  }
-
-  localStorage.setItem(GITHUB_OWNER_FILTER_STORAGE_KEY, JSON.stringify(filter));
 }
 
 export async function getStoredGitHubSortOrder() {
@@ -399,23 +381,29 @@ export function deleteNote(notes: Note[], noteId: string) {
 
 function mergeSettings(
   settings?: Partial<DashboardSettings>,
-  jiraOverrides?: Partial<DashboardSettings['integrations']['jira']>
+  overrides?: Partial<DashboardSettings['integrations']['jira']> & {
+    ownerFilter?: string;
+  }
 ): DashboardSettings {
   const jiraBaseUrl =
-    jiraOverrides?.baseUrl ?? settings?.integrations?.jira?.baseUrl ?? DEFAULT_SETTINGS.integrations.jira.baseUrl;
+    overrides?.baseUrl ?? settings?.integrations?.jira?.baseUrl ?? DEFAULT_SETTINGS.integrations.jira.baseUrl;
   const jiraEmail =
-    jiraOverrides?.email ?? settings?.integrations?.jira?.email ?? DEFAULT_SETTINGS.integrations.jira.email;
+    overrides?.email ?? settings?.integrations?.jira?.email ?? DEFAULT_SETTINGS.integrations.jira.email;
   const jiraApiToken =
-    jiraOverrides?.apiToken ??
+    overrides?.apiToken ??
     settings?.integrations?.jira?.apiToken ??
     DEFAULT_SETTINGS.integrations.jira.apiToken;
+  const gitHubOwnerFilter = mergeGitHubOwnerFilter(
+    settings?.integrations?.github?.ownerFilter ?? overrides?.ownerFilter
+  );
 
   return {
     name: settings?.name?.trim() ?? DEFAULT_SETTINGS.name,
     integrations: {
       github: {
         username: settings?.integrations?.github?.username ?? DEFAULT_SETTINGS.integrations.github.username,
-        token: settings?.integrations?.github?.token ?? DEFAULT_SETTINGS.integrations.github.token
+        token: settings?.integrations?.github?.token ?? DEFAULT_SETTINGS.integrations.github.token,
+        ownerFilter: gitHubOwnerFilter === 'all' ? '' : gitHubOwnerFilter
       },
       jira: {
         baseUrl: normalizeBaseUrl(jiraBaseUrl),

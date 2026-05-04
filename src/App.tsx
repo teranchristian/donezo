@@ -355,6 +355,7 @@ export default function App() {
           element={
             <SettingsPage
               settings={settings}
+              gitHubData={gitHubData}
               onSave={handleSaveSettings}
               onTestGitHubConnection={handleTestGitHubConnection}
               onTestJiraConnection={handleTestJiraConnection}
