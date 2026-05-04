@@ -307,12 +307,12 @@ export function GitHubCard({
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 overflow-hidden border-b border-white/[0.035] pb-1.5">
+          <div className="mb-1.5 flex min-w-0 flex-col gap-2.5 border-b border-white/[0.035] pb-1.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
               <CardTabMenu items={tabItems} className="border-b-0" />
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <label className={`${filterControlClass} w-[188px]`}>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 xl:max-w-[100%] xl:justify-end">
+              <label className={`${filterControlClass} min-w-[180px] flex-1 xl:w-[188px] xl:flex-none`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
                 <select
                   aria-label="Owner"
@@ -329,7 +329,7 @@ export function GitHubCard({
               </label>
 
               {activeView === 'prs' ? (
-                <label className={`${filterControlClass} w-[168px]`}>
+                <label className={`${filterControlClass} min-w-[160px] flex-1 xl:w-[168px] xl:flex-none`}>
                   <span className="shrink-0 text-[var(--text-tertiary)]">Status:</span>
                   <select
                     aria-label="PR status"
@@ -350,7 +350,7 @@ export function GitHubCard({
                 </label>
               ) : null}
 
-              <label className={`${filterControlClass} w-[220px]`}>
+              <label className={`${filterControlClass} min-w-[200px] flex-1 xl:w-[220px] xl:flex-none`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Sort:</span>
                 <select
                   aria-label="Sort"
