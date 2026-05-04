@@ -6,6 +6,8 @@ const JIRA_ACTIVE_ISSUES_JQL =
 const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
 const GITHUB_NOTIFICATION_SIGNALS_CACHE_KEY = 'github-notification-signals';
 const GITHUB_CACHE_TTL_MS = 5 * 60 * 1000;
+const GITHUB_NOTIFICATIONS_WINDOW_DAYS = 7;
+const GITHUB_NOTIFICATIONS_PAGE_SIZE = 50;
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const GITHUB_PULL_REQUESTS_QUERY = `
   query DashboardPullRequests(
@@ -290,20 +292,31 @@ async function testGitHubConnection(token) {
   }
 }
 
+function getGitHubNotificationsSinceIso() {
+  return new Date(Date.now() - GITHUB_NOTIFICATIONS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+}
+
 async function getGitHubNotifications(token) {
   const notifications = [];
   let page = 1;
+  const since = getGitHubNotificationsSinceIso();
 
   while (true) {
+    const searchParams = new URLSearchParams({
+      all: 'true',
+      per_page: String(GITHUB_NOTIFICATIONS_PAGE_SIZE),
+      page: String(page),
+      since
+    });
     const response = await fetchGitHub(
-      `https://api.github.com/notifications?all=true&per_page=50&page=${page}`,
+      `https://api.github.com/notifications?${searchParams.toString()}`,
       token
     );
     const pageNotifications = await response.json();
 
     notifications.push(...pageNotifications);
 
-    if (pageNotifications.length < 50) {
+    if (pageNotifications.length < GITHUB_NOTIFICATIONS_PAGE_SIZE) {
       break;
     }
 
