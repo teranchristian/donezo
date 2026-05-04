@@ -551,7 +551,23 @@ function PullRequestCheckStatusIcon({
   }
 
   if (ciStatus === 'pending') {
-    return <span className="shrink-0 text-[0.72rem] leading-none text-amber-100/60">●</span>;
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-[0.8rem] w-[0.8rem] shrink-0 animate-spin text-amber-300/85"
+        fill="none"
+      >
+        <circle cx="8" cy="8" r="5.25" className="text-amber-100/18" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="M8 2.75a5.25 5.25 0 0 1 5.25 5.25"
+          className="text-amber-300"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="1.75"
+        />
+      </svg>
+    );
   }
 
   return null;
