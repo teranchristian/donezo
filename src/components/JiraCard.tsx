@@ -9,9 +9,11 @@ import {
   type JiraDashboardData,
   type JiraIssue
 } from '../lib/jiraApi';
-import { type ActiveJiraView } from '../lib/storage';
+import { type ActiveJiraView, type FocusItem } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
+import { StatusBadge } from './StatusBadge';
+import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 
 type JiraCardProps = {
   topBar?: ReactNode;
@@ -113,17 +115,17 @@ export function JiraCard({
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col">
         {topBar ? (
-          <div className="-mx-5 -mt-4 mb-2 border-b border-white/[0.04] px-5 py-4">
+          <div className="-mx-4 -mt-3.5 mb-1.5 border-b border-white/[0.035] px-4 py-2.5">
             {topBar}
           </div>
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-2 min-w-0">
-            <CardTabMenu items={tabItems} />
+          <div className="mb-1.5 min-w-0 border-b border-white/[0.035] pb-1.5">
+            <CardTabMenu items={tabItems} className="border-b-0" />
           </div>
 
-          <div className="dashboard-scrollbar min-h-[280px] max-h-[420px] flex-1 overflow-y-auto pr-1">
+          <div className="dashboard-scrollbar min-h-[280px] max-h-[420px] flex-1 overflow-x-hidden overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
@@ -168,62 +170,95 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
   const blockedByIssues = issue.blockedByIssues;
   const issueUrl = getJiraBrowseUrl(baseUrl, issue.key);
   const projectName = issue.project?.name || issue.project?.key || '';
-  const detailItems = [
-    issue.key,
-    projectName,
-    `updated ${formatRelativeTime(issue.updated)}`,
-    issue.status.name
-  ].filter(Boolean);
+  const detailItems = [issue.key, projectName].filter(Boolean);
 
   return (
-    <div className="group relative -mx-2 px-2 py-2.5 transition hover:bg-white/[0.03]">
-      <a
-        href={issueUrl}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Open Jira issue ${issue.key}`}
-        className="absolute inset-0 rounded-[10px]"
-      />
-      <div className="relative z-10 flex items-start gap-2.5 pointer-events-none">
-        <PriorityIcon priorityName={issue.priority?.name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
+    <a
+      href={issueUrl}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open Jira issue ${issue.key}`}
+      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapIssueToFocusItem(issue)));
+        event.dataTransfer.setData('text/plain', issue.key);
+      }}
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-x-3">
+        <div className="flex min-w-0 items-start gap-1.5">
+          <PriorityIcon priorityName={issue.priority?.name} />
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
               {issue.summary}
             </p>
-            <div className="shrink-0">
-              <StatusBadge label={issue.status.name} />
+
+            <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
+              {detailItems.map((item, index) => (
+                <span key={`${item}-${index}`} className="min-w-0 truncate">
+                  {index > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
+                  <span title={item}>{item}</span>
+                </span>
+              ))}
+              {blockingIssues.map((blockingIssue) => (
+                <span
+                  key={blockingIssue.key}
+                  className="pointer-events-auto rounded-full bg-amber-300/10 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-amber-100"
+                >
+                  Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
+                </span>
+              ))}
+              {blockedByIssues.map((blockedByIssue) => (
+                <span
+                  key={blockedByIssue.key}
+                  className="pointer-events-auto rounded-full bg-rose-300/10 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-rose-100"
+                >
+                  Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
+                </span>
+              ))}
             </div>
           </div>
+        </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
-            {detailItems.map((item, index) => (
-              <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
-                <span title={item}>{item}</span>
-              </span>
-            ))}
-            {blockingIssues.map((blockingIssue) => (
-              <span
-                key={blockingIssue.key}
-                className="pointer-events-auto rounded-full bg-amber-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.14em] text-amber-100"
-              >
-                Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
-              </span>
-            ))}
-            {blockedByIssues.map((blockedByIssue) => (
-              <span
-                key={blockedByIssue.key}
-                className="pointer-events-auto rounded-full bg-rose-300/10 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.14em] text-rose-100"
-              >
-                Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
-              </span>
-            ))}
-          </div>
+        <div className="flex min-w-0 flex-col items-end pt-[0.08rem]">
+          <StatusBadge label={issue.status.name} />
+          <p className="mt-0.25 text-right text-[0.64rem] leading-4 text-white/38">
+            updated {formatRelativeTime(issue.updated)}
+          </p>
         </div>
       </div>
-    </div>
+    </a>
   );
+}
+
+function mapIssueToFocusItem(issue: JiraIssue): FocusItem {
+  return {
+    id: `jira:${issue.key}`,
+    source: 'jira',
+    sourceLabel: 'Jira',
+    reference: issue.key,
+    title: issue.summary,
+    statusLabel: issue.status.name,
+    statusTone: getIssueFocusTone(issue),
+    jiraKey: issue.key,
+    children: []
+  };
+}
+
+function getIssueFocusTone(issue: JiraIssue): FocusItem['statusTone'] {
+  const statusCategoryKey = issue.status.statusCategory?.key;
+  const normalizedStatus = issue.status.name.toLowerCase();
+
+  if (statusCategoryKey === 'done' || normalizedStatus.includes('done') || normalizedStatus.includes('closed')) {
+    return 'emerald';
+  }
+
+  if (statusCategoryKey === 'new' || normalizedStatus.includes('to do') || normalizedStatus.includes('todo')) {
+    return 'amber';
+  }
+
+  return 'violet';
 }
 
 function RelatedIssueLink({
@@ -237,8 +272,8 @@ function RelatedIssueLink({
 }) {
   const toneClass =
     tone === 'amber'
-      ? 'text-amber-50 decoration-amber-100/70 hover:text-white hover:decoration-amber-50'
-      : 'text-rose-50 decoration-rose-100/70 hover:text-white hover:decoration-rose-50';
+      ? 'text-amber-100/80 decoration-amber-100/45 hover:text-white hover:decoration-amber-100/70'
+      : 'text-rose-100/80 decoration-rose-100/45 hover:text-white hover:decoration-rose-100/70';
 
   return (
     <a
@@ -256,14 +291,6 @@ function RelatedIssueLink({
 function getRelatedIssueTooltip(issue: JiraIssue['blockingIssues'][number]) {
   const parts = [issue.summary, issue.status, issue.assignee ? `Owner: ${issue.assignee}` : undefined].filter(Boolean);
   return parts.join(' • ');
-}
-
-function StatusBadge({ label }: { label: string }) {
-  return (
-    <span className="rounded-full bg-sky-300/10 px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-sky-100">
-      {label}
-    </span>
-  );
 }
 
 function PriorityIcon({ priorityName }: { priorityName?: string }) {
@@ -361,16 +388,16 @@ function PriorityIcon({ priorityName }: { priorityName?: string }) {
     <span
       aria-label={priorityName}
       title={priorityName}
-      className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/5 px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-stone-300"
-    >
-      {priorityName.slice(0, 1)}
-    </span>
+        className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.045] px-1.5 text-[0.6rem] uppercase tracking-[0.14em] text-white/44"
+      >
+        {priorityName.slice(0, 1)}
+      </span>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
+    <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-white/44 shadow-[var(--shadow-card-soft)]">
       {message}
     </div>
   );

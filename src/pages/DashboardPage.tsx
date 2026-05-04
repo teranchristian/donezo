@@ -1,11 +1,10 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard';
-import { HeaderMenu } from '../components/HeaderMenu';
 import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
-import { SummaryCard, type SummaryContent } from '../components/SummaryCard';
+import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
 import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
 import { getJiraIssueCounts, JiraConnectionStatus, JiraDashboardData } from '../lib/jiraApi';
 import {
@@ -14,14 +13,18 @@ import {
 } from '../lib/dashboardRouting';
 import {
   DashboardSettings,
+  FocusItem,
+  FocusPullRequestItem,
   getStoredActiveGitHubView,
   getStoredActiveIntegration,
   getStoredActiveJiraView,
   getStoredGitHubPrStatusFilter,
+  getStoredTodayFocusItems,
   saveStoredActiveIntegration,
   saveStoredActiveGitHubView,
   saveStoredActiveJiraView,
   saveStoredGitHubPrStatusFilter,
+  saveStoredTodayFocusItems,
   type ActiveGitHubView,
   type ActiveIntegration,
   type ActiveJiraView,
@@ -56,6 +59,8 @@ export function DashboardPage({
   const [githubPrStatusFilter, setGitHubPrStatusFilter] = useState<GitHubPrStatusFilter>('all');
   const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
   const [hasLoadedNavigation, setHasLoadedNavigation] = useState(false);
+  const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
+  const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(null);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
@@ -155,6 +160,26 @@ export function DashboardPage({
   ]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    getStoredTodayFocusItems().then((storedItems) => {
+      if (!isMounted) {
+        return;
+      }
+
+      const nextItems = storedItems ?? getDefaultTodayFocusItems();
+      setTodayFocusItems(nextItems);
+      if (storedItems === null) {
+        void saveStoredTodayFocusItems(nextItems);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     setGitHubSummaryMetrics((current) => ({
       ...current,
       connectionStatus: gitHubData.connectionStatus,
@@ -162,27 +187,15 @@ export function DashboardPage({
     }));
   }, [gitHubData.connectionStatus, gitHubData.missingUsername]);
 
-  const daySummary = getDaySummary({
-    gitHubMetrics: gitHubSummaryMetrics,
-    jiraData,
-    isGitHubLoading,
-    isJiraLoading,
-    onOpenGitHubPrs: () => {
-      navigateToGitHubPrs('all');
-    },
-    onOpenApprovedPrs: () => {
-      navigateToGitHubPrs('approved');
-    },
-    onOpenJiraInProgress: () => {
-      navigateToJiraView('in-progress');
-    }
-  });
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
   const dashboardAlerts = getDashboardAlerts({
     gitHubMetrics: gitHubSummaryMetrics,
     jiraCounts,
     isGitHubLoading,
     isJiraLoading,
+    onOpenGitHubPrs: () => {
+      navigateToGitHubPrs('all');
+    },
     onOpenReviewRequestedPrs: () => {
       handleGitHubViewChange('review');
     },
@@ -262,8 +275,70 @@ export function DashboardPage({
     });
   }
 
+  function handleAddTodayFocusItem(item: FocusItem) {
+    setTodayFocusWarning(null);
+
+    const addResult = addTodayFocusItem(todayFocusItems, item);
+    if (addResult.warning) {
+      setTodayFocusWarning(addResult.warning);
+      return;
+    }
+
+    const nextItems = addResult.items;
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleRemoveTodayFocusItem(itemId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = removeTodayFocusItem(todayFocusItems, itemId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleNestNewTodayFocusPullRequest(parentId: string, item: FocusPullRequestItem) {
+    setTodayFocusWarning(null);
+
+    const nextState = nestNewPullRequestUnderJira(todayFocusItems, parentId, item);
+    if (nextState.warning) {
+      setTodayFocusWarning(nextState.warning);
+      return;
+    }
+
+    setTodayFocusItems(nextState.items);
+    void saveStoredTodayFocusItems(nextState.items);
+  }
+
+  function handleNestExistingTodayFocusPullRequest(parentId: string, itemId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = moveStandalonePullRequestUnderJira(todayFocusItems, parentId, itemId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleReorderTopLevelTodayFocusItem(itemId: string, targetId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = reorderTopLevelTodayFocusItems(todayFocusItems, itemId, targetId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleMoveTopLevelTodayFocusItemToEnd(itemId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = moveTopLevelTodayFocusItemToEnd(todayFocusItems, itemId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
+  function handleReorderNestedTodayFocusPullRequest(parentId: string, itemId: string, targetId: string) {
+    setTodayFocusWarning(null);
+    const nextItems = reorderNestedPullRequests(todayFocusItems, parentId, itemId, targetId);
+    setTodayFocusItems(nextItems);
+    void saveStoredTodayFocusItems(nextItems);
+  }
+
   const integrationSwitcher = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-white/[0.035] bg-white/[0.025] p-1">
       <IntegrationTabButton
         label="GitHub"
         isActive={activeIntegration === 'github'}
@@ -294,41 +369,37 @@ export function DashboardPage({
         onRefresh={onRefreshJira}
       />
     );
-  const integrationTopBar = (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      {integrationSwitcher}
-      {integrationStatusBar}
-    </div>
-  );
-
   const [primaryAlert, ...secondaryAlerts] = dashboardAlerts;
 
   return (
-    <main className="min-h-screen py-6 text-stone-100 sm:py-8">
-      <div className="dashboard-container flex flex-col gap-6">
-        <div className="flex items-start justify-between gap-4">
+    <main className="min-h-screen py-6 text-stone-100 sm:py-7">
+      <div className="dashboard-container flex flex-col gap-5">
+        <div className="dashboard-header-row">
           <DashboardHeader name={settings.name} />
-          <HeaderMenu />
+          <div className="dashboard-header-status">{integrationStatusBar}</div>
         </div>
 
-        <section className="main-content">
-          <div className="main-grid top-grid">
-            <div className="left-column">
-              {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
-            </div>
-
-            <div className="right-column">
-              <div className="right-top-cards">
-                {secondaryAlerts.map((alert) => (
-                  <DashboardAlert key={alert.title} alert={alert} />
-                ))}
-              </div>
-            </div>
+        <section className="main-content flex flex-col gap-3">
+          <div className="summary-cards-grid">
+            {primaryAlert ? <DashboardAlert alert={primaryAlert} /> : null}
+            {secondaryAlerts.map((alert) => (
+              <DashboardAlert key={alert.title} alert={alert} />
+            ))}
           </div>
 
-          <div className="main-grid">
-            <section className="left-column">
-              <SummaryCard summary={daySummary} />
+          <div className="dashboard-main-grid">
+            <section className="dashboard-side-column">
+              <SummaryCard
+                items={todayFocusItems}
+                warning={todayFocusWarning}
+                onAddItem={handleAddTodayFocusItem}
+                onNestNewPullRequest={handleNestNewTodayFocusPullRequest}
+                onNestExistingPullRequest={handleNestExistingTodayFocusPullRequest}
+                onRemoveItem={handleRemoveTodayFocusItem}
+                onReorderTopLevelItem={handleReorderTopLevelTodayFocusItem}
+                onMoveTopLevelItemToEnd={handleMoveTopLevelTodayFocusItemToEnd}
+                onReorderNestedPullRequest={handleReorderNestedTodayFocusPullRequest}
+              />
               <NotesCard />
               <PlaceholderCard
                 title="Calendar"
@@ -344,14 +415,14 @@ export function DashboardPage({
               />
             </section>
 
-            <section className="right-column">
+            <section className="dashboard-panel-column">
               <div className="relative flex min-h-0">
                 <div
                   className={`min-h-0 flex-1 ${activeIntegration === 'github' ? 'flex' : 'hidden'}`}
                   aria-hidden={activeIntegration !== 'github'}
                 >
                   <GitHubCard
-                    topBar={integrationTopBar}
+                    topBar={integrationSwitcher}
                     data={gitHubData}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
@@ -371,7 +442,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'jira'}
                 >
                   <JiraCard
-                    topBar={integrationTopBar}
+                    topBar={integrationSwitcher}
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
                     isLoading={isJiraLoading}
@@ -403,100 +474,218 @@ function replaceDashboardHash(nextState: {
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
 }
 
-function getDaySummary(options: {
-  gitHubMetrics: GitHubSummaryMetrics;
-  jiraData: JiraDashboardData;
-  isGitHubLoading: boolean;
-  isJiraLoading: boolean;
-  onOpenGitHubPrs: () => void;
-  onOpenApprovedPrs: () => void;
-  onOpenJiraInProgress: () => void;
-}): SummaryContent {
-  const {
-    gitHubMetrics,
-    jiraData,
-    isGitHubLoading,
-    isJiraLoading,
-    onOpenGitHubPrs,
-    onOpenApprovedPrs,
-    onOpenJiraInProgress
-  } = options;
-
-  if (isGitHubLoading || isJiraLoading) {
-    return { type: 'text', lines: ['Loading your latest work summary...'] };
-  }
-
-  const jiraTicketCount = getJiraIssueCounts(jiraData.issues).inProgress;
-
-  if (gitHubMetrics.connectionStatus === 'invalid') {
-    return {
-      type: 'text',
-      lines: ['GitHub token is invalid. Update it in Settings.', `You're working on ${jiraTicketCount} Jira tickets.`]
-    };
-  }
-
-  if (gitHubMetrics.connectionStatus === 'error') {
-    return {
-      type: 'text',
-      lines: ['GitHub data is temporarily unavailable.', `You're working on ${jiraTicketCount} Jira tickets.`]
-    };
-  }
-
-  if (gitHubMetrics.missingUsername) {
-    return {
-      type: 'text',
-      lines: [
-        'GitHub is connected, but your username is missing in Settings.',
-        `You're working on ${jiraTicketCount} Jira tickets.`
+function getDefaultTodayFocusItems(): FocusItem[] {
+  return [
+    {
+      id: 'jira:CLK-112',
+      source: 'jira',
+      sourceLabel: 'Jira',
+      reference: 'CLK-112',
+      jiraKey: 'CLK-112',
+      title: 'Fix lead status bug in dashboard',
+      statusLabel: 'In Progress',
+      statusTone: 'violet',
+      children: [
+        {
+          id: 'github:dashboard#142',
+          source: 'github',
+          sourceLabel: 'GitHub',
+          reference: '#142',
+          title: 'CLK-112 Fix venue provision defaults',
+          statusLabel: 'Approved',
+          statusTone: 'emerald',
+          jiraKey: 'CLK-112'
+        }
       ]
-    };
-  }
-
-  if (gitHubMetrics.connectionStatus === 'not-connected') {
-    return {
-      type: 'text',
-      lines: ['Connect GitHub to load pull request activity.', `You're working on ${jiraTicketCount} Jira tickets.`]
-    };
-  }
-
-  if (gitHubMetrics.relevantPrCount === 0 && jiraTicketCount === 0) {
-    return { type: 'text', lines: ['All clear: no pending PRs or tickets.'] };
-  }
-
-  return {
-    type: 'segments',
-    items: [
-      {
-        value: gitHubMetrics.relevantPrCount,
-        label: gitHubMetrics.relevantPrCount === 1 ? 'PR open' : 'PRs open',
-        onClick: onOpenGitHubPrs
-      },
-      {
-        value: gitHubMetrics.approvedPrCount ?? 'Loading…',
-        label: 'approved',
-        onClick: onOpenApprovedPrs
-      },
-      {
-        value: jiraTicketCount,
-        label: jiraTicketCount === 1 ? 'Jira ticket in progress' : 'Jira tickets in progress',
-        onClick: onOpenJiraInProgress
-      }
-    ]
-  };
+    }
+  ];
 }
 
 type DashboardAlertItem = {
+  value: string;
   title: string;
   detail: string;
-  tone: 'amber' | 'rose' | 'emerald';
+  tone: 'amber' | 'rose' | 'emerald' | 'blue';
   onClick?: () => void;
 };
+
+function addTodayFocusItem(items: FocusItem[], item: FocusItem) {
+  if (hasTodayFocusItem(items, item.id)) {
+    return { items, warning: 'That item is already in Today focus.' };
+  }
+
+  if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
+    return { items, warning: 'Today focus already has 3 items.' };
+  }
+
+  return {
+    items: [...items, normalizeTopLevelTodayFocusItem(item)],
+    warning: null
+  };
+}
+
+function removeTodayFocusItem(items: FocusItem[], itemId: string) {
+  const nextItems: FocusItem[] = [];
+
+  for (const item of items) {
+    if (item.id === itemId) {
+      continue;
+    }
+
+    if (item.source === 'jira') {
+      const nextChildren = item.children.filter((child) => child.id !== itemId);
+      nextItems.push(
+        nextChildren.length === item.children.length
+          ? item
+          : {
+              ...item,
+              children: nextChildren
+            }
+      );
+      continue;
+    }
+
+    nextItems.push(item);
+  }
+
+  return nextItems;
+}
+
+function hasTodayFocusItem(items: FocusItem[], itemId: string) {
+  return items.some((item) => item.id === itemId || (item.source === 'jira' && item.children.some((child) => child.id === itemId)));
+}
+
+function nestNewPullRequestUnderJira(items: FocusItem[], parentId: string, pullRequest: FocusPullRequestItem) {
+  if (hasTodayFocusItem(items, pullRequest.id)) {
+    return { items, warning: 'That item is already in Today focus.' };
+  }
+
+  if (!items.some((item) => item.id === parentId && item.source === 'jira')) {
+    return { items, warning: null };
+  }
+
+  return {
+    items: items.map((item) =>
+      item.id === parentId && item.source === 'jira'
+        ? {
+            ...item,
+            children: [...item.children, pullRequest]
+          }
+        : item
+    ),
+    warning: null
+  };
+}
+
+function moveStandalonePullRequestUnderJira(items: FocusItem[], parentId: string, itemId: string) {
+  const standalonePullRequest = items.find(
+    (item): item is FocusPullRequestItem => item.id === itemId && item.source === 'github'
+  );
+
+  if (!standalonePullRequest || !items.some((item) => item.id === parentId && item.source === 'jira')) {
+    return items;
+  }
+
+  return items.reduce<FocusItem[]>((nextItems, item) => {
+    if (item.id === itemId) {
+      return nextItems;
+    }
+
+    if (item.id === parentId && item.source === 'jira') {
+      nextItems.push({
+        ...item,
+        children: [...item.children, standalonePullRequest]
+      });
+      return nextItems;
+    }
+
+    nextItems.push(item);
+    return nextItems;
+  }, []);
+}
+
+function reorderTopLevelTodayFocusItems(items: FocusItem[], itemId: string, targetId: string) {
+  if (itemId === targetId) {
+    return items;
+  }
+
+  const sourceIndex = items.findIndex((item) => item.id === itemId);
+  const targetIndex = items.findIndex((item) => item.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(sourceIndex, 1);
+  const insertIndex = nextItems.findIndex((item) => item.id === targetId);
+  nextItems.splice(insertIndex, 0, movedItem);
+  return nextItems;
+}
+
+function moveTopLevelTodayFocusItemToEnd(items: FocusItem[], itemId: string) {
+  const sourceIndex = items.findIndex((item) => item.id === itemId);
+  if (sourceIndex < 0 || sourceIndex === items.length - 1) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(sourceIndex, 1);
+  nextItems.push(movedItem);
+  return nextItems;
+}
+
+function reorderNestedPullRequests(items: FocusItem[], parentId: string, itemId: string, targetId: string) {
+  if (itemId === targetId) {
+    return items;
+  }
+
+  return items.map((item) => {
+    if (item.id !== parentId || item.source !== 'jira') {
+      return item;
+    }
+
+    const sourceIndex = item.children.findIndex((child) => child.id === itemId);
+    if (sourceIndex < 0) {
+      return item;
+    }
+
+    const nextChildren = [...item.children];
+    const [movedChild] = nextChildren.splice(sourceIndex, 1);
+    const insertIndex =
+      targetId === getNestedPullRequestEndTargetId(parentId)
+        ? nextChildren.length
+        : nextChildren.findIndex((child) => child.id === targetId);
+    if (insertIndex < 0) {
+      return item;
+    }
+    nextChildren.splice(insertIndex, 0, movedChild);
+
+    return {
+      ...item,
+      children: nextChildren
+    };
+  });
+}
+
+function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
+  return item.source === 'jira'
+    ? {
+        ...item,
+        children: item.children ?? []
+      }
+    : item;
+}
+
+function getNestedPullRequestEndTargetId(parentId: string) {
+  return `__end__:${parentId}`;
+}
 
 function getDashboardAlerts(options: {
   gitHubMetrics: GitHubSummaryMetrics;
   jiraCounts: ReturnType<typeof getJiraIssueCounts>;
   isGitHubLoading: boolean;
   isJiraLoading: boolean;
+  onOpenGitHubPrs: () => void;
   onOpenReviewRequestedPrs: () => void;
   onOpenBlockedIssues: () => void;
   onOpenApprovedPrs: () => void;
@@ -506,6 +695,7 @@ function getDashboardAlerts(options: {
     jiraCounts,
     isGitHubLoading,
     isJiraLoading,
+    onOpenGitHubPrs,
     onOpenReviewRequestedPrs,
     onOpenBlockedIssues,
     onOpenApprovedPrs
@@ -513,10 +703,11 @@ function getDashboardAlerts(options: {
 
   return [
     {
-      title:
+      value:
         isGitHubLoading || gitHubMetrics.connectionStatus !== 'connected'
-          ? 'PR review queue'
-          : `${gitHubMetrics.reviewRequestedCount} PR${gitHubMetrics.reviewRequestedCount === 1 ? '' : 's'} ready for review`,
+          ? '0'
+          : String(gitHubMetrics.reviewRequestedCount),
+      title: 'PRs ready for review',
       detail: getReviewAlertDetail(gitHubMetrics, isGitHubLoading),
       tone: 'amber',
       onClick:
@@ -525,17 +716,16 @@ function getDashboardAlerts(options: {
           : undefined
     },
     {
-      title:
-        isJiraLoading ? 'Blocked work' : `${jiraCounts.blocking} blocked item${jiraCounts.blocking === 1 ? '' : 's'}`,
+      value: isJiraLoading ? '0' : String(jiraCounts.blocking),
+      title: jiraCounts.blocking === 1 ? 'Blocked item' : 'Blocked items',
       detail: isJiraLoading ? 'Checking Jira blockers.' : 'Needs your input.',
       tone: 'rose',
       onClick: !isJiraLoading ? onOpenBlockedIssues : undefined
     },
     {
-      title:
-        isGitHubLoading || gitHubMetrics.approvedPrCount === null
-          ? 'Approved PRs'
-          : `${gitHubMetrics.approvedPrCount} PR${gitHubMetrics.approvedPrCount === 1 ? '' : 's'} approved`,
+      value:
+        isGitHubLoading || gitHubMetrics.approvedPrCount === null ? '0' : String(gitHubMetrics.approvedPrCount),
+      title: 'PRs approved',
       detail:
         gitHubMetrics.connectionStatus === 'connected'
           ? 'Ready to merge or follow through.'
@@ -545,6 +735,19 @@ function getDashboardAlerts(options: {
         gitHubMetrics.connectionStatus === 'connected' && gitHubMetrics.approvedPrCount !== null
           ? onOpenApprovedPrs
           : undefined
+    },
+    {
+      value:
+        isGitHubLoading || gitHubMetrics.connectionStatus !== 'connected'
+          ? '0'
+          : String(gitHubMetrics.relevantPrCount),
+      title: 'PRs open',
+      detail:
+        gitHubMetrics.connectionStatus === 'connected'
+          ? 'Across repositories.'
+          : 'Available once GitHub is connected.',
+      tone: 'blue',
+      onClick: gitHubMetrics.connectionStatus === 'connected' ? onOpenGitHubPrs : undefined
     }
   ];
 }
@@ -577,25 +780,33 @@ function getReviewAlertDetail(
 }
 
 function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
-  const toneClass =
+  const iconWrapClass =
     alert.tone === 'amber'
-      ? 'bg-amber-300/[0.07] text-amber-50'
+      ? 'bg-amber-500/14 text-amber-300'
       : alert.tone === 'rose'
-        ? 'bg-rose-300/[0.07] text-rose-50'
-        : 'bg-emerald-300/[0.07] text-emerald-50';
-  const iconClass =
-    alert.tone === 'amber'
-      ? 'bg-amber-400'
-      : alert.tone === 'rose'
-        ? 'bg-rose-400'
-        : 'bg-emerald-400';
+        ? 'bg-rose-500/14 text-rose-300'
+        : alert.tone === 'emerald'
+          ? 'bg-emerald-500/14 text-emerald-300'
+          : 'bg-sky-500/14 text-sky-300';
 
   const content = (
-    <div className={`flex h-full items-start gap-3 rounded-[var(--radius-card)] px-5 py-5 shadow-[var(--shadow-card)] ${toneClass}`}>
-      <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${iconClass}`} aria-hidden="true" />
-      <div className="min-w-0">
-        <p className="text-base font-semibold leading-6 text-primary">{alert.title}</p>
-        <p className="mt-1 text-sm text-secondary">{alert.detail}</p>
+    <div
+      className="flex h-full min-h-[84px] items-center gap-2.5 rounded-[var(--radius-card)] border border-white/[0.06] bg-[rgba(255,255,255,0.028)] px-3 py-2.5 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)]"
+    >
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
+        aria-hidden="true"
+      >
+        <DashboardAlertIcon tone={alert.tone} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <p className="shrink-0 text-[1.7rem] font-semibold leading-none tracking-[-0.045em] text-primary">
+            {alert.value}
+          </p>
+          <p className="min-w-0 truncate text-[0.82rem] font-medium leading-4 text-primary">{alert.title}</p>
+        </div>
+        <p className="mt-0.5 text-[0.72rem] leading-4 text-secondary">{alert.detail}</p>
       </div>
     </div>
   );
@@ -608,10 +819,55 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
     <button
       type="button"
       onClick={alert.onClick}
-      className="text-left transition hover:translate-y-[-1px] hover:opacity-100"
+      className="dashboard-summary-button text-left transition hover:translate-y-[-1px] hover:opacity-100"
     >
       {content}
     </button>
+  );
+}
+
+function DashboardAlertIcon({
+  tone
+}: {
+  tone: DashboardAlertItem['tone'];
+}) {
+  if (tone === 'amber') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (tone === 'rose') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v5" strokeLinecap="round" />
+        <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+
+  if (tone === 'emerald') {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="12" r="8" />
+        <path d="m8.5 12 2.4 2.4L15.8 9.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="6.5" cy="6.5" r="1.6" />
+      <circle cx="17.5" cy="6.5" r="1.6" />
+      <circle cx="12" cy="17.5" r="1.6" />
+      <path d="M8 7.4h8" strokeLinecap="round" />
+      <path d="M7.4 8l3.5 7.2" strokeLinecap="round" />
+      <path d="M16.6 8 13 15.2" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -628,10 +884,10 @@ function IntegrationTabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm transition ${
+      className={`rounded-full px-3 py-1.5 text-[0.82rem] font-medium transition ${
         isActive
-          ? 'bg-white/10 text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
-          : 'bg-white/[0.035] text-secondary hover:bg-white/[0.07] hover:text-primary'
+          ? 'bg-white/[0.12] text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]'
+          : 'bg-transparent text-secondary hover:bg-white/[0.045] hover:text-primary'
       }`}
     >
       {label}
@@ -674,14 +930,14 @@ function GitHubIntegrationStatusBar({
             : 'Not connected';
 
   return (
-    <div className="ml-auto flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="ml-auto flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         <TopBarBadge className={toneClass}>{label}</TopBarBadge>
         <TopBarButton onClick={onRefresh} disabled={isLoading}>
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </TopBarButton>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[0.68rem] text-white/32">
         <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
         <span>·</span>
         <span>
@@ -724,14 +980,14 @@ function JiraIntegrationStatusBar({
             : 'Not connected';
 
   return (
-    <div className="ml-auto flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="ml-auto flex flex-col items-end gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         <TopBarBadge className={toneClass}>{label}</TopBarBadge>
         <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus === 'not-connected'}>
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </TopBarButton>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[0.68rem] text-white/32">
         <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
       </div>
     </div>
@@ -747,7 +1003,7 @@ function TopBarBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${className}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] ${className}`}
     >
       {children}
     </span>
@@ -768,7 +1024,7 @@ function TopBarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center rounded-full bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-secondary transition hover:bg-white/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex items-center rounded-full bg-white/[0.045] px-2.5 py-0.5 text-[0.62rem] uppercase tracking-[0.16em] text-white/48 transition hover:bg-white/[0.08] hover:text-white/72 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>

@@ -4,7 +4,43 @@ export type Note = {
   createdAt: number;
 };
 
+export type FocusStatusTone = 'violet' | 'emerald' | 'amber';
+
+type FocusItemBase = {
+  id: string;
+  sourceLabel: string;
+  reference: string;
+  title: string;
+  statusLabel: string;
+  statusTone: FocusStatusTone;
+};
+
+export type FocusPullRequestItem = FocusItemBase & {
+  source: 'github';
+  jiraKey: string | null;
+};
+
+export type FocusJiraItem = FocusItemBase & {
+  source: 'jira';
+  jiraKey: string;
+  children: FocusPullRequestItem[];
+  isPlaceholder?: boolean;
+};
+
+export type FocusItem = FocusJiraItem | FocusPullRequestItem;
+
+type LegacyFocusItem = {
+  id: string;
+  source: 'jira' | 'github';
+  sourceLabel: string;
+  reference: string;
+  title: string;
+  statusLabel: string;
+  statusTone: FocusStatusTone;
+};
+
 const NOTES_STORAGE_KEY = 'dashboard-notes';
+const TODAY_FOCUS_ITEMS_STORAGE_KEY = 'today-focus-items';
 const SETTINGS_STORAGE_KEY = 'dashboard-settings';
 const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
 const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
@@ -96,6 +132,35 @@ export async function getStoredNotes() {
 }
 
 export { saveStoredNotes };
+
+export async function getStoredTodayFocusItems() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get(TODAY_FOCUS_ITEMS_STORAGE_KEY);
+    return mergeFocusItems(result[TODAY_FOCUS_ITEMS_STORAGE_KEY] as FocusItem[] | undefined);
+  }
+
+  const raw = localStorage.getItem(TODAY_FOCUS_ITEMS_STORAGE_KEY);
+  if (raw === null) {
+    return null;
+  }
+
+  try {
+    return mergeFocusItems(JSON.parse(raw) as FocusItem[]);
+  } catch {
+    return [];
+  }
+}
+
+export async function saveStoredTodayFocusItems(items: FocusItem[]) {
+  const normalizedItems = mergeFocusItems(items) ?? [];
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [TODAY_FOCUS_ITEMS_STORAGE_KEY]: normalizedItems });
+    return;
+  }
+
+  localStorage.setItem(TODAY_FOCUS_ITEMS_STORAGE_KEY, JSON.stringify(normalizedItems));
+}
 
 export async function getStoredSettings() {
   if (hasChromeStorage()) {
@@ -407,4 +472,65 @@ function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
     activeJiraView === 'active'
     ? activeJiraView
     : DEFAULT_ACTIVE_JIRA_VIEW;
+}
+
+function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+
+  return items
+    .map((item) => normalizeFocusItem(item))
+    .filter((item): item is FocusItem => item !== null);
+}
+
+function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined): FocusItem | null {
+  if (
+    !item ||
+    typeof item.id !== 'string' ||
+    (item.source !== 'jira' && item.source !== 'github') ||
+    typeof item.sourceLabel !== 'string' ||
+    typeof item.reference !== 'string' ||
+    typeof item.title !== 'string' ||
+    typeof item.statusLabel !== 'string' ||
+    (item.statusTone !== 'violet' && item.statusTone !== 'emerald' && item.statusTone !== 'amber')
+  ) {
+    return null;
+  }
+
+  const normalizedBase = {
+    id: item.id,
+    sourceLabel: item.sourceLabel.trim(),
+    reference: item.reference.trim(),
+    title: item.title.trim(),
+    statusLabel: item.statusLabel.trim(),
+    statusTone: item.statusTone
+  };
+
+  if (item.source === 'github') {
+    return {
+      ...normalizedBase,
+      source: 'github',
+      jiraKey: normalizeJiraKey('jiraKey' in item ? item.jiraKey : null)
+    };
+  }
+
+  const rawChildren = 'children' in item && Array.isArray(item.children) ? item.children : [];
+  const children = rawChildren
+    .map((child) => normalizeFocusItem(child))
+    .filter((child): child is FocusPullRequestItem => child?.source === 'github');
+  const normalizedJiraKey =
+    normalizeJiraKey('jiraKey' in item ? item.jiraKey : item.reference) ?? item.reference.trim();
+
+  return {
+    ...normalizedBase,
+    source: 'jira',
+    jiraKey: normalizedJiraKey,
+    children,
+    isPlaceholder: 'isPlaceholder' in item ? Boolean(item.isPlaceholder) : false
+  };
+}
+
+function normalizeJiraKey(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim().toUpperCase() : null;
 }

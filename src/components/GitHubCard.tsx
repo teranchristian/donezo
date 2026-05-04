@@ -7,6 +7,7 @@ import {
   getGitHubPullRequestState,
   type GitHubPullRequestState
 } from '../lib/githubApi';
+import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
 import {
   getStoredGitHubOwnerFilter,
@@ -19,6 +20,8 @@ import {
 } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
+import { StatusBadge } from './StatusBadge';
+import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 
 type GitHubCardProps = {
   topBar?: ReactNode;
@@ -88,8 +91,9 @@ export function GitHubCard({
   onPrStatusFilterChange
 }: GitHubCardProps) {
   const filterControlClass =
-    'flex h-10 min-w-0 items-center gap-1.5 rounded-[8px] border border-white/[0.07] bg-[#121820] px-3 text-sm text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.015)]';
-  const filterSelectClass = 'min-w-0 bg-transparent pr-5 text-sm text-primary outline-none';
+    'flex h-9 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.035] bg-white/[0.025] px-2.5 text-[0.8rem] text-white/40 transition hover:bg-white/[0.04] hover:text-white/54';
+  const filterSelectClass =
+    'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
   const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
@@ -126,7 +130,7 @@ export function GitHubCard({
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
   const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
-    (pullRequest) => pullRequest.reviewStatus === 'approved'
+    (pullRequest) => pullRequest.reviewStatus === 'approved' && !isPullRequestOutOfDate(pullRequest)
   ).length;
   const currentView = getGitHubViewContent(
     activeView,
@@ -297,18 +301,18 @@ export function GitHubCard({
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-[720px] flex-1 flex-col">
         {topBar ? (
-          <div className="-mx-5 -mt-4 mb-2 border-b border-white/[0.04] px-5 py-4">
+          <div className="-mx-4 -mt-3.5 mb-1.5 border-b border-white/[0.035] px-4 py-2.5">
             {topBar}
           </div>
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="mb-2 flex min-w-0 items-end justify-between gap-3 overflow-hidden border-b border-white/[0.05]">
+          <div className="mb-1.5 flex min-w-0 flex-col gap-2.5 border-b border-white/[0.035] pb-1.5 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0 flex-1">
-              <CardTabMenu items={tabItems} className="border-b-0 pb-0.5" />
+              <CardTabMenu items={tabItems} className="border-b-0" />
             </div>
-            <div className="flex shrink-0 items-center gap-2 pb-2">
-              <label className={`${filterControlClass} w-[188px]`}>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 xl:max-w-[100%] xl:justify-end">
+              <label className={`${filterControlClass} min-w-[180px] flex-1 xl:w-[188px] xl:flex-none`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Owner:</span>
                 <select
                   aria-label="Owner"
@@ -325,7 +329,7 @@ export function GitHubCard({
               </label>
 
               {activeView === 'prs' ? (
-                <label className={`${filterControlClass} w-[168px]`}>
+                <label className={`${filterControlClass} min-w-[160px] flex-1 xl:w-[168px] xl:flex-none`}>
                   <span className="shrink-0 text-[var(--text-tertiary)]">Status:</span>
                   <select
                     aria-label="PR status"
@@ -346,7 +350,7 @@ export function GitHubCard({
                 </label>
               ) : null}
 
-              <label className={`${filterControlClass} w-[220px]`}>
+              <label className={`${filterControlClass} min-w-[200px] flex-1 xl:w-[220px] xl:flex-none`}>
                 <span className="shrink-0 text-[var(--text-tertiary)]">Sort:</span>
                 <select
                   aria-label="Sort"
@@ -371,7 +375,7 @@ export function GitHubCard({
             </div>
           </div>
 
-          <div className="dashboard-scrollbar min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
+          <div className="dashboard-scrollbar min-h-[320px] max-h-[420px] flex-1 overflow-x-hidden overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
@@ -382,6 +386,12 @@ export function GitHubCard({
               <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
                 {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
+            ) : activeView === 'prs' ? (
+              <PullRequestList
+                pullRequests={filteredItems
+                  .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
+                  .map((item) => item.value)}
+              />
             ) : (
               <div className="divide-y divide-white/[0.06]">
                 {filteredItems.map((item) =>
@@ -444,42 +454,118 @@ function PullRequestRow({
 }: {
   pullRequest: GitHubPullRequestItem;
 }) {
-  const reviewStatusLabel = getCompactReviewStatusLabel(pullRequest.reviewStatus);
-  const detailItems = [
-    pullRequest.repositoryName,
-    `opened ${formatRelativeTime(pullRequest.updatedAt)}`,
-    pullRequest.authorLogin ? `by ${pullRequest.authorLogin}` : '',
-    reviewStatusLabel
-  ].filter(Boolean);
+  const isOutOfDate = isPullRequestOutOfDate(pullRequest);
+  const status = getPullRequestDisplayStatus(pullRequest);
+  const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
 
   return (
     <a
       href={pullRequest.url}
       target="_blank"
       rel="noreferrer"
-      className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = 'copy';
+        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
+        event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
+      }}
+      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-2.5">
-        <GitHubItemIcon kind="pull-request" />
-        <div className="min-w-0 flex-1">
-          <div className="inline-flex max-w-full items-start gap-2 align-top">
-            <p className="line-clamp-2 min-w-0 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
-              {pullRequest.title}
-            </p>
-            <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
-            {detailItems.map((item, index) => (
-              <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-2 text-[var(--text-tertiary)]">•</span> : null}
-                <span title={item}>{item}</span>
-              </span>
-            ))}
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
+        <div className="row-span-2 flex min-w-0 items-start gap-1.5">
+          <GitHubItemIcon kind="pull-request" />
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex max-w-full items-center gap-1 align-top">
+              <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+                {pullRequest.title}
+              </p>
+              <PullRequestTrailingIcon pullRequest={pullRequest} />
+            </div>
+            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
+              <p
+                className="truncate"
+                title={`${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
+              >
+                <span>{pullRequest.repositoryName}</span>
+                {shouldShowAuthor ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {shouldShowAuthor ? <span>by {pullRequest.authorLogin}</span> : null}
+              </p>
+              {isOutOfDate ? (
+                <span
+                  title="This branch is out of date with the base branch. Update branch required."
+                  className="ml-1.5 shrink-0 whitespace-nowrap text-amber-200/70"
+                >
+                  <span className="mr-1.5 text-white/22">•</span>
+                  <span aria-hidden="true">⚠</span>
+                  <span className="ml-1">Out of date</span>
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
+        <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
+          <StatusBadge label={status.label} />
+        </div>
+        <p className="col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 text-white/38">
+          updated {formatRelativeTime(pullRequest.updatedAt)}
+        </p>
       </div>
     </a>
   );
+}
+
+function PullRequestTrailingIcon({
+  pullRequest
+}: {
+  pullRequest: GitHubPullRequestItem;
+}) {
+  return <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />;
+}
+
+function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusItem {
+  return {
+    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
+    source: 'github',
+    sourceLabel: 'GitHub',
+    reference: `#${pullRequest.pullNumber}`,
+    title: pullRequest.title,
+    statusLabel: getFocusStatusLabel(pullRequest.reviewStatus),
+    statusTone: getFocusStatusTone(pullRequest.reviewStatus),
+    jiraKey: extractJiraKey(pullRequest.title)
+  };
+}
+
+function extractJiraKey(value: string) {
+  const match = value.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function getFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
+  if (reviewStatus === 'approved') {
+    return 'Approved';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'Changes Requested';
+  }
+
+  if (reviewStatus === 'draft') {
+    return 'Draft';
+  }
+
+  return 'Open';
+}
+
+function getFocusStatusTone(reviewStatus: GitHubPullRequestItem['reviewStatus']): FocusItem['statusTone'] {
+  if (reviewStatus === 'approved') {
+    return 'emerald';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'amber';
+  }
+
+  return 'violet';
 }
 
 function PullRequestCheckStatusIcon({
@@ -492,14 +578,46 @@ function PullRequestCheckStatusIcon({
   }
 
   if (ciStatus === 'failing') {
-    return <span className="shrink-0 text-sm leading-none text-rose-400">✕</span>;
+    return <span className="shrink-0 text-[0.76rem] leading-none text-rose-200/65">✕</span>;
   }
 
   if (ciStatus === 'pending') {
-    return <span className="shrink-0 text-sm leading-none text-amber-400">●</span>;
+    return <span className="shrink-0 text-[0.72rem] leading-none text-amber-100/60">●</span>;
   }
 
   return null;
+}
+
+function PullRequestList({
+  pullRequests
+}: {
+  pullRequests: GitHubPullRequestItem[];
+}) {
+  const readyToClose = pullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest));
+  const remainingPullRequests = pullRequests.filter((pullRequest) => !isPullRequestReadyToClose(pullRequest));
+
+  if (readyToClose.length === 0) {
+    return (
+      <div className="divide-y divide-white/[0.06]">
+        {remainingPullRequests.map((pullRequest) => (
+          <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-white/[0.06]">
+      {readyToClose.map((pullRequest) => (
+        <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+      ))}
+      {remainingPullRequests.length > 0 ? (
+        remainingPullRequests.map((pullRequest) => (
+          <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+        ))
+      ) : null}
+    </div>
+  );
 }
 
 function NotificationRow({
@@ -517,32 +635,40 @@ function NotificationRow({
       href={getNotificationUrl(notification)}
       target="_blank"
       rel="noreferrer"
-      className="group -mx-2 block cursor-pointer px-2 py-2.5 transition hover:bg-white/[0.03]"
+      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-2.5">
-        <GitHubItemIcon
-          kind={iconKind}
-          state={iconKind === 'pull-request' ? pullRequestState : undefined}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-5 text-primary transition group-hover:text-white">
-              {notification.subject.title}
-            </p>
-            <p className="shrink-0 pt-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-secondary">
-              {notificationTypeLabel}
-            </p>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.78rem] text-secondary">
-            <span>{notification.repository.full_name}</span>
-            <span className="text-[var(--text-tertiary)]">•</span>
-            <span>updated {formatRelativeTime(notification.updated_at)}</span>
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            <Badge label={notification.reason} tone="gray" />
-            {notification.unread ? <Badge label="Unread" tone="green" /> : null}
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
+        <div className="row-span-2 flex min-w-0 items-start gap-1.5">
+          <GitHubItemIcon
+            kind={iconKind}
+            state={iconKind === 'pull-request' ? pullRequestState : undefined}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex max-w-full items-center gap-1 align-top">
+              <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+                {notification.subject.title}
+              </p>
+            </div>
+            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
+              <p
+                className="truncate"
+                title={`${notification.repository.full_name}${notification.unread ? ' • unread' : ''}`}
+              >
+                <span>{notification.repository.full_name}</span>
+                {notification.unread ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {notification.unread ? <span>Unread</span> : null}
+              </p>
+            </div>
           </div>
         </div>
+        <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
+          <p className="text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] text-white/36">
+            {notificationTypeLabel}
+          </p>
+        </div>
+        <p className="col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 text-white/38">
+          updated {formatRelativeTime(notification.updated_at)}
+        </p>
       </div>
     </a>
   );
@@ -640,16 +766,16 @@ function Badge({
   tone: 'default' | 'green' | 'red' | 'yellow' | 'gray';
 }) {
   const toneClass = {
-    default: 'bg-white/5 text-stone-300',
-    green: 'bg-emerald-200/10 text-emerald-100',
-    red: 'bg-rose-200/10 text-rose-100',
-    yellow: 'bg-amber-200/10 text-amber-100',
-    gray: 'bg-white/5 text-stone-400'
+    default: 'bg-white/[0.05] text-white/50',
+    green: 'bg-emerald-400/16 text-emerald-100',
+    red: 'bg-rose-400/16 text-rose-100',
+    yellow: 'bg-amber-400/16 text-amber-100',
+    gray: 'bg-white/[0.045] text-white/42'
   }[tone];
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.18em] ${toneClass}`}
+      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[0.6rem] uppercase tracking-[0.14em] ${toneClass}`}
     >
       {label}
     </span>
@@ -906,22 +1032,71 @@ function getNotificationUrl(notification: GitHubNotification) {
 
 function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
   if (reviewStatus === 'approved') {
-    return 'Approved';
+    return 'APPROVED';
   }
 
   if (reviewStatus === 'changes-requested') {
-    return 'Changes requested';
+    return 'CHANGES REQUESTED';
   }
 
   if (reviewStatus === 'draft') {
-    return 'Draft';
+    return 'DRAFT';
   }
 
   if (reviewStatus === 'open') {
-    return 'Open';
+    return 'OPEN';
   }
 
-  return 'Waiting for review';
+  return 'WAITING FOR REVIEW';
+}
+
+function getPullRequestDisplayStatus(pullRequest: GitHubPullRequestItem) {
+  if (isPullRequestReadyToClose(pullRequest)) {
+    return {
+      label: 'READY TO MERGE'
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'approved') {
+    return {
+      label: 'APPROVED'
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'waiting-review') {
+    return {
+      label: 'WAITING FOR REVIEW'
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'changes-requested') {
+    return {
+      label: 'CHANGES REQUESTED'
+    };
+  }
+
+  if (pullRequest.reviewStatus === 'draft') {
+    return {
+      label: 'DRAFT'
+    };
+  }
+
+  return {
+    label: getCompactReviewStatusLabel(pullRequest.reviewStatus)
+  };
+}
+
+function isPullRequestReadyToClose(pullRequest: GitHubPullRequestItem) {
+  return (
+    pullRequest.reviewStatus === 'approved' &&
+    pullRequest.ciStatus === 'passing' &&
+    !isPullRequestOutOfDate(pullRequest) &&
+    pullRequest.mergeStateStatus === 'CLEAN'
+  );
+}
+
+function isPullRequestOutOfDate(pullRequest: GitHubPullRequestItem) {
+  return pullRequest.mergeStateStatus === 'BEHIND';
 }
 
 function getEmptyListMessage(data: GitHubDashboardData) {
