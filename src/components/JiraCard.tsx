@@ -139,7 +139,7 @@ export function JiraCard({
             ) : filteredIssues.length === 0 ? (
               <EmptyState message={getEmptyFilterMessage(activeView)} />
             ) : (
-              <div className="divide-y divide-white/[0.06]">
+              <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
                 {filteredIssues.map((issue) => (
                   <IssueRow key={issue.id} issue={issue} baseUrl={baseUrl} />
                 ))}
