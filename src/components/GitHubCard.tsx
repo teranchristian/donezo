@@ -375,7 +375,7 @@ export function GitHubCard({
             </div>
           </div>
 
-          <div className="dashboard-scrollbar min-h-[320px] max-h-[420px] flex-1 overflow-y-auto pr-1">
+          <div className="dashboard-scrollbar min-h-[320px] max-h-[420px] flex-1 overflow-x-hidden overflow-y-auto pr-1">
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
