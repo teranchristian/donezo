@@ -3,6 +3,7 @@ import { formatRelativeTime } from '../lib/date';
 import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
+  getJiraIssueFocusTone,
   getJiraSearchUrl,
   isBlockingIssue,
   type JiraConnectionStatus,
@@ -240,25 +241,10 @@ function mapIssueToFocusItem(issue: JiraIssue): FocusItem {
     reference: issue.key,
     title: issue.summary,
     statusLabel: issue.status.name,
-    statusTone: getIssueFocusTone(issue),
+    statusTone: getJiraIssueFocusTone(issue),
     jiraKey: issue.key,
     children: []
   };
-}
-
-function getIssueFocusTone(issue: JiraIssue): FocusItem['statusTone'] {
-  const statusCategoryKey = issue.status.statusCategory?.key;
-  const normalizedStatus = issue.status.name.toLowerCase();
-
-  if (statusCategoryKey === 'done' || normalizedStatus.includes('done') || normalizedStatus.includes('closed')) {
-    return 'emerald';
-  }
-
-  if (statusCategoryKey === 'new' || normalizedStatus.includes('to do') || normalizedStatus.includes('todo')) {
-    return 'amber';
-  }
-
-  return 'violet';
 }
 
 function RelatedIssueLink({

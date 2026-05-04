@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
 import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard';
 import { HeaderMenu } from '../components/HeaderMenu';
@@ -7,7 +7,12 @@ import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
 import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
-import { getJiraIssueCounts, JiraConnectionStatus, JiraDashboardData } from '../lib/jiraApi';
+import {
+  getJiraIssueCounts,
+  JiraConnectionStatus,
+  JiraDashboardData,
+  loadJiraIssuesByKeys
+} from '../lib/jiraApi';
 import {
   buildDashboardHashNavigation,
   parseDashboardHashNavigation
@@ -31,6 +36,10 @@ import {
   type ActiveJiraView,
   type GitHubPrStatusFilter
 } from '../lib/storage';
+import {
+  reconcileTodayFocusJiraItems,
+  type TodayFocusRefreshSignal
+} from '../lib/todayFocusSync';
 
 type DashboardPageProps = {
   settings: DashboardSettings;
@@ -40,6 +49,7 @@ type DashboardPageProps = {
   lastGitHubActivityCheckAt: number | null;
   onRefreshGitHub: () => void;
   jiraData: JiraDashboardData;
+  jiraRefreshSignal: TodayFocusRefreshSignal;
   isJiraLoading: boolean;
   onRefreshJira: () => void;
 };
@@ -52,6 +62,7 @@ export function DashboardPage({
   lastGitHubActivityCheckAt,
   onRefreshGitHub,
   jiraData,
+  jiraRefreshSignal,
   isJiraLoading,
   onRefreshJira
 }: DashboardPageProps) {
@@ -61,7 +72,13 @@ export function DashboardPage({
   const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
   const [hasLoadedNavigation, setHasLoadedNavigation] = useState(false);
   const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
+  const [hasLoadedTodayFocusItems, setHasLoadedTodayFocusItems] = useState(false);
   const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(null);
+  const hasLoadedTodayFocusItemsRef = useRef(false);
+  const hasRunInitialFocusedJiraFallbackRef = useRef(false);
+  const isFocusedJiraFallbackInFlightRef = useRef(false);
+  const lastFocusedJiraFallbackAtRef = useRef<number | null>(null);
+  const todayFocusItemsRef = useRef<FocusItem[]>([]);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
@@ -69,6 +86,10 @@ export function DashboardPage({
     approvedPrCount: null,
     relevantPrCount: gitHubData.openPrsCount
   });
+
+  useEffect(() => {
+    todayFocusItemsRef.current = todayFocusItems;
+  }, [todayFocusItems]);
 
   useEffect(() => {
     let isActive = true;
@@ -169,7 +190,10 @@ export function DashboardPage({
       }
 
       const nextItems = storedItems ?? getDefaultTodayFocusItems();
+      todayFocusItemsRef.current = nextItems;
       setTodayFocusItems(nextItems);
+      hasLoadedTodayFocusItemsRef.current = true;
+      setHasLoadedTodayFocusItems(true);
       if (storedItems === null) {
         void saveStoredTodayFocusItems(nextItems);
       }
@@ -187,6 +211,61 @@ export function DashboardPage({
       missingUsername: gitHubData.missingUsername
     }));
   }, [gitHubData.connectionStatus, gitHubData.missingUsername]);
+
+  useEffect(() => {
+    if (!hasLoadedTodayFocusItemsRef.current) {
+      return;
+    }
+
+    const syncResult = reconcileTodayFocusJiraItems(todayFocusItemsRef.current, jiraData.issues);
+    if (syncResult.items === todayFocusItemsRef.current) {
+      return;
+    }
+
+    commitTodayFocusItems(syncResult.items);
+  }, [hasLoadedTodayFocusItems, jiraData.issues]);
+
+  useEffect(() => {
+    if (!hasLoadedTodayFocusItemsRef.current || jiraRefreshSignal.lastCompletedAt === null) {
+      return;
+    }
+
+    if (!hasRunInitialFocusedJiraFallbackRef.current) {
+      hasRunInitialFocusedJiraFallbackRef.current = true;
+      void runFocusedJiraFallback();
+      return;
+    }
+
+    if (
+      lastFocusedJiraFallbackAtRef.current !== null &&
+      jiraRefreshSignal.lastCompletedAt - lastFocusedJiraFallbackAtRef.current < 5 * 60 * 1000
+    ) {
+      return;
+    }
+
+    void runFocusedJiraFallback();
+  }, [
+    hasLoadedTodayFocusItems,
+    jiraRefreshSignal.lastCompletedAt,
+    jiraData.issues,
+    settings.integrations.jira.apiToken,
+    settings.integrations.jira.baseUrl,
+    settings.integrations.jira.email
+  ]);
+
+  useEffect(() => {
+    if (!hasLoadedTodayFocusItemsRef.current || jiraRefreshSignal.lastManualAt === null) {
+      return;
+    }
+
+    void runFocusedJiraFallback();
+  }, [
+    hasLoadedTodayFocusItems,
+    jiraRefreshSignal.lastManualAt,
+    settings.integrations.jira.apiToken,
+    settings.integrations.jira.baseUrl,
+    settings.integrations.jira.email
+  ]);
 
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
   const dashboardAlerts = getDashboardAlerts({
@@ -285,16 +364,13 @@ export function DashboardPage({
       return;
     }
 
-    const nextItems = addResult.items;
-    setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
+    commitTodayFocusItems(addResult.items);
   }
 
   function handleRemoveTodayFocusItem(itemId: string) {
     setTodayFocusWarning(null);
     const nextItems = removeTodayFocusItem(todayFocusItems, itemId);
-    setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
+    commitTodayFocusItems(nextItems);
   }
 
   function handleNestNewTodayFocusPullRequest(parentId: string, item: FocusPullRequestItem) {
@@ -306,36 +382,72 @@ export function DashboardPage({
       return;
     }
 
-    setTodayFocusItems(nextState.items);
-    void saveStoredTodayFocusItems(nextState.items);
+    commitTodayFocusItems(nextState.items);
   }
 
   function handleNestExistingTodayFocusPullRequest(parentId: string, itemId: string) {
     setTodayFocusWarning(null);
     const nextItems = moveStandalonePullRequestUnderJira(todayFocusItems, parentId, itemId);
-    setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
+    commitTodayFocusItems(nextItems);
   }
 
   function handleReorderTopLevelTodayFocusItem(itemId: string, targetId: string) {
     setTodayFocusWarning(null);
     const nextItems = reorderTopLevelTodayFocusItems(todayFocusItems, itemId, targetId);
-    setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
+    commitTodayFocusItems(nextItems);
   }
 
   function handleMoveTopLevelTodayFocusItemToEnd(itemId: string) {
     setTodayFocusWarning(null);
     const nextItems = moveTopLevelTodayFocusItemToEnd(todayFocusItems, itemId);
-    setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
+    commitTodayFocusItems(nextItems);
   }
 
   function handleReorderNestedTodayFocusPullRequest(parentId: string, itemId: string, targetId: string) {
     setTodayFocusWarning(null);
     const nextItems = reorderNestedPullRequests(todayFocusItems, parentId, itemId, targetId);
+    commitTodayFocusItems(nextItems);
+  }
+
+  function commitTodayFocusItems(nextItems: FocusItem[]) {
+    todayFocusItemsRef.current = nextItems;
     setTodayFocusItems(nextItems);
     void saveStoredTodayFocusItems(nextItems);
+  }
+
+  async function runFocusedJiraFallback() {
+    const { baseUrl, email, apiToken } = settings.integrations.jira;
+    if (!baseUrl.trim() || !email.trim() || !apiToken.trim() || isFocusedJiraFallbackInFlightRef.current) {
+      return;
+    }
+
+    const syncResult = reconcileTodayFocusJiraItems(todayFocusItemsRef.current, jiraData.issues);
+    if (syncResult.missingKeys.length === 0) {
+      return;
+    }
+
+    isFocusedJiraFallbackInFlightRef.current = true;
+    lastFocusedJiraFallbackAtRef.current = Date.now();
+
+    try {
+      const fallbackIssues = await loadJiraIssuesByKeys({
+        baseUrl,
+        email,
+        apiToken,
+        issueKeys: syncResult.missingKeys
+      });
+
+      if (fallbackIssues.length === 0) {
+        return;
+      }
+
+      const fallbackSyncResult = reconcileTodayFocusJiraItems(todayFocusItemsRef.current, fallbackIssues);
+      if (fallbackSyncResult.items !== todayFocusItemsRef.current) {
+        commitTodayFocusItems(fallbackSyncResult.items);
+      }
+    } finally {
+      isFocusedJiraFallbackInFlightRef.current = false;
+    }
   }
 
   const integrationSwitcher = (

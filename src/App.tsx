@@ -23,6 +23,7 @@ import {
   saveStoredSettings,
   type DashboardSettings
 } from './lib/storage';
+import { type TodayFocusRefreshSignal } from './lib/todayFocusSync';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
 
@@ -42,6 +43,10 @@ export default function App() {
   const [jiraProfile, setJiraProfile] = useState<JiraProfile | null>(null);
   const [jiraErrorMessage, setJiraErrorMessage] = useState<string>('');
   const [jiraData, setJiraData] = useState<JiraDashboardData>(getEmptyJiraDashboardData());
+  const [jiraRefreshSignal, setJiraRefreshSignal] = useState<TodayFocusRefreshSignal>({
+    lastCompletedAt: null,
+    lastManualAt: null
+  });
   const [isJiraLoading, setIsJiraLoading] = useState(false);
   const isMountedRef = useRef(true);
   const isGitHubRefreshInFlightRef = useRef(false);
@@ -114,6 +119,7 @@ export default function App() {
       baseUrl: settings.integrations.jira.baseUrl,
       email: settings.integrations.jira.email,
       apiToken: settings.integrations.jira.apiToken,
+      reason: 'load',
       showLoadingIndicator: true
     });
   }, [
@@ -176,6 +182,7 @@ export default function App() {
         email,
         apiToken,
         forceRefresh: true,
+        reason: 'poll',
         showLoadingIndicator: false
       });
     };
@@ -292,6 +299,7 @@ export default function App() {
       email: settings.integrations.jira.email,
       apiToken: settings.integrations.jira.apiToken,
       forceRefresh: true,
+      reason: 'manual',
       showLoadingIndicator: true
     });
   }
@@ -338,6 +346,7 @@ export default function App() {
     email: string;
     apiToken: string;
     forceRefresh?: boolean;
+    reason: 'load' | 'manual' | 'poll';
     showLoadingIndicator: boolean;
   }) {
     if (isJiraRefreshInFlightRef.current) {
@@ -362,6 +371,11 @@ export default function App() {
       }
 
       setJiraData(data);
+      const completedAt = Date.now();
+      setJiraRefreshSignal((current) => ({
+        lastCompletedAt: completedAt,
+        lastManualAt: options.reason === 'manual' ? completedAt : current.lastManualAt
+      }));
     } finally {
       isJiraRefreshInFlightRef.current = false;
 
@@ -380,6 +394,7 @@ export default function App() {
       lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
       onRefreshGitHub={() => void handleRefreshGitHub()}
       jiraData={jiraData}
+      jiraRefreshSignal={jiraRefreshSignal}
       isJiraLoading={isJiraLoading}
       onRefreshJira={() => void handleRefreshJira()}
     />

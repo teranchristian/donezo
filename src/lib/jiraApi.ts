@@ -1,3 +1,5 @@
+import { type FocusStatusTone } from './storage';
+
 export type JiraConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
 
 export type JiraProfile = {
@@ -246,6 +248,48 @@ export async function loadJiraDashboardData(options: {
   }
 }
 
+export async function loadJiraIssuesByKeys(options: {
+  baseUrl: string;
+  email: string;
+  apiToken: string;
+  issueKeys: string[];
+}) {
+  const trimmedBaseUrl = normalizeJiraBaseUrl(options.baseUrl);
+  const trimmedEmail = options.email.trim();
+  const trimmedApiToken = options.apiToken.trim();
+  const issueKeys = Array.from(
+    new Set(options.issueKeys.map((issueKey) => issueKey.trim().toUpperCase()).filter(Boolean))
+  );
+
+  if (!trimmedBaseUrl || !trimmedEmail || !trimmedApiToken || issueKeys.length === 0) {
+    return [];
+  }
+
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return [];
+  }
+
+  try {
+    const response = await sendMessage<BackgroundJiraIssuesResponse>({
+      type: 'FETCH_JIRA_ISSUES_BY_KEYS',
+      payload: {
+        jiraBaseUrl: trimmedBaseUrl,
+        jiraEmail: trimmedEmail,
+        jiraApiToken: trimmedApiToken,
+        issueKeys
+      }
+    });
+
+    if (response?.success) {
+      return response.issues.map(normalizeJiraIssue);
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 export function getJiraIssueCounts(issues: JiraIssue[]) {
   return {
     active: issues.length,
@@ -257,6 +301,21 @@ export function getJiraIssueCounts(issues: JiraIssue[]) {
 
 export function getJiraBrowseUrl(baseUrl: string, issueKey: string) {
   return `${normalizeJiraBaseUrl(baseUrl)}/browse/${issueKey}`;
+}
+
+export function getJiraIssueFocusTone(issue: JiraIssue): FocusStatusTone {
+  const statusCategoryKey = issue.status.statusCategory?.key;
+  const normalizedStatus = issue.status.name.toLowerCase();
+
+  if (statusCategoryKey === 'done' || normalizedStatus.includes('done') || normalizedStatus.includes('closed')) {
+    return 'emerald';
+  }
+
+  if (statusCategoryKey === 'new' || normalizedStatus.includes('to do') || normalizedStatus.includes('todo')) {
+    return 'amber';
+  }
+
+  return 'violet';
 }
 
 export function getJiraSearchUrl(baseUrl: string) {

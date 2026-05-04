@@ -995,6 +995,47 @@ async function fetchBlockingIssueDetails(jiraBaseUrl, auth, issueKeys) {
   }, {});
 }
 
+async function fetchJiraIssuesByJql(jiraBaseUrl, auth, jql, maxResults) {
+  const result = await fetchJira(`${jiraBaseUrl}/rest/api/3/search/jql`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      jql,
+      fields: ['summary', 'status', 'priority', 'updated', 'issuelinks', 'project'],
+      maxResults
+    })
+  });
+
+  if (!result.success) {
+    throw new Error(result.error ?? 'Failed to load Jira issues');
+  }
+
+  const data = await result.response.json();
+  const fetchedIssues = Array.isArray(data.issues) ? data.issues : [];
+  const missingBlockingIssueKeys = getMissingBlockingIssueKeys(fetchedIssues);
+  const blockingIssueDetailsByKey = await fetchBlockingIssueDetails(
+    jiraBaseUrl,
+    auth,
+    missingBlockingIssueKeys
+  );
+
+  return mergeBlockingIssueDetails(fetchedIssues, blockingIssueDetailsByKey).map(normalizeJiraIssue);
+}
+
+async function fetchJiraIssuesByKeys(jiraBaseUrl, auth, issueKeys) {
+  const uniqueIssueKeys = Array.from(new Set(issueKeys.map((issueKey) => String(issueKey).trim().toUpperCase())));
+  if (uniqueIssueKeys.length === 0) {
+    return [];
+  }
+
+  const jql = `issuekey in (${uniqueIssueKeys.map((issueKey) => `"${escapeJqlValue(issueKey)}"`).join(', ')})`;
+  return fetchJiraIssuesByJql(jiraBaseUrl, auth, jql, uniqueIssueKeys.length);
+}
+
 async function fetchJira(endpoint, options) {
   const response = await fetch(endpoint, options);
 
@@ -1031,7 +1072,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       'FETCH_GITHUB_PULL_REQUEST_STATE',
       'FETCH_GITHUB_PULL_REQUEST_STATES',
       'TEST_JIRA_CONNECTION',
-      'FETCH_JIRA_ISSUES'
+      'FETCH_JIRA_ISSUES',
+      'FETCH_JIRA_ISSUES_BY_KEYS'
     ].includes(message?.type)
   ) {
     return false;
@@ -1205,6 +1247,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
+    if (message.type === 'FETCH_JIRA_ISSUES_BY_KEYS') {
+      const issueKeys = Array.isArray(payload.issueKeys) ? payload.issueKeys : [];
+
+      try {
+        const issues = await fetchJiraIssuesByKeys(jiraBaseUrl, auth, issueKeys);
+        sendResponse({ success: true, issues });
+      } catch (error) {
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to load Jira issues'
+        });
+      }
+
+      return;
+    }
+
     const forceRefresh = Boolean(payload.forceRefresh);
     const credentialsKey = createJiraCredentialsKey(jiraBaseUrl, jiraEmail, jiraApiToken);
 
@@ -1217,48 +1275,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
 
-      const result = await fetchJira(`${jiraBaseUrl}/rest/api/3/search/jql`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${auth}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          jql: JIRA_ACTIVE_ISSUES_JQL,
-          fields: ['summary', 'status', 'priority', 'updated', 'issuelinks', 'project'],
-          maxResults: 50
-        })
-      });
-
-      if (!result.success) {
-        sendResponse(result);
-        return;
-      }
-
-      const data = await result.response.json();
-      console.log('Jira search response:', data);
-      const fetchedIssues = Array.isArray(data.issues) ? data.issues : [];
-
-      fetchedIssues.forEach((issue) => {
-        console.log('Issue links:', {
-          key: issue?.key,
-          issuelinks: issue?.fields?.issuelinks
-        });
-      });
-
-      const missingBlockingIssueKeys = getMissingBlockingIssueKeys(fetchedIssues);
-      console.log('Missing blocking issue keys:', missingBlockingIssueKeys);
-      const blockingIssueDetailsByKey = await fetchBlockingIssueDetails(
-        jiraBaseUrl,
-        auth,
-        missingBlockingIssueKeys
-      );
-      console.log('Blocking issue details response:', blockingIssueDetailsByKey);
-      const issues = mergeBlockingIssueDetails(fetchedIssues, blockingIssueDetailsByKey).map(
-        normalizeJiraIssue
-      );
-
+      const issues = await fetchJiraIssuesByJql(jiraBaseUrl, auth, JIRA_ACTIVE_ISSUES_JQL, 50);
       await saveCachedJiraIssues(credentialsKey, issues);
       sendResponse({ success: true, issues });
     } catch (error) {
