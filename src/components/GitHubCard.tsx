@@ -424,6 +424,7 @@ function PullRequestRow({
   pullRequest: GitHubPullRequestItem;
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
+  const hasConflicts = pullRequest.mergeStateStatus === 'DIRTY';
   const status = getPullRequestDisplayStatus(pullRequest);
   const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
 
@@ -459,6 +460,16 @@ function PullRequestRow({
                 {shouldShowAuthor ? <span className="mx-1.5 text-white/22">•</span> : null}
                 {shouldShowAuthor ? <span>by {pullRequest.authorLogin}</span> : null}
               </p>
+              {hasConflicts ? (
+                <span
+                  title="This pull request has merge conflicts that must be resolved before merging."
+                  className="ml-1.5 shrink-0 whitespace-nowrap text-amber-200/70"
+                >
+                  <span className="mr-1.5 text-white/22">•</span>
+                  <span aria-hidden="true">⚠</span>
+                  <span className="ml-1">Has conflicts</span>
+                </span>
+              ) : null}
               {isOutOfDate ? (
                 <span
                   title="This branch is out of date with the base branch. Update branch required."
