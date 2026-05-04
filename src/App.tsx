@@ -159,6 +159,47 @@ export default function App() {
       return;
     }
 
+    const { baseUrl, email, apiToken } = settings.integrations.jira;
+    if (!baseUrl.trim() || !email.trim() || !apiToken.trim()) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const pollForJiraActivity = async () => {
+      if (isCancelled || isJiraRefreshInFlightRef.current) {
+        return;
+      }
+
+      await refreshJiraData({
+        baseUrl,
+        email,
+        apiToken,
+        forceRefresh: true,
+        showLoadingIndicator: false
+      });
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pollForJiraActivity();
+    }, 60 * 1000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    isLoadingSettings,
+    settings.integrations.jira.apiToken,
+    settings.integrations.jira.baseUrl,
+    settings.integrations.jira.email
+  ]);
+
+  useEffect(() => {
+    if (isLoadingSettings) {
+      return;
+    }
+
     const username = settings.integrations.github.username;
     const token = settings.integrations.github.token.trim();
     if (!token) {
