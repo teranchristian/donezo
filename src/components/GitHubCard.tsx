@@ -451,7 +451,7 @@ function PullRequestRow({
               </p>
               <PullRequestTrailingIcon pullRequest={pullRequest} />
             </div>
-            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
+            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-secondary">
               <p
                 className="truncate"
                 title={`${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
