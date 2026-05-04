@@ -443,7 +443,7 @@ function PullRequestRow({
     >
       <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
         <div className="row-span-2 flex min-w-0 items-start gap-1.5">
-          <GitHubItemIcon kind="pull-request" />
+          <GitHubItemIcon kind="pull-request" isDraft={pullRequest.reviewStatus === 'draft'} />
           <div className="min-w-0 flex-1">
             <div className="inline-flex max-w-full items-center gap-1 align-top">
               <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
@@ -672,10 +672,12 @@ function NotificationRow({
 
 function GitHubItemIcon({
   kind,
-  state
+  state,
+  isDraft = false
 }: {
   kind: 'pull-request' | 'issue' | 'commit' | 'discussion'
   state?: GitHubPullRequestState
+  isDraft?: boolean
 }) {
   if (kind === 'issue') {
     return (
@@ -738,6 +740,19 @@ function GitHubItemIcon({
         fill="currentColor"
       >
         <path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z" />
+      </svg>
+    );
+  }
+
+  if (kind === 'pull-request' && isDraft) {
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-4 w-4 flex-none text-white/38"
+        fill="currentColor"
+      >
+        <path d="M2.75 1a2.25 2.25 0 0 1 .75 4.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 2.75 1Zm0 1.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM8 2.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm0 4.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm0 4.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Zm5.25-5.25a.75.75 0 0 1 .75.75v3.378a2.251 2.251 0 1 1-1.5 0V7.25a.75.75 0 0 1 .75-.75Zm0 5.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z" />
       </svg>
     );
   }
