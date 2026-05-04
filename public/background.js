@@ -78,6 +78,7 @@ const GITHUB_PULL_REQUEST_PAGE_SIZE = 50;
 const gitHubDashboardRequests = new Map();
 const gitHubActivityPollRequests = new Map();
 const gitHubPullRequestStateRequests = new Map();
+const gitHubPullRequestStatesRequests = new Map();
 
 function normalizeJiraBaseUrl(baseUrl) {
   return String(baseUrl ?? '').trim().replace(/\/+$/, '');
@@ -632,6 +633,73 @@ async function getGitHubPullRequestState(payload) {
   return detail.state === 'open' ? 'open' : 'closed';
 }
 
+function buildGitHubPullRequestStatesQuery(pullRequests) {
+  const queryBody = pullRequests
+    .map(
+      (pullRequest, index) => `
+      pr${index}: repository(owner: ${JSON.stringify(pullRequest.owner)}, name: ${JSON.stringify(pullRequest.repo)}) {
+        pullRequest(number: ${pullRequest.pullNumber}) {
+          state
+          merged
+        }
+      }`
+    )
+    .join('\n');
+
+  return `query NotificationPullRequestStates {${queryBody}
+  }`;
+}
+
+async function getGitHubPullRequestStates(payload) {
+  const token = normalizeGitHubToken(payload.token);
+  const inputPullRequests = Array.isArray(payload.pullRequests) ? payload.pullRequests : [];
+  const uniquePullRequests = [];
+  const requestIdsByPullRequestKey = new Map();
+
+  for (const pullRequest of inputPullRequests) {
+    const owner = String(pullRequest?.owner ?? '').trim();
+    const repo = String(pullRequest?.repo ?? '').trim();
+    const pullNumber = Number(pullRequest?.pullNumber);
+    const id = String(pullRequest?.id ?? '').trim();
+
+    if (!owner || !repo || !Number.isFinite(pullNumber) || pullNumber <= 0 || !id) {
+      continue;
+    }
+
+    const key = `${owner}/${repo}#${pullNumber}`;
+    if (!requestIdsByPullRequestKey.has(key)) {
+      requestIdsByPullRequestKey.set(key, []);
+      uniquePullRequests.push({ owner, repo, pullNumber });
+    }
+
+    requestIdsByPullRequestKey.get(key).push(id);
+  }
+
+  if (uniquePullRequests.length === 0) {
+    return {};
+  }
+
+  const data = await fetchGitHubGraphQL(
+    buildGitHubPullRequestStatesQuery(uniquePullRequests),
+    {},
+    token
+  );
+  const statesById = {};
+
+  uniquePullRequests.forEach((pullRequest, index) => {
+    const result = data?.[`pr${index}`]?.pullRequest;
+    const state = result?.merged ? 'merged' : result?.state === 'OPEN' ? 'open' : 'closed';
+    const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
+    const requestIds = requestIdsByPullRequestKey.get(key) ?? [];
+
+    requestIds.forEach((id) => {
+      statesById[id] = state;
+    });
+  });
+
+  return statesById;
+}
+
 function withSharedPromise(map, key, factory) {
   const existing = map.get(key);
   if (existing) {
@@ -903,6 +971,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       'FETCH_GITHUB_DASHBOARD',
       'POLL_GITHUB_ACTIVITY',
       'FETCH_GITHUB_PULL_REQUEST_STATE',
+      'FETCH_GITHUB_PULL_REQUEST_STATES',
       'TEST_JIRA_CONNECTION',
       'FETCH_JIRA_ISSUES'
     ].includes(message?.type)
@@ -998,6 +1067,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           success: false,
           state: 'closed',
           error: error instanceof Error ? error.message : 'Failed to load GitHub pull request state'
+        });
+      }
+
+      return;
+    }
+
+    if (message.type === 'FETCH_GITHUB_PULL_REQUEST_STATES') {
+      const token = normalizeGitHubToken(payload.token);
+      const pullRequests = Array.isArray(payload.pullRequests) ? payload.pullRequests : [];
+      const requestKey = JSON.stringify({
+        type: message.type,
+        token,
+        pullRequests: pullRequests
+          .map((pullRequest) => ({
+            id: String(pullRequest?.id ?? ''),
+            owner: String(pullRequest?.owner ?? ''),
+            repo: String(pullRequest?.repo ?? ''),
+            pullNumber: Number(pullRequest?.pullNumber ?? 0)
+          }))
+          .sort((left, right) =>
+            `${left.owner}/${left.repo}#${left.pullNumber}:${left.id}`.localeCompare(
+              `${right.owner}/${right.repo}#${right.pullNumber}:${right.id}`
+            )
+          )
+      });
+
+      try {
+        const states = await withSharedPromise(gitHubPullRequestStatesRequests, requestKey, () =>
+          getGitHubPullRequestStates(payload)
+        );
+        sendResponse({ success: true, states });
+      } catch (error) {
+        sendResponse({
+          success: false,
+          states: {},
+          error: error instanceof Error ? error.message : 'Failed to load GitHub pull request states'
         });
       }
 

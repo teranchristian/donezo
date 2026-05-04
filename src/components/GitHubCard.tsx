@@ -4,7 +4,7 @@ import {
   GitHubDashboardData,
   GitHubNotification,
   GitHubPullRequestItem,
-  getGitHubPullRequestState,
+  getGitHubPullRequestStates,
   type GitHubPullRequestState
 } from '../lib/githubApi';
 import { type FocusItem } from '../lib/storage';
@@ -256,36 +256,34 @@ export function GitHubCard({
 
     let isCancelled = false;
 
-    Promise.all(
-      visiblePullRequestNotifications.map(async (notification) => {
+    const missingPullRequests = visiblePullRequestNotifications
+      .map((notification) => {
         const pullRequestIdentity = getPullRequestIdentityFromNotification(notification);
         if (!pullRequestIdentity) {
           return null;
         }
 
-        try {
-          const state = await getGitHubPullRequestState({
-            ...pullRequestIdentity,
-            token
-          });
-
-          return { id: notification.id, state };
-        } catch {
-          return { id: notification.id, state: 'closed' as const };
-        }
+        return {
+          id: notification.id,
+          ...pullRequestIdentity
+        };
       })
-    ).then((results) => {
+      .filter((pullRequest): pullRequest is { id: string; owner: string; repo: string; pullNumber: number } =>
+        Boolean(pullRequest)
+      );
+
+    getGitHubPullRequestStates({
+      token,
+      pullRequests: missingPullRequests
+    }).then((statesById) => {
       if (isCancelled) {
         return;
       }
 
       setNotificationPullRequestStates((currentEntries) => {
         const nextEntries = { ...currentEntries };
-
-        for (const result of results) {
-          if (result) {
-            nextEntries[result.id] = result.state;
-          }
+        for (const [id, state] of Object.entries(statesById)) {
+          nextEntries[id] = state;
         }
 
         return nextEntries;
@@ -1011,6 +1009,14 @@ function getPullRequestIdentityFromNotification(notification: GitHubNotification
     repo,
     pullNumber: Number(pullNumber)
   };
+}
+
+function getPullRequestIdentityKey(pullRequestIdentity: {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+}) {
+  return `${pullRequestIdentity.owner}/${pullRequestIdentity.repo}#${pullRequestIdentity.pullNumber}`;
 }
 
 function getNotificationUrl(notification: GitHubNotification) {

@@ -87,6 +87,12 @@ type GitHubPullRequestStateResponse = {
   error?: string;
 };
 
+type GitHubPullRequestStatesResponse = {
+  success: boolean;
+  states?: Record<string, GitHubPullRequestState>;
+  error?: string;
+};
+
 const CACHE_KEY = 'github-dashboard-cache';
 
 export function getEmptyGitHubDashboardData(
@@ -259,6 +265,39 @@ export async function getGitHubPullRequestState(options: {
     return response?.state ?? 'closed';
   } catch {
     return 'closed';
+  }
+}
+
+export async function getGitHubPullRequestStates(options: {
+  token: string;
+  pullRequests: Array<{
+    id: string;
+    owner: string;
+    repo: string;
+    pullNumber: number;
+  }>;
+}): Promise<Record<string, GitHubPullRequestState>> {
+  const token = options.token.trim();
+  if (!token || options.pullRequests.length === 0) {
+    return {};
+  }
+
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return {};
+  }
+
+  try {
+    const response = await sendMessage<GitHubPullRequestStatesResponse>({
+      type: 'FETCH_GITHUB_PULL_REQUEST_STATES',
+      payload: {
+        token,
+        pullRequests: options.pullRequests
+      }
+    });
+
+    return response?.states ?? {};
+  } catch {
+    return {};
   }
 }
 
