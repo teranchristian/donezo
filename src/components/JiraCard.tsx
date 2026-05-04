@@ -170,12 +170,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
   const blockedByIssues = issue.blockedByIssues;
   const issueUrl = getJiraBrowseUrl(baseUrl, issue.key);
   const projectName = issue.project?.name || issue.project?.key || '';
-  const detailItems = [
-    issue.key,
-    projectName,
-    `updated ${formatRelativeTime(issue.updated)}`,
-    issue.status.name
-  ].filter(Boolean);
+  const detailItems = [issue.key, projectName].filter(Boolean);
 
   return (
     <a
@@ -191,42 +186,46 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
         event.dataTransfer.setData('text/plain', issue.key);
       }}
     >
-      <div className="flex items-start gap-1.5">
-        <PriorityIcon priorityName={issue.priority?.name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1.5">
-            <p className="line-clamp-2 min-w-0 flex-1 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] gap-x-3">
+        <div className="flex min-w-0 items-start gap-1.5">
+          <PriorityIcon priorityName={issue.priority?.name} />
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
               {issue.summary}
             </p>
-            <div className="shrink-0 pt-0.5">
-              <StatusBadge label={issue.status.name} />
+
+            <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
+              {detailItems.map((item, index) => (
+                <span key={`${item}-${index}`} className="min-w-0 truncate">
+                  {index > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
+                  <span title={item}>{item}</span>
+                </span>
+              ))}
+              {blockingIssues.map((blockingIssue) => (
+                <span
+                  key={blockingIssue.key}
+                  className="pointer-events-auto rounded-full bg-amber-300/10 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-amber-100"
+                >
+                  Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
+                </span>
+              ))}
+              {blockedByIssues.map((blockedByIssue) => (
+                <span
+                  key={blockedByIssue.key}
+                  className="pointer-events-auto rounded-full bg-rose-300/10 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-rose-100"
+                >
+                  Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
+                </span>
+              ))}
             </div>
           </div>
+        </div>
 
-          <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
-            {detailItems.map((item, index) => (
-              <span key={`${item}-${index}`} className="min-w-0 truncate">
-                {index > 0 ? <span className="mr-1.5 text-white/22">•</span> : null}
-                <span title={item}>{item}</span>
-              </span>
-            ))}
-            {blockingIssues.map((blockingIssue) => (
-              <span
-                key={blockingIssue.key}
-                className="pointer-events-auto rounded-full bg-amber-300/10 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-amber-100"
-              >
-                Blocks <RelatedIssueLink baseUrl={baseUrl} issue={blockingIssue} tone="amber" />
-              </span>
-            ))}
-            {blockedByIssues.map((blockedByIssue) => (
-              <span
-                key={blockedByIssue.key}
-                className="pointer-events-auto rounded-full bg-rose-300/10 px-1.5 py-0.5 text-[0.58rem] uppercase tracking-[0.12em] text-rose-100"
-              >
-                Blocked by <RelatedIssueLink baseUrl={baseUrl} issue={blockedByIssue} tone="rose" />
-              </span>
-            ))}
-          </div>
+        <div className="flex min-w-0 flex-col items-end pt-[0.08rem]">
+          <StatusBadge label={issue.status.name} />
+          <p className="mt-0.25 text-right text-[0.64rem] leading-4 text-white/38">
+            updated {formatRelativeTime(issue.updated)}
+          </p>
         </div>
       </div>
     </a>
