@@ -538,7 +538,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'github'}
                 >
                   <GitHubCard
-                    topBar={integrationSwitcher}
+                    topBar={activeIntegration === 'github' ? integrationSwitcher : undefined}
                     data={gitHubData}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
@@ -559,7 +559,7 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'jira'}
                 >
                   <JiraCard
-                    topBar={integrationSwitcher}
+                    topBar={activeIntegration === 'jira' ? integrationSwitcher : undefined}
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
                     isLoading={isJiraLoading}
