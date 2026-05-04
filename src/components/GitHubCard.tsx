@@ -558,13 +558,13 @@ function PullRequestCheckStatusIcon({
         className="h-[0.8rem] w-[0.8rem] shrink-0 animate-spin text-amber-300/85"
         fill="none"
       >
-        <circle cx="8" cy="8" r="5.25" className="text-amber-100/18" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="8" cy="8" r="5.25" className="text-amber-100/4" stroke="currentColor" strokeWidth="2.1" />
         <path
           d="M8 2.75a5.25 5.25 0 0 1 5.25 5.25"
           className="text-amber-300"
           stroke="currentColor"
           strokeLinecap="round"
-          strokeWidth="1.75"
+          strokeWidth="2.35"
         />
       </svg>
     );
