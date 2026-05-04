@@ -637,30 +637,38 @@ function NotificationRow({
       rel="noreferrer"
       className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
     >
-      <div className="flex items-start gap-1.5">
-        <GitHubItemIcon
-          kind={iconKind}
-          state={iconKind === 'pull-request' ? pullRequestState : undefined}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1.5">
-            <p className="line-clamp-2 min-w-0 flex-1 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
-              {notification.subject.title}
-            </p>
-            <p className="shrink-0 pt-0.5 text-[0.58rem] font-medium uppercase tracking-[0.12em] text-white/36">
-              {notificationTypeLabel}
-            </p>
-          </div>
-          <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
-            <span>{notification.repository.full_name}</span>
-            <span className="text-white/22">•</span>
-            <span>updated {formatRelativeTime(notification.updated_at)}</span>
-          </div>
-          <div className="mt-0.75 flex flex-wrap gap-1">
-            <Badge label={notification.reason} tone="gray" />
-            {notification.unread ? <Badge label="Unread" tone="green" /> : null}
+      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
+        <div className="row-span-2 flex min-w-0 items-start gap-1.5">
+          <GitHubItemIcon
+            kind={iconKind}
+            state={iconKind === 'pull-request' ? pullRequestState : undefined}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="inline-flex max-w-full items-center gap-1 align-top">
+              <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+                {notification.subject.title}
+              </p>
+            </div>
+            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
+              <p
+                className="truncate"
+                title={`${notification.repository.full_name}${notification.unread ? ' • unread' : ''}`}
+              >
+                <span>{notification.repository.full_name}</span>
+                {notification.unread ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {notification.unread ? <span>Unread</span> : null}
+              </p>
+            </div>
           </div>
         </div>
+        <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
+          <p className="text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] text-white/36">
+            {notificationTypeLabel}
+          </p>
+        </div>
+        <p className="col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 text-white/38">
+          updated {formatRelativeTime(notification.updated_at)}
+        </p>
       </div>
     </a>
   );
