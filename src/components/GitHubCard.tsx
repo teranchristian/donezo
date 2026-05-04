@@ -625,6 +625,10 @@ function NotificationRow({
 }) {
   const iconKind = getNotificationIconKind(notification.subject.type);
   const notificationTypeLabel = getNotificationTypeLabel(notification);
+  const rowTextClass = notification.unread ? 'text-primary' : 'text-secondary';
+  const rowMetaClass = notification.unread ? 'text-white/42' : 'text-[var(--text-tertiary)]';
+  const rowMutedClass = notification.unread ? 'text-white/36' : 'text-[var(--text-tertiary)]';
+  const rowTimestampClass = notification.unread ? 'text-white/38' : 'text-[var(--text-tertiary)]';
 
   return (
     <a
@@ -641,11 +645,13 @@ function NotificationRow({
           />
           <div className="min-w-0 flex-1">
             <div className="inline-flex max-w-full items-center gap-1 align-top">
-              <p className="truncate text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+              <p
+                className={`truncate text-[0.82rem] font-medium leading-4.25 transition group-hover:text-white ${rowTextClass}`}
+              >
                 {notification.subject.title}
               </p>
             </div>
-            <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-white/42">
+            <div className={`mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] ${rowMetaClass}`}>
               <p
                 className="truncate"
                 title={`${notification.repository.full_name}${notification.unread ? ' • unread' : ''}`}
@@ -658,11 +664,11 @@ function NotificationRow({
           </div>
         </div>
         <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
-          <p className="text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] text-white/36">
+          <p className={`text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] ${rowMutedClass}`}>
             {notificationTypeLabel}
           </p>
         </div>
-        <p className="col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 text-white/38">
+        <p className={`col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 ${rowTimestampClass}`}>
           updated {formatRelativeTime(notification.updated_at)}
         </p>
       </div>
