@@ -98,6 +98,7 @@ export function GitHubCard({
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedOwnerFilter, setHasLoadedOwnerFilter] = useState(false);
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
+  const [isResolvingNotificationStates, setIsResolvingNotificationStates] = useState(false);
   const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
     Record<string, GitHubPullRequestState>
   >({});
@@ -151,6 +152,7 @@ export function GitHubCard({
   const visibleNotificationPullRequestKey = visiblePullRequestNotifications
     .map((notification) => notification.id)
     .join('|');
+  const isNotificationViewLoading = activeView === 'notifications' && (isLoading || isResolvingNotificationStates);
   const tabItems = [
     {
       key: 'prs',
@@ -163,7 +165,7 @@ export function GitHubCard({
     {
       key: 'notifications',
       label: 'Notifications',
-      value: formatCount(filteredNotificationCount, isLoading),
+      value: formatCount(filteredNotificationCount, isLoading || isResolvingNotificationStates),
       isActive: activeView === 'notifications',
       onClick: () => onViewChange('notifications')
     },
@@ -221,6 +223,7 @@ export function GitHubCard({
   useEffect(() => {
     const activeNotificationIds = new Set((data.notifications ?? []).map((notification) => notification.id));
 
+    setIsResolvingNotificationStates(false);
     setNotificationPullRequestStates((currentEntries) => {
       const nextEntries = Object.fromEntries(
         Object.entries(currentEntries).filter(([id]) => activeNotificationIds.has(id))
@@ -251,10 +254,12 @@ export function GitHubCard({
 
   useEffect(() => {
     if (!token.trim() || visiblePullRequestNotifications.length === 0) {
+      setIsResolvingNotificationStates(false);
       return;
     }
 
     let isCancelled = false;
+    setIsResolvingNotificationStates(true);
 
     const missingPullRequests = visiblePullRequestNotifications
       .map((notification) => {
@@ -288,6 +293,7 @@ export function GitHubCard({
 
         return nextEntries;
       });
+      setIsResolvingNotificationStates(false);
     });
 
     return () => {
@@ -374,7 +380,7 @@ export function GitHubCard({
           </div>
 
           <div className="dashboard-scrollbar min-h-[320px] max-h-[420px] flex-1 overflow-x-hidden overflow-y-auto pr-1">
-            {isLoading ? (
+            {isNotificationViewLoading || isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <ListItemSkeleton key={index} />
