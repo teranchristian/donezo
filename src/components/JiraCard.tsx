@@ -191,7 +191,7 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
         <div className="flex min-w-0 items-start gap-1.5">
           <PriorityIcon priorityName={issue.priority?.name} />
           <div className="min-w-0 flex-1">
-            <p className="line-clamp-2 min-w-0 text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+            <p className="line-clamp-2 min-w-0 text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
               {issue.summary}
             </p>
 

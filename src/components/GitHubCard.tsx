@@ -446,7 +446,7 @@ function PullRequestRow({
           <GitHubItemIcon kind="pull-request" isDraft={pullRequest.reviewStatus === 'draft'} />
           <div className="min-w-0 flex-1">
             <div className="inline-flex max-w-full items-center gap-1 align-top">
-              <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+              <p className="truncate text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
                 {pullRequest.title}
               </p>
               <PullRequestTrailingIcon pullRequest={pullRequest} />
@@ -641,7 +641,7 @@ function NotificationRow({
           />
           <div className="min-w-0 flex-1">
             <div className="inline-flex max-w-full items-center gap-1 align-top">
-              <p className="truncate text-[0.78rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+              <p className="truncate text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
                 {notification.subject.title}
               </p>
             </div>
