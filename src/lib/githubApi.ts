@@ -42,6 +42,10 @@ export type GitHubPullRequestItem = {
     | 'HAS_HOOKS'
     | 'UNKNOWN'
     | 'UNSTABLE';
+  mergeQueueEntry: {
+    position: number;
+    state: 'AWAITING_CHECKS' | 'LOCKED' | 'MERGEABLE' | 'QUEUED' | 'UNMERGEABLE';
+  } | null;
   detailsLoaded: boolean;
 };
 

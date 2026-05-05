@@ -432,6 +432,7 @@ function PullRequestRow({
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
   const hasConflicts = pullRequest.mergeStateStatus === 'DIRTY';
+  const isQueued = isPullRequestQueued(pullRequest);
   const isReadyToMerge = isPullRequestReadyToClose(pullRequest);
   const status = getPullRequestDisplayStatus(pullRequest);
   const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
@@ -469,7 +470,14 @@ function PullRequestRow({
                 <p className="truncate">
                   <span>{repositoryLabel}</span>
                 </p>
-                {isReadyToMerge ? (
+                {isQueued ? (
+                  <>
+                    <span className="mx-1.5 text-white/22">•</span>
+                    <span>
+                      Queue #{pullRequest.mergeQueueEntry?.position ?? '?'}
+                    </span>
+                  </>
+                ) : isReadyToMerge ? (
                   <>
                     <span className="mx-1.5 text-white/22">•</span>
                     <PullRequestReadyToMergeIcon />
@@ -1094,6 +1102,12 @@ function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['review
 }
 
 function getPullRequestDisplayStatus(pullRequest: GitHubPullRequestItem) {
+  if (isPullRequestQueued(pullRequest)) {
+    return {
+      label: 'QUEUED'
+    };
+  }
+
   if (isPullRequestReadyToClose(pullRequest)) {
     return {
       label: 'READY TO MERGE'
@@ -1131,11 +1145,16 @@ function getPullRequestDisplayStatus(pullRequest: GitHubPullRequestItem) {
 
 function isPullRequestReadyToClose(pullRequest: GitHubPullRequestItem) {
   return (
+    !isPullRequestQueued(pullRequest) &&
     pullRequest.reviewStatus === 'approved' &&
     pullRequest.ciStatus === 'passing' &&
     !isPullRequestOutOfDate(pullRequest) &&
     pullRequest.mergeStateStatus === 'CLEAN'
   );
+}
+
+function isPullRequestQueued(pullRequest: GitHubPullRequestItem) {
+  return Boolean(pullRequest.mergeQueueEntry);
 }
 
 function isPullRequestOutOfDate(pullRequest: GitHubPullRequestItem) {

@@ -38,6 +38,10 @@ const GITHUB_PULL_REQUESTS_QUERY = `
     updatedAt
     reviewDecision
     mergeStateStatus
+    mergeQueueEntry {
+      position
+      state
+    }
     author {
       login
     }
@@ -237,6 +241,8 @@ function getDashboardPullRequestSignals(pullRequests) {
     reviewStatus: pullRequest.reviewStatus,
     ciStatus: pullRequest.ciStatus,
     mergeStateStatus: pullRequest.mergeStateStatus,
+    mergeQueueEntryState: pullRequest.mergeQueueEntry?.state ?? null,
+    mergeQueueEntryPosition: pullRequest.mergeQueueEntry?.position ?? null,
     isDraft: Boolean(pullRequest.isDraft)
   }));
 }
@@ -529,7 +535,26 @@ function mapGraphQlPullRequest(pullRequest, source) {
     reviewStatus: getReviewStatusFromDecision(pullRequest.isDraft, pullRequest.reviewDecision),
     ciStatus: getCiStatusFromRollup(pullRequest.commits.nodes[0]?.commit?.statusCheckRollup ?? null),
     mergeStateStatus: pullRequest.mergeStateStatus,
+    mergeQueueEntry: mapMergeQueueEntry(pullRequest.mergeQueueEntry),
     detailsLoaded: true
+  };
+}
+
+function mapMergeQueueEntry(mergeQueueEntry) {
+  if (!mergeQueueEntry) {
+    return null;
+  }
+
+  const position = Number(mergeQueueEntry.position);
+  const state = String(mergeQueueEntry.state ?? '').trim();
+
+  if (!Number.isFinite(position) || position <= 0 || !state) {
+    return null;
+  }
+
+  return {
+    position,
+    state
   };
 }
 
