@@ -143,7 +143,6 @@ body {
 }
 
 .dashboard-panel-column {
-  max-width: min(100%, var(--dashboard-panel-max-width));
   width: 100%;
 }
 
