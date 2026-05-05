@@ -432,6 +432,7 @@ function PullRequestRow({
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
   const hasConflicts = pullRequest.mergeStateStatus === 'DIRTY';
+  const isReadyToMerge = isPullRequestReadyToClose(pullRequest);
   const status = getPullRequestDisplayStatus(pullRequest);
   const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
   const repositoryLabel = getRepositoryLabel(pullRequest.repositoryName);
@@ -461,14 +462,22 @@ function PullRequestRow({
               {isInTodayFocus ? <TodayFocusIndicator className="font-semibold" /> : null}
             </div>
             <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-secondary">
-              <p
-                className="truncate"
+              <div
+                className="flex min-w-0 items-center overflow-hidden"
                 title={`${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
               >
-                <span>{repositoryLabel}</span>
+                <p className="truncate">
+                  <span>{repositoryLabel}</span>
+                </p>
+                {isReadyToMerge ? (
+                  <>
+                    <span className="mx-1.5 text-white/22">•</span>
+                    <PullRequestReadyToMergeIcon />
+                  </>
+                ) : null}
                 {shouldShowAuthor ? <span className="mx-1.5 text-white/22">•</span> : null}
                 {shouldShowAuthor ? <span>by {pullRequest.authorLogin}</span> : null}
-              </p>
+              </div>
               {hasConflicts ? (
                 <span
                   title="This pull request has merge conflicts that must be resolved before merging."
@@ -591,6 +600,19 @@ function PullRequestCheckStatusIcon({
   }
 
   return null;
+}
+
+function PullRequestReadyToMergeIcon() {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      className="h-[0.8rem] w-[0.8rem] shrink-0 text-emerald-300"
+      fill="currentColor"
+    >
+      <path d="M6 0a6 6 0 1 1 0 12A6 6 0 0 1 6 0Zm-.705 8.737L9.63 4.403 8.392 3.166 5.295 6.263l-1.7-1.702L2.356 5.8l2.938 2.938Z" />
+    </svg>
+  );
 }
 
 function PullRequestList({
