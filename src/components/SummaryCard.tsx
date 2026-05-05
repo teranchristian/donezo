@@ -1,6 +1,7 @@
 import { FocusEvent, useEffect, useState } from 'react';
 import { CardShell } from './CardShell';
 import { type FocusItem, type FocusJiraItem, type FocusPullRequestItem } from '../lib/storage';
+import { FocusTargetIcon } from './TodayFocusIndicator';
 
 export const TODAY_FOCUS_MAX_ITEMS = 3;
 export const TODAY_FOCUS_DRAG_MIME = 'application/x-dashboard-today-focus-item';
@@ -773,16 +774,6 @@ function getStatusDotClass(statusTone: FocusItem['statusTone']) {
     : statusTone === 'emerald'
       ? 'bg-emerald-300'
       : 'bg-amber-300';
-}
-
-function FocusTargetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9">
-      <circle cx="12" cy="12" r="6.6" />
-      <circle cx="12" cy="12" r="1.8" />
-      <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 function FocusDropZoneIcon() {

@@ -86,6 +86,7 @@ export function DashboardPage({
     approvedPrCount: null,
     relevantPrCount: gitHubData.openPrsCount
   });
+  const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
 
   useEffect(() => {
     todayFocusItemsRef.current = todayFocusItems;
@@ -540,6 +541,7 @@ export function DashboardPage({
                   <GitHubCard
                     topBar={activeIntegration === 'github' ? integrationSwitcher : undefined}
                     data={gitHubData}
+                    todayFocusItemIds={todayFocusItemIds}
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
                     ownerFilter={settings.integrations.github.ownerFilter}
@@ -562,6 +564,7 @@ export function DashboardPage({
                     topBar={activeIntegration === 'jira' ? integrationSwitcher : undefined}
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
+                    todayFocusItemIds={todayFocusItemIds}
                     isLoading={isJiraLoading}
                     onRefresh={onRefreshJira}
                     activeView={activeJiraView}
@@ -575,6 +578,22 @@ export function DashboardPage({
       </div>
     </main>
   );
+}
+
+function collectTodayFocusItemIds(items: FocusItem[]) {
+  const itemIds = new Set<string>();
+
+  for (const item of items) {
+    itemIds.add(item.id);
+
+    if (item.source === 'jira') {
+      for (const child of item.children) {
+        itemIds.add(child.id);
+      }
+    }
+  }
+
+  return itemIds;
 }
 
 function replaceDashboardHash(nextState: {

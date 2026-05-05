@@ -20,10 +20,12 @@ import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 import { StatusBadge } from './StatusBadge';
 import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
+import { TodayFocusIndicator } from './TodayFocusIndicator';
 
 type GitHubCardProps = {
   topBar?: ReactNode;
   data: GitHubDashboardData;
+  todayFocusItemIds: Set<string>;
   username: string;
   token: string;
   ownerFilter: string;
@@ -77,6 +79,7 @@ const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string;
 export function GitHubCard({
   topBar,
   data,
+  todayFocusItemIds,
   username,
   token,
   ownerFilter,
@@ -360,6 +363,7 @@ export function GitHubCard({
                 pullRequests={filteredItems
                   .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
                   .map((item) => item.value)}
+                todayFocusItemIds={todayFocusItemIds}
               />
             ) : (
               <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
@@ -374,6 +378,7 @@ export function GitHubCard({
                     <PullRequestRow
                       key={item.key}
                       pullRequest={item.value}
+                      isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(item.value).id)}
                     />
                   )
                 )}
@@ -420,8 +425,10 @@ type GitHubViewItem =
 
 function PullRequestRow({
   pullRequest,
+  isInTodayFocus
 }: {
   pullRequest: GitHubPullRequestItem;
+  isInTodayFocus: boolean;
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
   const hasConflicts = pullRequest.mergeStateStatus === 'DIRTY';
@@ -451,6 +458,7 @@ function PullRequestRow({
                 {pullRequest.title}
               </p>
               <PullRequestTrailingIcon pullRequest={pullRequest} />
+              {isInTodayFocus ? <TodayFocusIndicator className="font-semibold" /> : null}
             </div>
             <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-secondary">
               <p
@@ -586,9 +594,11 @@ function PullRequestCheckStatusIcon({
 }
 
 function PullRequestList({
-  pullRequests
+  pullRequests,
+  todayFocusItemIds
 }: {
   pullRequests: GitHubPullRequestItem[];
+  todayFocusItemIds: Set<string>;
 }) {
   const readyToClose = pullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest));
   const remainingPullRequests = pullRequests.filter((pullRequest) => !isPullRequestReadyToClose(pullRequest));
@@ -597,7 +607,11 @@ function PullRequestList({
     return (
       <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
         {remainingPullRequests.map((pullRequest) => (
-          <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+          <PullRequestRow
+            key={pullRequest.url}
+            pullRequest={pullRequest}
+            isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+          />
         ))}
       </div>
     );
@@ -606,11 +620,19 @@ function PullRequestList({
   return (
     <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
       {readyToClose.map((pullRequest) => (
-        <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+        <PullRequestRow
+          key={pullRequest.url}
+          pullRequest={pullRequest}
+          isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+        />
       ))}
       {remainingPullRequests.length > 0 ? (
         remainingPullRequests.map((pullRequest) => (
-          <PullRequestRow key={pullRequest.url} pullRequest={pullRequest} />
+          <PullRequestRow
+            key={pullRequest.url}
+            pullRequest={pullRequest}
+            isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+          />
         ))
       ) : null}
     </div>

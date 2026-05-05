@@ -15,11 +15,13 @@ import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 import { StatusBadge } from './StatusBadge';
 import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
+import { TodayFocusIndicator } from './TodayFocusIndicator';
 
 type JiraCardProps = {
   topBar?: ReactNode;
   baseUrl: string;
   data: JiraDashboardData;
+  todayFocusItemIds: Set<string>;
   isLoading: boolean;
   onRefresh: () => void;
   activeView: ActiveJiraView;
@@ -58,6 +60,7 @@ export function JiraCard({
   topBar,
   baseUrl,
   data,
+  todayFocusItemIds,
   isLoading,
   onRefresh,
   activeView,
@@ -142,7 +145,12 @@ export function JiraCard({
             ) : (
               <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
                 {filteredIssues.map((issue) => (
-                  <IssueRow key={issue.id} issue={issue} baseUrl={baseUrl} />
+                  <IssueRow
+                    key={issue.id}
+                    issue={issue}
+                    baseUrl={baseUrl}
+                    isInTodayFocus={todayFocusItemIds.has(mapIssueToFocusItem(issue).id)}
+                  />
                 ))}
               </div>
             )}
@@ -166,7 +174,15 @@ export function JiraCard({
   );
 }
 
-function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
+function IssueRow({
+  issue,
+  baseUrl,
+  isInTodayFocus
+}: {
+  issue: JiraIssue;
+  baseUrl: string;
+  isInTodayFocus: boolean;
+}) {
   const blockingIssues = issue.blockingIssues;
   const blockedByIssues = issue.blockedByIssues;
   const issueUrl = getJiraBrowseUrl(baseUrl, issue.key);
@@ -191,9 +207,12 @@ function IssueRow({ issue, baseUrl }: { issue: JiraIssue; baseUrl: string }) {
         <div className="flex min-w-0 items-start gap-1.5">
           <PriorityIcon priorityName={issue.priority?.name} />
           <div className="min-w-0 flex-1">
-            <p className="line-clamp-2 min-w-0 text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
-              {issue.summary}
-            </p>
+            <div className="inline-flex max-w-full items-start gap-1 align-top">
+              <p className="line-clamp-2 min-w-0 text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
+                {issue.summary}
+              </p>
+              {isInTodayFocus ? <TodayFocusIndicator className="pt-[0.04rem]" /> : null}
+            </div>
 
             <div className="mt-0.25 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.66rem] text-white/42">
               {detailItems.map((item, index) => (
