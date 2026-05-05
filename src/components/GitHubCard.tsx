@@ -427,6 +427,7 @@ function PullRequestRow({
   const hasConflicts = pullRequest.mergeStateStatus === 'DIRTY';
   const status = getPullRequestDisplayStatus(pullRequest);
   const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
+  const repositoryLabel = getRepositoryLabel(pullRequest.repositoryName);
 
   return (
     <a
@@ -456,7 +457,7 @@ function PullRequestRow({
                 className="truncate"
                 title={`${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
               >
-                <span>{pullRequest.repositoryName}</span>
+                <span>{repositoryLabel}</span>
                 {shouldShowAuthor ? <span className="mx-1.5 text-white/22">•</span> : null}
                 {shouldShowAuthor ? <span>by {pullRequest.authorLogin}</span> : null}
               </p>
@@ -625,6 +626,8 @@ function NotificationRow({
 }) {
   const iconKind = getNotificationIconKind(notification.subject.type);
   const notificationTypeLabel = getNotificationTypeLabel(notification);
+  const authorLogin = notification.authorLogin?.trim() ?? '';
+  const repositoryLabel = getRepositoryLabel(notification.repository.full_name);
   const rowTextClass = notification.unread ? 'text-primary' : 'text-secondary';
   const rowMetaClass = notification.unread ? 'text-white/42' : 'text-[var(--text-tertiary)]';
   const rowMutedClass = notification.unread ? 'text-white/36' : 'text-[var(--text-tertiary)]';
@@ -654,9 +657,11 @@ function NotificationRow({
             <div className={`mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] ${rowMetaClass}`}>
               <p
                 className="truncate"
-                title={`${notification.repository.full_name}${notification.unread ? ' • unread' : ''}`}
+                title={`${notification.repository.full_name}${authorLogin ? ` • by ${authorLogin}` : ''}${notification.unread ? ' • unread' : ''}`}
               >
-                <span>{notification.repository.full_name}</span>
+                <span>{repositoryLabel}</span>
+                {authorLogin ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {authorLogin ? <span>by {authorLogin}</span> : null}
                 {notification.unread ? <span className="mx-1.5 text-white/22">•</span> : null}
                 {notification.unread ? <span>Unread</span> : null}
               </p>
@@ -875,6 +880,11 @@ function mapPullRequestViewItem(pullRequest: GitHubPullRequestItem): GitHubViewI
 
 function getOwnerFromRepositoryName(repositoryName: string) {
   return repositoryName.split('/')[0] ?? '';
+}
+
+function getRepositoryLabel(repositoryName: string) {
+  const segments = repositoryName.split('/');
+  return segments[segments.length - 1] ?? repositoryName;
 }
 
 function filterGitHubItems(items: GitHubViewItem[], organizationFilter: string) {

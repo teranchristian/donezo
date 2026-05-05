@@ -7,6 +7,7 @@ export type GitHubNotification = {
   last_read_at?: string | null;
   updated_at: string;
   reason: string;
+  authorLogin?: string;
   repository: {
     full_name: string;
   };

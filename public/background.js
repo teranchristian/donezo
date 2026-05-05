@@ -367,6 +367,100 @@ async function getGitHubNotifications(token) {
   return notifications;
 }
 
+function getPullRequestIdentityFromNotification(notification) {
+  const subjectUrl = String(notification?.subject?.url ?? '').trim();
+  if (!subjectUrl) {
+    return null;
+  }
+
+  const apiPath = subjectUrl.replace('https://api.github.com/repos/', '');
+  const [owner, repo, resource, pullNumber] = apiPath.split('/');
+
+  if (resource !== 'pulls' || !owner || !repo || !pullNumber) {
+    return null;
+  }
+
+  const parsedPullNumber = Number(pullNumber);
+  if (!Number.isFinite(parsedPullNumber) || parsedPullNumber <= 0) {
+    return null;
+  }
+
+  return {
+    owner,
+    repo,
+    pullNumber: parsedPullNumber
+  };
+}
+
+function buildGitHubNotificationAuthorsQuery(pullRequests) {
+  const queryBody = pullRequests
+    .map(
+      (pullRequest, index) => `
+      pr${index}: repository(owner: ${JSON.stringify(pullRequest.owner)}, name: ${JSON.stringify(pullRequest.repo)}) {
+        pullRequest(number: ${pullRequest.pullNumber}) {
+          author {
+            login
+          }
+        }
+      }`
+    )
+    .join('\n');
+
+  return `query NotificationPullRequestAuthors {${queryBody}
+  }`;
+}
+
+async function getGitHubNotificationAuthorLogins(notifications, token) {
+  const uniquePullRequests = [];
+  const notificationIdsByPullRequestKey = new Map();
+
+  for (const notification of notifications) {
+    if (notification?.subject?.type !== 'PullRequest') {
+      continue;
+    }
+
+    const pullRequestIdentity = getPullRequestIdentityFromNotification(notification);
+    if (!pullRequestIdentity) {
+      continue;
+    }
+
+    const key = `${pullRequestIdentity.owner}/${pullRequestIdentity.repo}#${pullRequestIdentity.pullNumber}`;
+    if (!notificationIdsByPullRequestKey.has(key)) {
+      notificationIdsByPullRequestKey.set(key, []);
+      uniquePullRequests.push(pullRequestIdentity);
+    }
+
+    notificationIdsByPullRequestKey.get(key).push(notification.id);
+  }
+
+  if (uniquePullRequests.length === 0) {
+    return {};
+  }
+
+  const data = await fetchGitHubGraphQL(
+    buildGitHubNotificationAuthorsQuery(uniquePullRequests),
+    {},
+    token
+  );
+  const authorLoginsByNotificationId = {};
+
+  uniquePullRequests.forEach((pullRequest, index) => {
+    const authorLogin = data?.[`pr${index}`]?.pullRequest?.author?.login ?? '';
+    if (!authorLogin) {
+      return;
+    }
+
+    const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
+    const notificationIds = notificationIdsByPullRequestKey.get(key) ?? [];
+
+    notificationIds.forEach((notificationId) => {
+      authorLoginsByNotificationId[notificationId] = authorLogin;
+    });
+  });
+
+  return authorLoginsByNotificationId;
+}
+
 async function getDashboardPullRequests(username, token) {
   const data = await fetchGitHubGraphQL(
     GITHUB_PULL_REQUESTS_QUERY,
@@ -607,6 +701,12 @@ async function loadGitHubDashboardData(payload) {
       getGitHubNotifications(token),
       getDashboardPullRequests(username, token)
     ]);
+    const notificationAuthorLogins = await getGitHubNotificationAuthorLogins(notifications, token);
+    const enrichedNotifications = notifications.map((notification) =>
+      notificationAuthorLogins[notification.id]
+        ? { ...notification, authorLogin: notificationAuthorLogins[notification.id] }
+        : notification
+    );
     const pullRequests = mergePullRequestSeeds(
       pullRequestResult.authored.items,
       pullRequestResult.reviewRequested.items
@@ -614,10 +714,10 @@ async function loadGitHubDashboardData(payload) {
 
     const data = {
       connectionStatus: 'connected',
-      notificationsCount: notifications.length,
+      notificationsCount: enrichedNotifications.length,
       openPrsCount: pullRequestResult.authored.total_count,
       reviewRequestedCount: pullRequestResult.reviewRequested.total_count,
-      notifications,
+      notifications: enrichedNotifications,
       pullRequests,
       errorMessage: null,
       missingUsername: false,
@@ -626,7 +726,7 @@ async function loadGitHubDashboardData(payload) {
 
     await Promise.all([
       saveCachedGitHubDashboardData(cacheToken, data),
-      saveCachedGitHubNotificationSignals(cacheToken, notifications),
+      saveCachedGitHubNotificationSignals(cacheToken, enrichedNotifications),
       saveCachedGitHubPullRequestSignals(cacheToken, pullRequests)
     ]);
     return data;
