@@ -74,7 +74,9 @@ export function buildDashboardHashNavigation(state: DashboardNavigationState) {
 }
 
 function mergeGitHubPrStatusFilter(filter: string | null): GitHubPrStatusFilter {
-  return filter === 'approved' || filter === 'waiting-review' || filter === 'all' ? filter : 'all';
+  return filter === 'approved' || filter === 'ready-to-merge' || filter === 'waiting-review' || filter === 'all'
+    ? filter
+    : 'all';
 }
 
 function mergeActiveGitHubView(activeGitHubView: string | null): ActiveGitHubView {

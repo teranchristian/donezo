@@ -10,9 +10,12 @@ import {
 import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
 import {
+  getStoredGitHubPrWarningState,
   getStoredGitHubSortOrder,
+  saveStoredGitHubPrWarningState,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
+  type GitHubPrWarningState,
   type GitHubPrStatusFilter,
   type GitHubListSort
 } from '../lib/storage';
@@ -43,6 +46,7 @@ type GitHubCardProps = {
 export type GitHubSummaryMetrics = {
   connectionStatus: GitHubConnectionStatus;
   missingUsername: boolean;
+  highlightedWarningCount: number;
   reviewRequestedCount: number;
   approvedPrCount: number | null;
   relevantPrCount: number;
@@ -99,6 +103,8 @@ export function GitHubCard({
     'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
+  const [gitHubPrWarningState, setGitHubPrWarningState] = useState<GitHubPrWarningState>({});
+  const [hasLoadedGitHubPrWarningState, setHasLoadedGitHubPrWarningState] = useState(false);
   const [isResolvingNotificationStates, setIsResolvingNotificationStates] = useState(false);
   const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
     Record<string, GitHubPullRequestState>
@@ -131,6 +137,9 @@ export function GitHubCard({
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
+  const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) =>
+    isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)
+  ).length;
   const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
     (pullRequest) => pullRequest.reviewStatus === 'approved' && !isPullRequestOutOfDate(pullRequest)
   ).length;
@@ -191,6 +200,15 @@ export function GitHubCard({
       setHasLoadedSortOrder(true);
     });
 
+    getStoredGitHubPrWarningState().then((storedWarningState) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setGitHubPrWarningState(storedWarningState);
+      setHasLoadedGitHubPrWarningState(true);
+    });
+
     return () => {
       isMounted = false;
     };
@@ -203,6 +221,25 @@ export function GitHubCard({
 
     void saveStoredGitHubSortOrder(sortOrder);
   }, [hasLoadedSortOrder, sortOrder]);
+
+  useEffect(() => {
+    if (!hasLoadedGitHubPrWarningState) {
+      return;
+    }
+
+    void saveStoredGitHubPrWarningState(gitHubPrWarningState);
+  }, [gitHubPrWarningState, hasLoadedGitHubPrWarningState]);
+
+  useEffect(() => {
+    if (!hasLoadedGitHubPrWarningState) {
+      return;
+    }
+
+    setGitHubPrWarningState((currentState) => {
+      const nextState = buildGitHubPrWarningState(currentState, resolvedPullRequests);
+      return areGitHubPrWarningStatesEqual(currentState, nextState) ? currentState : nextState;
+    });
+  }, [hasLoadedGitHubPrWarningState, resolvedPullRequests]);
 
   useEffect(() => {
     const activeNotificationIds = new Set((data.notifications ?? []).map((notification) => notification.id));
@@ -223,6 +260,7 @@ export function GitHubCard({
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
+      highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
       approvedPrCount: summaryApprovedPrCount,
       relevantPrCount: summaryMyOpenPrCount + summaryReviewRequestedCount
@@ -230,6 +268,7 @@ export function GitHubCard({
   }, [
     data.connectionStatus,
     data.missingUsername,
+    highlightedWarningCount,
     summaryApprovedPrCount,
     summaryMyOpenPrCount,
     summaryReviewRequestedCount,
@@ -285,6 +324,25 @@ export function GitHubCard({
     };
   }, [token, visibleNotificationPullRequestKey]);
 
+  function handleClearWarningHighlight(pullRequest: GitHubPullRequestItem) {
+    const warningStateKey = getGitHubPullRequestWarningStateKey(pullRequest);
+
+    setGitHubPrWarningState((currentState) => {
+      const currentEntry = currentState[warningStateKey];
+      if (!currentEntry?.highlighted) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        [warningStateKey]: {
+          ...currentEntry,
+          highlighted: false
+        }
+      };
+    });
+  }
+
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col">
@@ -314,6 +372,9 @@ export function GitHubCard({
                     </option>
                     <option value="approved" className="bg-panel text-stone-100">
                       Approved
+                    </option>
+                    <option value="ready-to-merge" className="bg-panel text-stone-100">
+                      Ready to merge
                     </option>
                     <option value="waiting-review" className="bg-panel text-stone-100">
                       Waiting review
@@ -364,6 +425,8 @@ export function GitHubCard({
                   .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
                   .map((item) => item.value)}
                 todayFocusItemIds={todayFocusItemIds}
+                gitHubPrWarningState={gitHubPrWarningState}
+                onClearWarningHighlight={handleClearWarningHighlight}
               />
             ) : (
               <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
@@ -379,6 +442,8 @@ export function GitHubCard({
                       key={item.key}
                       pullRequest={item.value}
                       isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(item.value).id)}
+                      isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, item.value)}
+                      onClearWarningHighlight={handleClearWarningHighlight}
                     />
                   )
                 )}
@@ -425,10 +490,14 @@ type GitHubViewItem =
 
 function PullRequestRow({
   pullRequest,
-  isInTodayFocus
+  isInTodayFocus,
+  isWarningHighlighted = false,
+  onClearWarningHighlight
 }: {
   pullRequest: GitHubPullRequestItem;
   isInTodayFocus: boolean;
+  isWarningHighlighted?: boolean;
+  onClearWarningHighlight?: (pullRequest: GitHubPullRequestItem) => void;
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
   const hasConflicts = pullRequest.mergeStateStatus === 'DIRTY';
@@ -449,7 +518,12 @@ function PullRequestRow({
         event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
         event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
       }}
-      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
+      onClick={() => onClearWarningHighlight?.(pullRequest)}
+      className={`group -mx-2 block cursor-pointer rounded-[12px] px-2 py-1.5 transition ${
+        isWarningHighlighted
+          ? 'bg-amber-400/[0.08] shadow-[inset_0_0_0_1px_rgba(251,191,36,0.22)] hover:bg-amber-400/[0.12]'
+          : 'hover:bg-white/[0.03]'
+      }`}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
         <div className="row-span-2 flex min-w-0 items-start gap-1.5">
@@ -634,10 +708,14 @@ function PullRequestReadyToMergeIcon() {
 
 function PullRequestList({
   pullRequests,
-  todayFocusItemIds
+  todayFocusItemIds,
+  gitHubPrWarningState,
+  onClearWarningHighlight
 }: {
   pullRequests: GitHubPullRequestItem[];
   todayFocusItemIds: Set<string>;
+  gitHubPrWarningState: GitHubPrWarningState;
+  onClearWarningHighlight: (pullRequest: GitHubPullRequestItem) => void;
 }) {
   const readyToClose = pullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest));
   const remainingPullRequests = pullRequests.filter((pullRequest) => !isPullRequestReadyToClose(pullRequest));
@@ -650,6 +728,8 @@ function PullRequestList({
             key={pullRequest.url}
             pullRequest={pullRequest}
             isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+            isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+            onClearWarningHighlight={onClearWarningHighlight}
           />
         ))}
       </div>
@@ -663,6 +743,8 @@ function PullRequestList({
           key={pullRequest.url}
           pullRequest={pullRequest}
           isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+          isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+          onClearWarningHighlight={onClearWarningHighlight}
         />
       ))}
       {remainingPullRequests.length > 0 ? (
@@ -671,6 +753,8 @@ function PullRequestList({
             key={pullRequest.url}
             pullRequest={pullRequest}
             isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+            isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+            onClearWarningHighlight={onClearWarningHighlight}
           />
         ))
       ) : null}
@@ -970,6 +1054,10 @@ function filterGitHubPullRequests(
     return organizationFilteredPullRequests.filter((pullRequest) => pullRequest.reviewStatus === 'approved');
   }
 
+  if (prStatusFilter === 'ready-to-merge') {
+    return organizationFilteredPullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest));
+  }
+
   if (prStatusFilter === 'waiting-review') {
     return organizationFilteredPullRequests.filter(
       (pullRequest) =>
@@ -1088,6 +1176,93 @@ function getNotificationUrl(notification: GitHubNotification) {
   }
 
   return `https://github.com/${notification.repository.full_name}`;
+}
+
+const githubPrWarningCases = [
+  {
+    key: 'has-conflicts',
+    label: 'Has conflicts',
+    predicate: (pullRequest: GitHubPullRequestItem) => pullRequest.mergeStateStatus === 'DIRTY'
+  },
+  {
+    key: 'failed-checks',
+    label: 'Failed checks',
+    predicate: (pullRequest: GitHubPullRequestItem) => pullRequest.ciStatus === 'failing'
+  },
+  {
+    key: 'out-of-date',
+    label: 'Out of date',
+    predicate: (pullRequest: GitHubPullRequestItem) => isPullRequestOutOfDate(pullRequest)
+  }
+] as const;
+
+function getGitHubPullRequestWarningStateKey(pullRequest: GitHubPullRequestItem) {
+  return `${pullRequest.repositoryName}#${pullRequest.pullNumber}`;
+}
+
+function getActiveGitHubPrWarningCaseKeys(pullRequest: GitHubPullRequestItem) {
+  return githubPrWarningCases
+    .filter((warningCase) => warningCase.predicate(pullRequest))
+    .map((warningCase) => warningCase.key);
+}
+
+function buildGitHubPrWarningState(
+  currentState: GitHubPrWarningState,
+  pullRequests: GitHubPullRequestItem[]
+): GitHubPrWarningState {
+  const nextState: GitHubPrWarningState = {};
+  const updatedAt = Date.now();
+
+  for (const pullRequest of pullRequests) {
+    const warningStateKey = getGitHubPullRequestWarningStateKey(pullRequest);
+    const activeCaseKeys = getActiveGitHubPrWarningCaseKeys(pullRequest);
+    const currentEntry = currentState[warningStateKey];
+    const hasNewWarningTransition =
+      Boolean(currentEntry) && currentEntry.activeCaseKeys.length === 0 && activeCaseKeys.length > 0;
+
+    nextState[warningStateKey] = {
+      activeCaseKeys,
+      highlighted:
+        activeCaseKeys.length > 0 ? (hasNewWarningTransition ? true : currentEntry?.highlighted ?? false) : false,
+      updatedAt
+    };
+  }
+
+  return nextState;
+}
+
+function isGitHubPrWarningHighlighted(state: GitHubPrWarningState, pullRequest: GitHubPullRequestItem) {
+  return Boolean(state[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted);
+}
+
+function areGitHubPrWarningStatesEqual(left: GitHubPrWarningState, right: GitHubPrWarningState) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (!rightEntry || leftEntry.highlighted !== rightEntry.highlighted) {
+      return false;
+    }
+
+    if (leftEntry.activeCaseKeys.length !== rightEntry.activeCaseKeys.length) {
+      return false;
+    }
+
+    for (let index = 0; index < leftEntry.activeCaseKeys.length; index += 1) {
+      if (leftEntry.activeCaseKeys[index] !== rightEntry.activeCaseKeys[index]) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 function getCompactReviewStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {

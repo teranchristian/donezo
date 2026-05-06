@@ -51,6 +51,7 @@ const JIRA_API_TOKEN_STORAGE_KEY = 'jiraApiToken';
 const ACTIVE_INTEGRATION_STORAGE_KEY = 'activeIntegration';
 const ACTIVE_GITHUB_VIEW_STORAGE_KEY = 'activeGitHubView';
 const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
+const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
 
 export type DashboardSettings = {
   name: string;
@@ -74,10 +75,16 @@ export type GitHubListSort =
   | 'oldest-updated'
   | 'repository-asc'
   | 'title-asc';
-export type GitHubPrStatusFilter = 'all' | 'approved' | 'waiting-review';
+export type GitHubPrStatusFilter = 'all' | 'approved' | 'ready-to-merge' | 'waiting-review';
 export type ActiveIntegration = 'github' | 'jira';
 export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
 export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-priority';
+export type GitHubPrWarningStateEntry = {
+  activeCaseKeys: string[];
+  highlighted: boolean;
+  updatedAt: number;
+};
+export type GitHubPrWarningState = Record<string, GitHubPrWarningStateEntry>;
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   name: '',
@@ -358,6 +365,35 @@ export async function saveStoredActiveJiraView(activeJiraView: ActiveJiraView) {
   localStorage.setItem(ACTIVE_JIRA_VIEW_STORAGE_KEY, JSON.stringify(activeJiraView));
 }
 
+export async function getStoredGitHubPrWarningState() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_PR_WARNING_STATE_STORAGE_KEY]);
+    return mergeGitHubPrWarningState(result[GITHUB_PR_WARNING_STATE_STORAGE_KEY] as GitHubPrWarningState | undefined);
+  }
+
+  const raw = localStorage.getItem(GITHUB_PR_WARNING_STATE_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    return mergeGitHubPrWarningState(JSON.parse(raw) as GitHubPrWarningState);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveStoredGitHubPrWarningState(state: GitHubPrWarningState) {
+  const normalizedState = mergeGitHubPrWarningState(state);
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_PR_WARNING_STATE_STORAGE_KEY]: normalizedState });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_PR_WARNING_STATE_STORAGE_KEY, JSON.stringify(normalizedState));
+}
+
 export function getDefaultSettings() {
   return structuredClone(DEFAULT_SETTINGS);
 }
@@ -436,7 +472,7 @@ function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
 }
 
 function mergeGitHubPrStatusFilter(filter?: string): GitHubPrStatusFilter {
-  return filter === 'approved' || filter === 'waiting-review' || filter === 'all'
+  return filter === 'approved' || filter === 'ready-to-merge' || filter === 'waiting-review' || filter === 'all'
     ? filter
     : DEFAULT_GITHUB_PR_STATUS_FILTER;
 }
@@ -462,6 +498,38 @@ function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
     : DEFAULT_ACTIVE_JIRA_VIEW;
 }
 
+function mergeGitHubPrWarningState(state?: GitHubPrWarningState | null) {
+  if (!state || typeof state !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(state)
+      .map(([key, value]) => {
+        if (
+          typeof key !== 'string' ||
+          !value ||
+          typeof value !== 'object' ||
+          !Array.isArray(value.activeCaseKeys) ||
+          typeof value.highlighted !== 'boolean' ||
+          typeof value.updatedAt !== 'number'
+        ) {
+          return null;
+        }
+
+        const activeCaseKeys = value.activeCaseKeys.filter((caseKey): caseKey is string => typeof caseKey === 'string');
+        return [
+          key,
+          {
+            activeCaseKeys,
+            highlighted: value.highlighted,
+            updatedAt: value.updatedAt
+          }
+        ] satisfies [string, GitHubPrWarningStateEntry];
+      })
+      .filter((entry): entry is [string, GitHubPrWarningStateEntry] => entry !== null)
+  );
+}
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
   if (!Array.isArray(items)) {
     return null;

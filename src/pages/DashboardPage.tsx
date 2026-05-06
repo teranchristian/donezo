@@ -6,7 +6,7 @@ import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
-import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
+import { GitHubConnectionStatus, GitHubDashboardData, GitHubPullRequestItem } from '../lib/githubApi';
 import {
   getJiraIssueCounts,
   JiraConnectionStatus,
@@ -82,11 +82,13 @@ export function DashboardPage({
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
+    highlightedWarningCount: 0,
     reviewRequestedCount: 0,
     approvedPrCount: null,
     relevantPrCount: gitHubData.openPrsCount
   });
   const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
+  const gitHubReadyToMergeCount = getGitHubReadyToMergeCount(gitHubData.pullRequests);
 
   useEffect(() => {
     todayFocusItemsRef.current = todayFocusItems;
@@ -495,11 +497,11 @@ export function DashboardPage({
             {activeIntegration === 'github' ? (
               <GitHubHeaderShortcuts
                 connectionStatus={gitHubSummaryMetrics.connectionStatus}
-                notificationsCount={gitHubData.notificationsCount}
-                openPrCount={gitHubSummaryMetrics.relevantPrCount}
+                warningCount={gitHubSummaryMetrics.highlightedWarningCount}
+                readyToMergeCount={gitHubReadyToMergeCount}
                 jiraBlockingCount={jiraCounts.blocking}
-                onOpenNotifications={() => handleGitHubViewChange('notifications')}
-                onOpenOpenPrs={() => navigateToGitHubPrs('all')}
+                onOpenWarnings={() => navigateToGitHubPrs('all')}
+                onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
                 onOpenJira={() => navigateToJiraView('blocking')}
               />
             ) : null}
@@ -1180,37 +1182,37 @@ function TopBarButton({
 
 function GitHubHeaderShortcuts({
   connectionStatus,
-  notificationsCount,
-  openPrCount,
+  warningCount,
+  readyToMergeCount,
   jiraBlockingCount,
-  onOpenNotifications,
-  onOpenOpenPrs,
+  onOpenWarnings,
+  onOpenReadyToMerge,
   onOpenJira
 }: {
   connectionStatus: GitHubConnectionStatus;
-  notificationsCount: number;
-  openPrCount: number;
+  warningCount: number;
+  readyToMergeCount: number;
   jiraBlockingCount: number;
-  onOpenNotifications: () => void;
-  onOpenOpenPrs: () => void;
+  onOpenWarnings: () => void;
+  onOpenReadyToMerge: () => void;
   onOpenJira: () => void;
 }) {
   const isConnected = connectionStatus === 'connected';
   const items = [
     {
       key: 'notifications',
-      count: notificationsCount,
+      count: warningCount,
       colorClass: 'text-rose-300',
-      label: 'Open notifications',
-      onClick: onOpenNotifications,
+      label: 'Open pull request warnings',
+      onClick: onOpenWarnings,
       icon: <HeaderBlockedIcon />
     },
     {
       key: 'open-prs',
-      count: openPrCount,
+      count: readyToMergeCount,
       colorClass: 'text-violet-300',
-      label: 'Open pull requests',
-      onClick: onOpenOpenPrs,
+      label: 'Open ready to merge pull requests',
+      onClick: onOpenReadyToMerge,
       icon: <HeaderOpenPrIcon />
     },
     {
@@ -1288,4 +1290,17 @@ function formatDashboardTime(value: number | null) {
     hour: 'numeric',
     minute: '2-digit'
   });
+}
+
+function getGitHubReadyToMergeCount(pullRequests: GitHubPullRequestItem[]) {
+  return pullRequests.filter((pullRequest) => isGitHubPrReadyToMerge(pullRequest)).length;
+}
+
+function isGitHubPrReadyToMerge(pullRequest: GitHubPullRequestItem) {
+  return (
+    pullRequest.reviewStatus === 'approved' &&
+    pullRequest.ciStatus === 'passing' &&
+    pullRequest.mergeStateStatus === 'CLEAN' &&
+    pullRequest.mergeQueueEntry === null
+  );
 }
