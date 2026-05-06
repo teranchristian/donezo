@@ -32,6 +32,7 @@ type GitHubCardProps = {
   username: string;
   token: string;
   ownerFilter: string;
+  isMockMode?: boolean;
   isLoading: boolean;
   isCheckingActivity: boolean;
   lastActivityCheckAt: number | null;
@@ -87,6 +88,7 @@ export function GitHubCard({
   username,
   token,
   ownerFilter,
+  isMockMode = false,
   isLoading,
   isCheckingActivity,
   lastActivityCheckAt,
@@ -109,7 +111,7 @@ export function GitHubCard({
   const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
     Record<string, GitHubPullRequestState>
   >({});
-  const organizationFilter = ownerFilter.trim() || 'all';
+  const organizationFilter = isMockMode ? 'all' : ownerFilter.trim() || 'all';
   const resolvedPullRequests = data.pullRequests;
   const myOpenPRs = resolvedPullRequests.filter((pullRequest) => pullRequest.source === 'authored');
   const reviewRequestedPRs = resolvedPullRequests.filter(

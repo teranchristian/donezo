@@ -44,9 +44,12 @@ import {
 type DashboardPageProps = {
   settings: DashboardSettings;
   gitHubData: GitHubDashboardData;
+  gitHubMockScenarioKey: string | null;
+  isGitHubMockMode: boolean;
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
+  onClearGitHubMockScenario: () => void;
   onRefreshGitHub: () => void;
   jiraData: JiraDashboardData;
   jiraRefreshSignal: TodayFocusRefreshSignal;
@@ -57,9 +60,12 @@ type DashboardPageProps = {
 export function DashboardPage({
   settings,
   gitHubData,
+  gitHubMockScenarioKey,
+  isGitHubMockMode,
   isGitHubLoading,
   isCheckingGitHubActivity,
   lastGitHubActivityCheckAt,
+  onClearGitHubMockScenario,
   onRefreshGitHub,
   jiraData,
   jiraRefreshSignal,
@@ -147,7 +153,7 @@ export function DashboardPage({
       applyNavigationState(nextState);
 
       if (options?.replaceUrl) {
-        replaceDashboardHash(nextState);
+        replaceDashboardHash(nextState, gitHubMockScenarioKey);
       }
     };
 
@@ -163,7 +169,7 @@ export function DashboardPage({
       isActive = false;
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, []);
+  }, [gitHubMockScenarioKey]);
 
   useEffect(() => {
     if (!hasLoadedNavigation) {
@@ -301,7 +307,7 @@ export function DashboardPage({
     setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
     setActiveJiraView(nextState.activeJiraView);
     setHasLoadedNavigation(true);
-    window.location.hash = buildDashboardHashNavigation(nextState);
+    window.location.hash = appendMockScenarioToHash(buildDashboardHashNavigation(nextState), gitHubMockScenarioKey);
   }
 
   function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
@@ -505,7 +511,10 @@ export function DashboardPage({
                 onOpenJira={() => navigateToJiraView('blocking')}
               />
             ) : null}
-            <HeaderMenu />
+            <HeaderMenu
+              mockScenarioKey={gitHubMockScenarioKey}
+              onClearMockScenario={onClearGitHubMockScenario}
+            />
           </div>
         </div>
 
@@ -558,6 +567,7 @@ export function DashboardPage({
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
                     ownerFilter={settings.integrations.github.ownerFilter}
+                    isMockMode={isGitHubMockMode}
                     isLoading={isGitHubLoading}
                     isCheckingActivity={isCheckingGitHubActivity}
                     lastActivityCheckAt={lastGitHubActivityCheckAt}
@@ -614,13 +624,26 @@ function replaceDashboardHash(nextState: {
   activeGitHubView: ActiveGitHubView;
   githubPrStatusFilter: GitHubPrStatusFilter;
   activeJiraView: ActiveJiraView;
-}) {
+}, mockScenarioKey: string | null) {
   const nextHash = buildDashboardHashNavigation(nextState);
-  if (window.location.hash === nextHash) {
+  const nextHashWithMock = appendMockScenarioToHash(nextHash, mockScenarioKey);
+  if (window.location.hash === nextHashWithMock) {
     return;
   }
 
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHashWithMock}`);
+}
+
+function appendMockScenarioToHash(hash: string, mockScenarioKey: string | null) {
+  if (!mockScenarioKey) {
+    return hash;
+  }
+
+  const trimmedHash = hash.replace(/^#/, '');
+  const [path, rawSearch = ''] = trimmedHash.split('?');
+  const searchParams = new URLSearchParams(rawSearch);
+  searchParams.set('mock', mockScenarioKey);
+  return `#${path}?${searchParams.toString()}`;
 }
 
 function getDefaultTodayFocusItems(): FocusItem[] {

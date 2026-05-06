@@ -52,6 +52,7 @@ const ACTIVE_INTEGRATION_STORAGE_KEY = 'activeIntegration';
 const ACTIVE_GITHUB_VIEW_STORAGE_KEY = 'activeGitHubView';
 const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
 const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
+const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
 
 export type DashboardSettings = {
   name: string;
@@ -365,6 +366,38 @@ export async function saveStoredActiveJiraView(activeJiraView: ActiveJiraView) {
   localStorage.setItem(ACTIVE_JIRA_VIEW_STORAGE_KEY, JSON.stringify(activeJiraView));
 }
 
+export async function getStoredGitHubMockScenarioKey() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_MOCK_SCENARIO_STORAGE_KEY]);
+    return mergeGitHubMockScenarioKey(result[GITHUB_MOCK_SCENARIO_STORAGE_KEY] as string | undefined);
+  }
+
+  return mergeGitHubMockScenarioKey(localStorage.getItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY) ?? undefined);
+}
+
+export async function saveStoredGitHubMockScenarioKey(mockScenarioKey: string) {
+  const normalizedMockScenarioKey = mergeGitHubMockScenarioKey(mockScenarioKey);
+  if (!normalizedMockScenarioKey) {
+    return;
+  }
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_MOCK_SCENARIO_STORAGE_KEY]: normalizedMockScenarioKey });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY, normalizedMockScenarioKey);
+}
+
+export async function clearStoredGitHubMockScenarioKey() {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.remove(GITHUB_MOCK_SCENARIO_STORAGE_KEY);
+    return;
+  }
+
+  localStorage.removeItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY);
+}
+
 export async function getStoredGitHubPrWarningState() {
   if (hasChromeStorage()) {
     const result = await chrome.storage.local.get([GITHUB_PR_WARNING_STATE_STORAGE_KEY]);
@@ -530,6 +563,11 @@ function mergeGitHubPrWarningState(state?: GitHubPrWarningState | null) {
       .filter((entry): entry is [string, GitHubPrWarningStateEntry] => entry !== null)
   );
 }
+
+function mergeGitHubMockScenarioKey(mockScenarioKey?: string | null) {
+  return typeof mockScenarioKey === 'string' && mockScenarioKey.trim() ? mockScenarioKey.trim() : null;
+}
+
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
   if (!Array.isArray(items)) {
     return null;
