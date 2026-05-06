@@ -492,6 +492,17 @@ export function DashboardPage({
           <DashboardHeader name={settings.name} />
           <div className="dashboard-header-status gap-3">
             {integrationStatusBar}
+            {activeIntegration === 'github' ? (
+              <GitHubHeaderShortcuts
+                connectionStatus={gitHubSummaryMetrics.connectionStatus}
+                notificationsCount={gitHubData.notificationsCount}
+                openPrCount={gitHubSummaryMetrics.relevantPrCount}
+                jiraBlockingCount={jiraCounts.blocking}
+                onOpenNotifications={() => handleGitHubViewChange('notifications')}
+                onOpenOpenPrs={() => navigateToGitHubPrs('all')}
+                onOpenJira={() => navigateToJiraView('blocking')}
+              />
+            ) : null}
             <HeaderMenu />
           </div>
         </div>
@@ -1164,6 +1175,107 @@ function TopBarButton({
     >
       {children}
     </button>
+  );
+}
+
+function GitHubHeaderShortcuts({
+  connectionStatus,
+  notificationsCount,
+  openPrCount,
+  jiraBlockingCount,
+  onOpenNotifications,
+  onOpenOpenPrs,
+  onOpenJira
+}: {
+  connectionStatus: GitHubConnectionStatus;
+  notificationsCount: number;
+  openPrCount: number;
+  jiraBlockingCount: number;
+  onOpenNotifications: () => void;
+  onOpenOpenPrs: () => void;
+  onOpenJira: () => void;
+}) {
+  const isConnected = connectionStatus === 'connected';
+  const items = [
+    {
+      key: 'notifications',
+      count: notificationsCount,
+      colorClass: 'text-rose-300',
+      label: 'Open notifications',
+      onClick: onOpenNotifications,
+      icon: <HeaderBlockedIcon />
+    },
+    {
+      key: 'open-prs',
+      count: openPrCount,
+      colorClass: 'text-violet-300',
+      label: 'Open pull requests',
+      onClick: onOpenOpenPrs,
+      icon: <HeaderOpenPrIcon />
+    },
+    {
+      key: 'jira',
+      count: jiraBlockingCount,
+      colorClass: 'text-sky-400',
+      label: 'Open Jira blockers',
+      onClick: onOpenJira,
+      icon: <HeaderJiraIcon />
+    }
+  ];
+
+  return (
+    <div className="flex items-center gap-2">
+      {items.map((item) => {
+        const isDisabled = !isConnected;
+        const showBadge = isConnected && item.count > 0;
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            onClick={item.onClick}
+            disabled={isDisabled}
+            aria-label={item.label}
+            className={`relative inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition ${
+              isDisabled ? 'cursor-default opacity-45' : 'hover:bg-white/10'
+            }`}
+          >
+            <span className={item.colorClass} aria-hidden="true">
+              {item.icon}
+            </span>
+            {showBadge ? (
+              <span className="absolute right-1.5 top-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-rose-500 px-1 py-[0.1rem] text-[0.62rem] font-semibold leading-none text-white shadow-[0_4px_12px_rgba(244,63,94,0.28)]">
+                {item.count > 9 ? '9+' : item.count}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HeaderBlockedIcon() {
+  return (
+    <span className="text-[1.2rem] leading-none" aria-hidden="true">
+      ⚠
+    </span>
+  );
+}
+
+function HeaderOpenPrIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-[1.12rem] w-[1.12rem]" fill="currentColor" aria-hidden="true">
+      <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
+    </svg>
+  );
+}
+
+function HeaderJiraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[1.3rem] w-[1.3rem]" fill="currentColor" aria-hidden="true">
+      <path d="M12 3 21 12l-9 9-9-9 9-9Zm0 4.2L7.2 12 12 16.8 16.8 12 12 7.2Zm0 2.8 2 2-2 2-2-2 2-2Z" />
+    </svg>
   );
 }
 
