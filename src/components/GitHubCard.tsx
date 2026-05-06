@@ -584,7 +584,16 @@ function PullRequestCheckStatusIcon({
   }
 
   if (ciStatus === 'failing') {
-    return <span className="shrink-0 text-[0.76rem] leading-none text-rose-200/65">✕</span>;
+    return (
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-[1.08rem] w-[1.08rem] shrink-0 text-rose-500"
+        fill="currentColor"
+      >
+        <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
+      </svg>
+    );
   }
 
   if (ciStatus === 'pending') {
