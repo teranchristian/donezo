@@ -88,13 +88,13 @@ export function DashboardPage({
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
+    highlightedReadyCount: 0,
     highlightedWarningCount: 0,
     reviewRequestedCount: 0,
     approvedPrCount: null,
     relevantPrCount: gitHubData.openPrsCount
   });
   const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
-  const gitHubReadyToMergeCount = getGitHubReadyToMergeCount(gitHubData.pullRequests);
 
   useEffect(() => {
     todayFocusItemsRef.current = todayFocusItems;
@@ -504,7 +504,7 @@ export function DashboardPage({
               <GitHubHeaderShortcuts
                 connectionStatus={gitHubSummaryMetrics.connectionStatus}
                 warningCount={gitHubSummaryMetrics.highlightedWarningCount}
-                readyToMergeCount={gitHubReadyToMergeCount}
+                readyToMergeCount={gitHubSummaryMetrics.highlightedReadyCount}
                 jiraBlockingCount={jiraCounts.blocking}
                 onOpenWarnings={() => navigateToGitHubPrs('all')}
                 onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
@@ -1313,17 +1313,4 @@ function formatDashboardTime(value: number | null) {
     hour: 'numeric',
     minute: '2-digit'
   });
-}
-
-function getGitHubReadyToMergeCount(pullRequests: GitHubPullRequestItem[]) {
-  return pullRequests.filter((pullRequest) => isGitHubPrReadyToMerge(pullRequest)).length;
-}
-
-function isGitHubPrReadyToMerge(pullRequest: GitHubPullRequestItem) {
-  return (
-    pullRequest.reviewStatus === 'approved' &&
-    pullRequest.ciStatus === 'passing' &&
-    pullRequest.mergeStateStatus === 'CLEAN' &&
-    pullRequest.mergeQueueEntry === null
-  );
 }

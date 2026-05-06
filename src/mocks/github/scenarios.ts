@@ -1,9 +1,10 @@
 import { getEmptyGitHubDashboardData, type GitHubDashboardData, type GitHubPullRequestItem } from '../../lib/githubApi';
-import type { GitHubPrWarningState } from '../../lib/storage';
+import type { GitHubPrReadyState, GitHubPrWarningState } from '../../lib/storage';
 
 export type GitHubMockScenario = {
   key: string;
   dashboardData: GitHubDashboardData;
+  readyState: GitHubPrReadyState;
   warningState: GitHubPrWarningState;
 };
 
@@ -75,6 +76,18 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
   'ready-to-merge': {
     key: 'ready-to-merge',
     dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),
+    readyState: {
+      [getStateKey('acme/platform-web', 1533)]: {
+        isReady: false,
+        highlighted: false,
+        updatedAt: Date.now() - 10_000
+      },
+      [getStateKey('acme/chrome-home-page', 88)]: {
+        isReady: false,
+        highlighted: false,
+        updatedAt: Date.now() - 10_000
+      }
+    },
     warningState: {}
   },
   'warning-conflict-new': createWarningScenario('warning-conflict-new', 'DIRTY', 'has-conflicts'),
@@ -95,8 +108,9 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     return {
       key: 'warning-already-seen',
       dashboardData,
+      readyState: {},
       warningState: {
-        [getWarningStateKey('acme/platform-web', 1533)]: {
+        [getStateKey('acme/platform-web', 1533)]: {
           activeCaseKeys: ['has-conflicts'],
           highlighted: false,
           updatedAt: Date.now() - 10_000
@@ -131,8 +145,15 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     return {
       key: 'mixed',
       dashboardData,
+      readyState: {
+        [getStateKey('acme/chrome-home-page', 89)]: {
+          isReady: false,
+          highlighted: false,
+          updatedAt: Date.now() - 10_000
+        }
+      },
       warningState: {
-        [getWarningStateKey('acme/platform-web', 1533)]: {
+        [getStateKey('acme/platform-web', 1533)]: {
           activeCaseKeys: [],
           highlighted: false,
           updatedAt: Date.now() - 10_000
@@ -188,8 +209,9 @@ function createWarningScenario(
   return {
     key,
     dashboardData,
+    readyState: {},
     warningState: {
-      [getWarningStateKey('acme/platform-web', 1533)]: {
+      [getStateKey('acme/platform-web', 1533)]: {
         activeCaseKeys: [],
         highlighted: false,
         updatedAt: Date.now() - 10_000
@@ -238,6 +260,7 @@ function cloneScenario(scenario: GitHubMockScenario): GitHubMockScenario {
   return {
     key: scenario.key,
     dashboardData: cloneDashboardData(scenario.dashboardData),
+    readyState: structuredClone(scenario.readyState),
     warningState: structuredClone(scenario.warningState)
   };
 }
@@ -249,6 +272,6 @@ function cloneDashboardData(data: GitHubDashboardData): GitHubDashboardData {
   };
 }
 
-function getWarningStateKey(repositoryName: string, pullNumber: number) {
+function getStateKey(repositoryName: string, pullNumber: number) {
   return `${repositoryName}#${pullNumber}`;
 }

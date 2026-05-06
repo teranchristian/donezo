@@ -23,6 +23,7 @@ import {
   getStoredGitHubMockScenarioKey,
   getStoredSettings,
   saveStoredGitHubMockScenarioKey,
+  saveStoredGitHubPrReadyState,
   saveStoredGitHubPrWarningState,
   saveStoredSettings,
   type DashboardSettings
@@ -107,6 +108,7 @@ export default function App() {
     if (gitHubMockScenario) {
       setIsGitHubMockReady(false);
       void (async () => {
+        await saveStoredGitHubPrReadyState(gitHubMockScenario.readyState);
         await saveStoredGitHubPrWarningState(gitHubMockScenario.warningState);
         if (!isMountedRef.current) {
           return;
@@ -332,6 +334,7 @@ export default function App() {
 
   async function handleRefreshGitHub() {
     if (gitHubMockScenario) {
+      await saveStoredGitHubPrReadyState(gitHubMockScenario.readyState);
       await saveStoredGitHubPrWarningState(gitHubMockScenario.warningState);
       setGitHubData(gitHubMockScenario.dashboardData);
       setGitHubSettingsTestStatus(gitHubMockScenario.dashboardData.connectionStatus);
@@ -349,6 +352,7 @@ export default function App() {
 
   async function handleClearGitHubMockScenario() {
     await clearStoredGitHubMockScenarioKey();
+    await saveStoredGitHubPrReadyState({});
     await saveStoredGitHubPrWarningState({});
     setGitHubMockScenarioKey(null);
     setIsGitHubMockReady(true);

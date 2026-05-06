@@ -10,11 +10,14 @@ import {
 import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
 import {
+  getStoredGitHubPrReadyState,
   getStoredGitHubPrWarningState,
   getStoredGitHubSortOrder,
+  saveStoredGitHubPrReadyState,
   saveStoredGitHubPrWarningState,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
+  type GitHubPrReadyState,
   type GitHubPrWarningState,
   type GitHubPrStatusFilter,
   type GitHubListSort
@@ -47,6 +50,7 @@ type GitHubCardProps = {
 export type GitHubSummaryMetrics = {
   connectionStatus: GitHubConnectionStatus;
   missingUsername: boolean;
+  highlightedReadyCount: number;
   highlightedWarningCount: number;
   reviewRequestedCount: number;
   approvedPrCount: number | null;
@@ -105,6 +109,8 @@ export function GitHubCard({
     'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
   const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
+  const [gitHubPrReadyState, setGitHubPrReadyState] = useState<GitHubPrReadyState>({});
+  const [hasLoadedGitHubPrReadyState, setHasLoadedGitHubPrReadyState] = useState(false);
   const [gitHubPrWarningState, setGitHubPrWarningState] = useState<GitHubPrWarningState>({});
   const [hasLoadedGitHubPrWarningState, setHasLoadedGitHubPrWarningState] = useState(false);
   const [isResolvingNotificationStates, setIsResolvingNotificationStates] = useState(false);
@@ -139,6 +145,9 @@ export function GitHubCard({
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
+  const highlightedReadyCount = resolvedPullRequests.filter((pullRequest) =>
+    isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)
+  ).length;
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) =>
     isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)
   ).length;
@@ -202,6 +211,15 @@ export function GitHubCard({
       setHasLoadedSortOrder(true);
     });
 
+    getStoredGitHubPrReadyState().then((storedReadyState) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setGitHubPrReadyState(storedReadyState);
+      setHasLoadedGitHubPrReadyState(true);
+    });
+
     getStoredGitHubPrWarningState().then((storedWarningState) => {
       if (!isMounted) {
         return;
@@ -225,12 +243,31 @@ export function GitHubCard({
   }, [hasLoadedSortOrder, sortOrder]);
 
   useEffect(() => {
+    if (!hasLoadedGitHubPrReadyState) {
+      return;
+    }
+
+    void saveStoredGitHubPrReadyState(gitHubPrReadyState);
+  }, [gitHubPrReadyState, hasLoadedGitHubPrReadyState]);
+
+  useEffect(() => {
     if (!hasLoadedGitHubPrWarningState) {
       return;
     }
 
     void saveStoredGitHubPrWarningState(gitHubPrWarningState);
   }, [gitHubPrWarningState, hasLoadedGitHubPrWarningState]);
+
+  useEffect(() => {
+    if (!hasLoadedGitHubPrReadyState) {
+      return;
+    }
+
+    setGitHubPrReadyState((currentState) => {
+      const nextState = buildGitHubPrReadyState(currentState, resolvedPullRequests);
+      return areGitHubPrReadyStatesEqual(currentState, nextState) ? currentState : nextState;
+    });
+  }, [hasLoadedGitHubPrReadyState, resolvedPullRequests]);
 
   useEffect(() => {
     if (!hasLoadedGitHubPrWarningState) {
@@ -262,6 +299,7 @@ export function GitHubCard({
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
+      highlightedReadyCount,
       highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
       approvedPrCount: summaryApprovedPrCount,
@@ -270,6 +308,7 @@ export function GitHubCard({
   }, [
     data.connectionStatus,
     data.missingUsername,
+    highlightedReadyCount,
     highlightedWarningCount,
     summaryApprovedPrCount,
     summaryMyOpenPrCount,
@@ -327,7 +366,23 @@ export function GitHubCard({
   }, [token, visibleNotificationPullRequestKey]);
 
   function handleClearWarningHighlight(pullRequest: GitHubPullRequestItem) {
+    const readyStateKey = getGitHubPullRequestAttentionStateKey(pullRequest);
     const warningStateKey = getGitHubPullRequestWarningStateKey(pullRequest);
+
+    setGitHubPrReadyState((currentState) => {
+      const currentEntry = currentState[readyStateKey];
+      if (!currentEntry?.highlighted) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        [readyStateKey]: {
+          ...currentEntry,
+          highlighted: false
+        }
+      };
+    });
 
     setGitHubPrWarningState((currentState) => {
       const currentEntry = currentState[warningStateKey];
@@ -427,6 +482,7 @@ export function GitHubCard({
                   .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
                   .map((item) => item.value)}
                 todayFocusItemIds={todayFocusItemIds}
+                gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}
                 onClearWarningHighlight={handleClearWarningHighlight}
               />
@@ -444,6 +500,7 @@ export function GitHubCard({
                       key={item.key}
                       pullRequest={item.value}
                       isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(item.value).id)}
+                      isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, item.value)}
                       isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, item.value)}
                       onClearWarningHighlight={handleClearWarningHighlight}
                     />
@@ -493,11 +550,13 @@ type GitHubViewItem =
 function PullRequestRow({
   pullRequest,
   isInTodayFocus,
+  isReadyHighlighted = false,
   isWarningHighlighted = false,
   onClearWarningHighlight
 }: {
   pullRequest: GitHubPullRequestItem;
   isInTodayFocus: boolean;
+  isReadyHighlighted?: boolean;
   isWarningHighlighted?: boolean;
   onClearWarningHighlight?: (pullRequest: GitHubPullRequestItem) => void;
 }) {
@@ -521,9 +580,11 @@ function PullRequestRow({
         event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
       }}
       onClick={() => onClearWarningHighlight?.(pullRequest)}
-      className={`group -mx-2 block cursor-pointer rounded-[12px] px-2 py-1.5 transition ${
+      className={`group -mx-2 block cursor-pointer px-2 py-1.5 transition ${
         isWarningHighlighted
           ? 'bg-amber-400/[0.08] shadow-[inset_0_0_0_1px_rgba(251,191,36,0.22)] hover:bg-amber-400/[0.12]'
+          : isReadyHighlighted
+            ? 'bg-violet-400/[0.09] shadow-[inset_0_0_0_1px_rgba(196,181,253,0.22)] hover:bg-violet-400/[0.14]'
           : 'hover:bg-white/[0.03]'
       }`}
     >
@@ -711,11 +772,13 @@ function PullRequestReadyToMergeIcon() {
 function PullRequestList({
   pullRequests,
   todayFocusItemIds,
+  gitHubPrReadyState,
   gitHubPrWarningState,
   onClearWarningHighlight
 }: {
   pullRequests: GitHubPullRequestItem[];
   todayFocusItemIds: Set<string>;
+  gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
   onClearWarningHighlight: (pullRequest: GitHubPullRequestItem) => void;
 }) {
@@ -730,6 +793,7 @@ function PullRequestList({
             key={pullRequest.url}
             pullRequest={pullRequest}
             isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+            isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
             isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
             onClearWarningHighlight={onClearWarningHighlight}
           />
@@ -745,6 +809,7 @@ function PullRequestList({
           key={pullRequest.url}
           pullRequest={pullRequest}
           isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+          isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
           isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
           onClearWarningHighlight={onClearWarningHighlight}
         />
@@ -755,6 +820,7 @@ function PullRequestList({
             key={pullRequest.url}
             pullRequest={pullRequest}
             isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
+            isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
             isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
             onClearWarningHighlight={onClearWarningHighlight}
           />
@@ -1180,6 +1246,10 @@ function getNotificationUrl(notification: GitHubNotification) {
   return `https://github.com/${notification.repository.full_name}`;
 }
 
+function getGitHubPullRequestAttentionStateKey(pullRequest: GitHubPullRequestItem) {
+  return `${pullRequest.repositoryName}#${pullRequest.pullNumber}`;
+}
+
 const githubPrWarningCases = [
   {
     key: 'has-conflicts',
@@ -1199,7 +1269,7 @@ const githubPrWarningCases = [
 ] as const;
 
 function getGitHubPullRequestWarningStateKey(pullRequest: GitHubPullRequestItem) {
-  return `${pullRequest.repositoryName}#${pullRequest.pullNumber}`;
+  return getGitHubPullRequestAttentionStateKey(pullRequest);
 }
 
 function getActiveGitHubPrWarningCaseKeys(pullRequest: GitHubPullRequestItem) {
@@ -1235,6 +1305,57 @@ function buildGitHubPrWarningState(
 
 function isGitHubPrWarningHighlighted(state: GitHubPrWarningState, pullRequest: GitHubPullRequestItem) {
   return Boolean(state[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted);
+}
+
+function buildGitHubPrReadyState(
+  currentState: GitHubPrReadyState,
+  pullRequests: GitHubPullRequestItem[]
+): GitHubPrReadyState {
+  const nextState: GitHubPrReadyState = {};
+  const updatedAt = Date.now();
+
+  for (const pullRequest of pullRequests) {
+    const readyStateKey = getGitHubPullRequestAttentionStateKey(pullRequest);
+    const isReady = isPullRequestReadyToClose(pullRequest);
+    const currentEntry = currentState[readyStateKey];
+    const hasNewReadyTransition = Boolean(currentEntry) && !currentEntry.isReady && isReady;
+
+    nextState[readyStateKey] = {
+      isReady,
+      highlighted: isReady ? (hasNewReadyTransition ? true : currentEntry?.highlighted ?? false) : false,
+      updatedAt
+    };
+  }
+
+  return nextState;
+}
+
+function isGitHubPrReadyHighlighted(state: GitHubPrReadyState, pullRequest: GitHubPullRequestItem) {
+  return Boolean(state[getGitHubPullRequestAttentionStateKey(pullRequest)]?.highlighted);
+}
+
+function areGitHubPrReadyStatesEqual(left: GitHubPrReadyState, right: GitHubPrReadyState) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (
+      !rightEntry ||
+      leftEntry.isReady !== rightEntry.isReady ||
+      leftEntry.highlighted !== rightEntry.highlighted
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function areGitHubPrWarningStatesEqual(left: GitHubPrWarningState, right: GitHubPrWarningState) {
