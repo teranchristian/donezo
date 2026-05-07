@@ -44,6 +44,7 @@ export default function App() {
     () => getGitHubMockScenarioByKey(gitHubMockScenarioKey),
     [gitHubMockScenarioKey]
   );
+  const isGitHubMockMode = Boolean(gitHubMockScenario);
   const [isGitHubMockReady, setIsGitHubMockReady] = useState(false);
   const [gitHubData, setGitHubData] = useState<GitHubDashboardData>(getEmptyGitHubDashboardData());
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
@@ -92,6 +93,7 @@ export default function App() {
 
       setGitHubMockScenarioKey(nextMockScenarioKey);
       setSettings(storedSettings);
+      setIsGitHubMockReady(!nextMockScenarioKey);
       setIsLoadingSettings(false);
     })();
 
@@ -354,8 +356,8 @@ export default function App() {
     await clearStoredGitHubMockScenarioKey();
     await saveStoredGitHubPrReadyState({});
     await saveStoredGitHubPrWarningState({});
-    setGitHubMockScenarioKey(null);
-    setIsGitHubMockReady(true);
+      setGitHubMockScenarioKey(null);
+      setIsGitHubMockReady(true);
     clearMockScenarioFromLocation();
 
     await refreshGitHubData({
@@ -463,7 +465,7 @@ export default function App() {
       settings={settings}
       gitHubData={gitHubData}
       gitHubMockScenarioKey={gitHubMockScenarioKey}
-      isGitHubMockMode={Boolean(gitHubMockScenario)}
+      isGitHubMockMode={isGitHubMockMode}
       isGitHubLoading={isGitHubLoading}
       isCheckingGitHubActivity={isCheckingGitHubActivity}
       lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
@@ -476,7 +478,7 @@ export default function App() {
     />
   );
 
-  if (isLoadingSettings || !isGitHubMockReady) {
+  if (isLoadingSettings || (isGitHubMockMode && !isGitHubMockReady)) {
     return <div className="app-background" />;
   }
 
