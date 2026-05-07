@@ -36,6 +36,7 @@ import {
   type ActiveJiraView,
   type GitHubPrStatusFilter
 } from '../lib/storage';
+import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 import {
   reconcileTodayFocusJiraItems,
   type TodayFocusRefreshSignal
@@ -46,10 +47,12 @@ type DashboardPageProps = {
   gitHubData: GitHubDashboardData;
   gitHubMockScenarioKey: string | null;
   isGitHubMockMode: boolean;
+  gitHubMockScenarioOptions: GitHubMockScenarioOption[];
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
   onClearGitHubMockScenario: () => void;
+  onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onRefreshGitHub: () => void;
   jiraData: JiraDashboardData;
   jiraRefreshSignal: TodayFocusRefreshSignal;
@@ -62,10 +65,12 @@ export function DashboardPage({
   gitHubData,
   gitHubMockScenarioKey,
   isGitHubMockMode,
+  gitHubMockScenarioOptions,
   isGitHubLoading,
   isCheckingGitHubActivity,
   lastGitHubActivityCheckAt,
   onClearGitHubMockScenario,
+  onApplyGitHubMockScenario,
   onRefreshGitHub,
   jiraData,
   jiraRefreshSignal,
@@ -153,7 +158,7 @@ export function DashboardPage({
       applyNavigationState(nextState);
 
       if (options?.replaceUrl) {
-        replaceDashboardHash(nextState, gitHubMockScenarioKey);
+        replaceDashboardHash(nextState, isGitHubMockMode);
       }
     };
 
@@ -169,7 +174,7 @@ export function DashboardPage({
       isActive = false;
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [gitHubMockScenarioKey]);
+  }, [gitHubMockScenarioKey, isGitHubMockMode]);
 
   useEffect(() => {
     if (!hasLoadedNavigation) {
@@ -307,7 +312,7 @@ export function DashboardPage({
     setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
     setActiveJiraView(nextState.activeJiraView);
     setHasLoadedNavigation(true);
-    window.location.hash = appendMockScenarioToHash(buildDashboardHashNavigation(nextState), gitHubMockScenarioKey);
+    window.location.hash = appendMockScenarioToHash(buildDashboardHashNavigation(nextState), isGitHubMockMode);
   }
 
   function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
@@ -512,7 +517,10 @@ export function DashboardPage({
               />
             ) : null}
             <HeaderMenu
+              isMockMode={isGitHubMockMode}
               mockScenarioKey={gitHubMockScenarioKey}
+              mockScenarioOptions={gitHubMockScenarioOptions}
+              onApplyMockScenario={onApplyGitHubMockScenario}
               onClearMockScenario={onClearGitHubMockScenario}
             />
           </div>
@@ -624,9 +632,9 @@ function replaceDashboardHash(nextState: {
   activeGitHubView: ActiveGitHubView;
   githubPrStatusFilter: GitHubPrStatusFilter;
   activeJiraView: ActiveJiraView;
-}, mockScenarioKey: string | null) {
+}, isGitHubMockMode: boolean) {
   const nextHash = buildDashboardHashNavigation(nextState);
-  const nextHashWithMock = appendMockScenarioToHash(nextHash, mockScenarioKey);
+  const nextHashWithMock = appendMockScenarioToHash(nextHash, isGitHubMockMode);
   if (window.location.hash === nextHashWithMock) {
     return;
   }
@@ -634,15 +642,15 @@ function replaceDashboardHash(nextState: {
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHashWithMock}`);
 }
 
-function appendMockScenarioToHash(hash: string, mockScenarioKey: string | null) {
-  if (!mockScenarioKey) {
+function appendMockScenarioToHash(hash: string, isGitHubMockMode: boolean) {
+  if (!isGitHubMockMode) {
     return hash;
   }
 
   const trimmedHash = hash.replace(/^#/, '');
   const [path, rawSearch = ''] = trimmedHash.split('?');
   const searchParams = new URLSearchParams(rawSearch);
-  searchParams.set('mock', mockScenarioKey);
+  searchParams.set('mock', 'true');
   return `#${path}?${searchParams.toString()}`;
 }
 
@@ -1244,13 +1252,18 @@ function GitHubHeaderShortcuts({
       colorClass: 'text-sky-400',
       label: 'Open Jira blockers',
       onClick: onOpenJira,
-      icon: <HeaderJiraIcon />
+      icon: <HeaderJiraIcon />,
+      isHidden: true
     }
   ];
 
   return (
     <div className="flex items-center gap-2">
       {items.map((item) => {
+        if (item.isHidden) {
+          return null;
+        }
+
         const isDisabled = !isConnected;
         const showBadge = isConnected && item.count > 0;
 

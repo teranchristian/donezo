@@ -1,14 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 
 type HeaderMenuProps = {
+  isMockMode?: boolean;
   mockScenarioKey?: string | null;
+  mockScenarioOptions?: GitHubMockScenarioOption[];
+  onApplyMockScenario?: (mockScenarioKey: string) => void;
   onClearMockScenario?: () => void;
 };
 
-export function HeaderMenu({ mockScenarioKey = null, onClearMockScenario }: HeaderMenuProps) {
+export function HeaderMenu({
+  isMockMode = false,
+  mockScenarioKey = null,
+  mockScenarioOptions = [],
+  onApplyMockScenario,
+  onClearMockScenario
+}: HeaderMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedMockScenarioKey, setSelectedMockScenarioKey] = useState(mockScenarioKey ?? '');
   const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setSelectedMockScenarioKey(mockScenarioKey ?? '');
+  }, [mockScenarioKey]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -51,14 +66,41 @@ export function HeaderMenu({ mockScenarioKey = null, onClearMockScenario }: Head
 
       {isOpen ? (
         <div className="absolute right-0 top-14 z-20 min-w-[180px] rounded-2xl bg-panel p-2 shadow-glow">
-          {mockScenarioKey ? (
+          {isMockMode ? (
             <div className="mb-1 rounded-xl bg-white/[0.03] px-4 py-3">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.66rem] font-medium uppercase tracking-[0.14em] text-white/38">
                     Using mock data
                   </p>
-                  <p className="mt-1 truncate text-sm text-primary">{mockScenarioKey}</p>
+                  <div className="mt-2 space-y-2">
+                    <select
+                      value={selectedMockScenarioKey}
+                      onChange={(event) => setSelectedMockScenarioKey(event.target.value)}
+                      className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-primary outline-none transition focus:border-white/20"
+                    >
+                      {mockScenarioOptions.map((option) => (
+                        <option key={option.key} value={option.key} className="bg-panel text-primary">
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedMockScenarioKey && onApplyMockScenario) {
+                            onApplyMockScenario(selectedMockScenarioKey);
+                          }
+                          setIsOpen(false);
+                        }}
+                        className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-xs font-medium uppercase tracking-[0.12em] text-primary transition hover:bg-white/[0.12]"
+                      >
+                        OK
+                      </button>
+                      <p className="min-w-0 truncate text-sm text-primary/82">{mockScenarioKey}</p>
+                    </div>
+                  </div>
                 </div>
                 {onClearMockScenario ? (
                   <button

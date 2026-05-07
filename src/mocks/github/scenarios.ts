@@ -8,6 +8,13 @@ export type GitHubMockScenario = {
   warningState: GitHubPrWarningState;
 };
 
+export type GitHubMockScenarioOption = {
+  key: string;
+  label: string;
+};
+
+export const DEFAULT_GITHUB_MOCK_SCENARIO_KEY = 'base';
+
 const BASE_UPDATED_AT = '2026-05-06T09:30:00.000Z';
 const BASE_DASHBOARD_DATA: GitHubDashboardData = {
   ...getEmptyGitHubDashboardData('connected'),
@@ -72,7 +79,23 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
   notifications: []
 };
 
+const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
+  { key: DEFAULT_GITHUB_MOCK_SCENARIO_KEY, label: 'Base' },
+  { key: 'ready-to-merge', label: 'Ready to merge' },
+  { key: 'warning-conflict-new', label: 'Warning: conflict' },
+  { key: 'warning-build-failed-new', label: 'Warning: build failed' },
+  { key: 'warning-out-of-date-new', label: 'Warning: out of date' },
+  { key: 'warning-already-seen', label: 'Warning: already seen' },
+  { key: 'mixed', label: 'Mixed' }
+];
+
 const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
+  [DEFAULT_GITHUB_MOCK_SCENARIO_KEY]: {
+    key: DEFAULT_GITHUB_MOCK_SCENARIO_KEY,
+    dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),
+    readyState: {},
+    warningState: {}
+  },
   'ready-to-merge': {
     key: 'ready-to-merge',
     dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),
@@ -163,10 +186,47 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
   })()
 };
 
-export function getGitHubMockScenarioKeyFromLocation(search: string, hash: string) {
-  const searchMockKey = new URLSearchParams(search).get('mock')?.trim() ?? '';
-  const hashMockKey = getHashMockKey(hash);
-  return hashMockKey || searchMockKey || null;
+export function getGitHubMockScenarioOptions() {
+  return MOCK_SCENARIO_OPTIONS;
+}
+
+export function getGitHubMockLocationState(search: string, hash: string) {
+  const searchMockValue = new URLSearchParams(search).get('mock')?.trim() ?? '';
+  const hashMockValue = getHashMockValue(hash);
+  const mockValue = hashMockValue || searchMockValue;
+
+  if (!mockValue) {
+    return {
+      isEnabled: null,
+      scenarioKey: null
+    };
+  }
+
+  if (mockValue === 'true') {
+    return {
+      isEnabled: true,
+      scenarioKey: null
+    };
+  }
+
+  if (mockValue === 'false') {
+    return {
+      isEnabled: false,
+      scenarioKey: null
+    };
+  }
+
+  if (MOCK_SCENARIOS[mockValue]) {
+    return {
+      isEnabled: true,
+      scenarioKey: mockValue
+    };
+  }
+
+  return {
+    isEnabled: null,
+    scenarioKey: null
+  };
 }
 
 export function getGitHubMockScenarioByKey(mockKey: string | null | undefined) {
@@ -177,7 +237,7 @@ export function getGitHubMockScenarioByKey(mockKey: string | null | undefined) {
   return MOCK_SCENARIOS[mockKey] ? cloneScenario(MOCK_SCENARIOS[mockKey]) : null;
 }
 
-function getHashMockKey(hash: string) {
+function getHashMockValue(hash: string) {
   const trimmedHash = hash.replace(/^#/, '').trim();
   if (!trimmedHash) {
     return '';

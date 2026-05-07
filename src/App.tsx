@@ -30,8 +30,10 @@ import {
 } from './lib/storage';
 import { type TodayFocusRefreshSignal } from './lib/todayFocusSync';
 import {
+  DEFAULT_GITHUB_MOCK_SCENARIO_KEY,
   getGitHubMockScenarioByKey,
-  getGitHubMockScenarioKeyFromLocation
+  getGitHubMockLocationState,
+  getGitHubMockScenarioOptions
 } from './mocks/github/scenarios';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -39,12 +41,15 @@ import { SettingsPage } from './pages/SettingsPage';
 export default function App() {
   const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isGitHubMockMode, setIsGitHubMockMode] = useState(false);
   const [gitHubMockScenarioKey, setGitHubMockScenarioKey] = useState<string | null>(null);
   const gitHubMockScenario = useMemo(
-    () => getGitHubMockScenarioByKey(gitHubMockScenarioKey),
-    [gitHubMockScenarioKey]
+    () =>
+      isGitHubMockMode
+        ? getGitHubMockScenarioByKey(gitHubMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY)
+        : null,
+    [gitHubMockScenarioKey, isGitHubMockMode]
   );
-  const isGitHubMockMode = Boolean(gitHubMockScenario);
   const [isGitHubMockReady, setIsGitHubMockReady] = useState(false);
   const [gitHubData, setGitHubData] = useState<GitHubDashboardData>(getEmptyGitHubDashboardData());
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
@@ -78,12 +83,18 @@ export default function App() {
     let active = true;
 
     void (async () => {
-      const locationMockScenarioKey = getGitHubMockScenarioKeyFromLocation(window.location.search, window.location.hash);
+      const locationMockState = getGitHubMockLocationState(window.location.search, window.location.hash);
       const storedMockScenarioKey = await getStoredGitHubMockScenarioKey();
-      const nextMockScenarioKey = locationMockScenarioKey ?? storedMockScenarioKey;
+      const shouldEnableMockMode =
+        locationMockState.isEnabled === null ? Boolean(storedMockScenarioKey) : locationMockState.isEnabled;
+      const nextMockScenarioKey = shouldEnableMockMode
+        ? locationMockState.scenarioKey ?? storedMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY
+        : null;
 
-      if (locationMockScenarioKey) {
-        await saveStoredGitHubMockScenarioKey(locationMockScenarioKey);
+      if (locationMockState.isEnabled === false) {
+        await clearStoredGitHubMockScenarioKey();
+      } else if (nextMockScenarioKey) {
+        await saveStoredGitHubMockScenarioKey(nextMockScenarioKey);
       }
 
       const storedSettings = await getStoredSettings();
@@ -91,9 +102,10 @@ export default function App() {
         return;
       }
 
+      setIsGitHubMockMode(shouldEnableMockMode);
       setGitHubMockScenarioKey(nextMockScenarioKey);
       setSettings(storedSettings);
-      setIsGitHubMockReady(!nextMockScenarioKey);
+      setIsGitHubMockReady(!shouldEnableMockMode);
       setIsLoadingSettings(false);
     })();
 
@@ -352,12 +364,36 @@ export default function App() {
     });
   }
 
+  async function handleApplyGitHubMockScenario(nextMockScenarioKey: string) {
+    await saveStoredGitHubMockScenarioKey(nextMockScenarioKey);
+    setIsGitHubMockMode(true);
+    setGitHubMockScenarioKey(nextMockScenarioKey);
+    setIsGitHubMockReady(false);
+    syncMockModeToLocation(true);
+
+    const nextScenario = getGitHubMockScenarioByKey(nextMockScenarioKey);
+    if (!nextScenario) {
+      return;
+    }
+
+    await saveStoredGitHubPrReadyState(nextScenario.readyState);
+    await saveStoredGitHubPrWarningState(nextScenario.warningState);
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setGitHubData(nextScenario.dashboardData);
+    setGitHubSettingsTestStatus(nextScenario.dashboardData.connectionStatus);
+    setIsGitHubMockReady(true);
+  }
+
   async function handleClearGitHubMockScenario() {
     await clearStoredGitHubMockScenarioKey();
     await saveStoredGitHubPrReadyState({});
     await saveStoredGitHubPrWarningState({});
-      setGitHubMockScenarioKey(null);
-      setIsGitHubMockReady(true);
+    setIsGitHubMockMode(false);
+    setGitHubMockScenarioKey(null);
+    setIsGitHubMockReady(true);
     clearMockScenarioFromLocation();
 
     await refreshGitHubData({
@@ -466,10 +502,12 @@ export default function App() {
       gitHubData={gitHubData}
       gitHubMockScenarioKey={gitHubMockScenarioKey}
       isGitHubMockMode={isGitHubMockMode}
+      gitHubMockScenarioOptions={getGitHubMockScenarioOptions()}
       isGitHubLoading={isGitHubLoading}
       isCheckingGitHubActivity={isCheckingGitHubActivity}
       lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
       onClearGitHubMockScenario={() => void handleClearGitHubMockScenario()}
+      onApplyGitHubMockScenario={(mockScenarioKey) => void handleApplyGitHubMockScenario(mockScenarioKey)}
       onRefreshGitHub={() => void handleRefreshGitHub()}
       jiraData={jiraData}
       jiraRefreshSignal={jiraRefreshSignal}
@@ -527,4 +565,19 @@ function clearMockScenarioFromLocation() {
     '',
     `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${nextHash}`
   );
+}
+
+function syncMockModeToLocation(isEnabled: boolean) {
+  const trimmedHash = window.location.hash.replace(/^#/, '');
+  const [path = '', rawSearch = ''] = trimmedHash.split('?');
+  const hashParams = new URLSearchParams(rawSearch);
+
+  if (isEnabled) {
+    hashParams.set('mock', 'true');
+  } else {
+    hashParams.delete('mock');
+  }
+
+  const nextHash = path ? `#${path}${hashParams.toString() ? `?${hashParams.toString()}` : ''}` : '';
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
 }
