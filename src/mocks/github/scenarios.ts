@@ -190,75 +190,12 @@ export function getGitHubMockScenarioOptions() {
   return MOCK_SCENARIO_OPTIONS;
 }
 
-export function getGitHubMockLocationState(search: string, hash: string) {
-  const searchParams = new URLSearchParams(search);
-  const hashParams = getHashSearchParams(hash);
-  const searchDevModeValue = searchParams.get('dev_mode')?.trim() ?? '';
-  const hashDevModeValue = hashParams.get('dev_mode')?.trim() ?? '';
-  const searchMockValue = searchParams.get('mock')?.trim() ?? '';
-  const hashMockValue = hashParams.get('mock')?.trim() ?? '';
-  const modeValue = hashDevModeValue || searchDevModeValue || hashMockValue || searchMockValue;
-  const scenarioValue = getHashMockValue(hash) || searchMockValue;
-
-  if (!modeValue && !scenarioValue) {
-    return {
-      isEnabled: null,
-      scenarioKey: null
-    };
-  }
-
-  if (modeValue === 'true') {
-    return {
-      isEnabled: true,
-      scenarioKey: null
-    };
-  }
-
-  if (modeValue === 'false') {
-    return {
-      isEnabled: false,
-      scenarioKey: null
-    };
-  }
-
-  if (scenarioValue && MOCK_SCENARIOS[scenarioValue]) {
-    return {
-      isEnabled: true,
-      scenarioKey: scenarioValue
-    };
-  }
-
-  return {
-    isEnabled: null,
-    scenarioKey: null
-  };
-}
-
 export function getGitHubMockScenarioByKey(mockKey: string | null | undefined) {
   if (!mockKey) {
     return null;
   }
 
   return MOCK_SCENARIOS[mockKey] ? cloneScenario(MOCK_SCENARIOS[mockKey]) : null;
-}
-
-function getHashMockValue(hash: string) {
-  const hashMockValue = getHashSearchParams(hash).get('mock')?.trim() ?? '';
-  if (MOCK_SCENARIOS[hashMockValue]) {
-    return hashMockValue;
-  }
-
-  return '';
-}
-
-function getHashSearchParams(hash: string) {
-  const trimmedHash = hash.replace(/^#/, '').trim();
-  if (!trimmedHash) {
-    return new URLSearchParams();
-  }
-
-  const [, rawSearch = ''] = trimmedHash.split('?');
-  return new URLSearchParams(rawSearch);
 }
 
 function createWarningScenario(
