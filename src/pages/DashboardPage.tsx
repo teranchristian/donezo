@@ -95,6 +95,7 @@ export function DashboardPage({
     missingUsername: gitHubData.missingUsername,
     readyToMergeCount: 0,
     failedBuildCount: 0,
+    failedBuildBadgeCount: 0,
     highlightedReadyCount: 0,
     highlightedWarningCount: 0,
     reviewRequestedCount: 0,
@@ -512,7 +513,9 @@ export function DashboardPage({
                 connectionStatus={gitHubSummaryMetrics.connectionStatus}
                 warningCount={gitHubSummaryMetrics.highlightedWarningCount}
                 readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
+                readyToMergeBadgeCount={gitHubSummaryMetrics.highlightedReadyCount}
                 failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
+                failedBuildBadgeCount={gitHubSummaryMetrics.failedBuildBadgeCount}
                 jiraBlockingCount={jiraCounts.blocking}
                 onOpenWarnings={() => navigateToGitHubPrs('all')}
                 onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
@@ -1205,7 +1208,9 @@ function GitHubHeaderShortcuts({
   connectionStatus,
   warningCount,
   readyToMergeCount,
+  readyToMergeBadgeCount,
   failedBuildCount,
+  failedBuildBadgeCount,
   jiraBlockingCount,
   onOpenWarnings,
   onOpenReadyToMerge,
@@ -1214,7 +1219,9 @@ function GitHubHeaderShortcuts({
   connectionStatus: GitHubConnectionStatus;
   warningCount: number;
   readyToMergeCount: number;
+  readyToMergeBadgeCount: number;
   failedBuildCount: number;
+  failedBuildBadgeCount: number;
   jiraBlockingCount: number;
   onOpenWarnings: () => void;
   onOpenReadyToMerge: () => void;
@@ -1225,6 +1232,7 @@ function GitHubHeaderShortcuts({
     {
       key: 'notifications',
       count: warningCount,
+      badgeCount: warningCount,
       colorClass: 'text-rose-300',
       label: 'Open pull request warnings',
       onClick: onOpenWarnings,
@@ -1233,18 +1241,20 @@ function GitHubHeaderShortcuts({
     {
       key: 'open-prs',
       count: readyToMergeCount,
-      colorClass: 'text-violet-300',
+      badgeCount: readyToMergeBadgeCount,
+      colorClass: 'text-emerald-400',
       label: 'Open ready to merge pull requests',
       onClick: onOpenReadyToMerge,
-      icon: <HeaderOpenPrIcon />
+      icon: (isDimmed: boolean) => <HeaderReadyPrIcon isDimmed={isDimmed} />
     },
     {
       key: 'failed-build-prs',
       count: failedBuildCount,
+      badgeCount: failedBuildBadgeCount,
       colorClass: 'text-emerald-400',
       label: 'Open pull requests with failed builds',
       onClick: onOpenWarnings,
-      icon: <HeaderFailedBuildPrIcon />
+      icon: (isDimmed: boolean) => <HeaderFailedBuildPrIcon isDimmed={isDimmed} />
     },
     {
       key: 'jira',
@@ -1264,8 +1274,9 @@ function GitHubHeaderShortcuts({
           return null;
         }
 
-        const isDisabled = !isConnected || item.count === 0;
-        const showBadge = isConnected && item.count > 0;
+        const effectiveBadgeCount = item.badgeCount ?? item.count;
+        const isDisabled = !isConnected || effectiveBadgeCount === 0;
+        const showBadge = isConnected && effectiveBadgeCount > 0;
 
         return (
           <button
@@ -1279,11 +1290,11 @@ function GitHubHeaderShortcuts({
             }`}
           >
             <span className={item.colorClass} aria-hidden="true">
-              {item.icon}
+              {typeof item.icon === 'function' ? item.icon(isDisabled) : item.icon}
             </span>
             {showBadge ? (
               <span className="absolute right-1.5 top-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-rose-500 px-1 py-[0.1rem] text-[0.62rem] font-semibold leading-none text-white shadow-[0_4px_12px_rgba(244,63,94,0.28)]">
-                {item.count > 9 ? '9+' : item.count}
+                {effectiveBadgeCount > 9 ? '9+' : effectiveBadgeCount}
               </span>
             ) : null}
           </button>
@@ -1309,19 +1320,48 @@ function HeaderOpenPrIcon() {
   );
 }
 
-function HeaderFailedBuildPrIcon() {
+function HeaderReadyPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
   return (
-    <svg viewBox="0 0 16 16" className="h-[1.12rem] w-[1.12rem]" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" fill="#1fb236" fillOpacity={isDimmed ? 0.42 : 1} />
+      <circle cx="12" cy="12" r="9.5" fill="url(#ready-pr-glow)" fillOpacity={isDimmed ? 0.16 : 0.3} />
       <path
-        d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"
-        fill="currentColor"
+        d="m8.6 12.4 2.3 2.3 4.7-5.2"
+        stroke="#fff"
+        strokeOpacity={isDimmed ? 0.82 : 1}
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      <circle cx="4.35" cy="12.75" r="3.75" fill="#be123c" />
-      <circle cx="4.35" cy="12.75" r="4.15" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.48" />
+      <defs>
+        <radialGradient id="ready-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
+          <stop stopColor="#fff" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function HeaderFailedBuildPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" fill="#ef2029" fillOpacity={isDimmed ? 0.42 : 1} />
+      <circle cx="12" cy="12" r="9.5" fill="url(#failed-pr-glow)" fillOpacity={isDimmed ? 0.14 : 0.26} />
       <path
-        d="M2.3 10.75a1 1 0 0 1 1.414 0l.636.636.636-.636a1 1 0 1 1 1.414 1.414l-.636.636.636.636a1 1 0 1 1-1.414 1.414l-.636-.636-.636.636a1 1 0 1 1-1.414-1.414l.636-.636-.636-.636a1 1 0 0 1 0-1.414Z"
-        fill="#fff"
+        d="m8.8 8.8 6.4 6.4m0-6.4-6.4 6.4"
+        stroke="#fff"
+        strokeOpacity={isDimmed ? 0.82 : 1}
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
+      <defs>
+        <radialGradient id="failed-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
+          <stop stopColor="#fff" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
     </svg>
   );
 }

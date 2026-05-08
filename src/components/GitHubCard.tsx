@@ -52,6 +52,7 @@ export type GitHubSummaryMetrics = {
   missingUsername: boolean;
   readyToMergeCount: number;
   failedBuildCount: number;
+  failedBuildBadgeCount: number;
   highlightedReadyCount: number;
   highlightedWarningCount: number;
   reviewRequestedCount: number;
@@ -152,9 +153,19 @@ export function GitHubCard({
   ).length;
   const readyToMergeCount = resolvedPullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest)).length;
   const failedBuildCount = resolvedPullRequests.filter((pullRequest) => pullRequest.ciStatus === 'failing').length;
-  const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) =>
-    isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)
+  const failedBuildBadgeCount = resolvedPullRequests.filter(
+    (pullRequest) =>
+      pullRequest.ciStatus === 'failing' &&
+      Boolean(gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted)
   ).length;
+  const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
+    const warningEntry = gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
+    if (!warningEntry?.highlighted) {
+      return false;
+    }
+
+    return warningEntry.activeCaseKeys.some((caseKey) => caseKey !== 'failed-checks');
+  }).length;
   const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
     (pullRequest) => pullRequest.reviewStatus === 'approved' && !isPullRequestOutOfDate(pullRequest)
   ).length;
@@ -305,6 +316,7 @@ export function GitHubCard({
       missingUsername: data.missingUsername,
       readyToMergeCount,
       failedBuildCount,
+      failedBuildBadgeCount,
       highlightedReadyCount,
       highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
@@ -316,6 +328,7 @@ export function GitHubCard({
     data.missingUsername,
     readyToMergeCount,
     failedBuildCount,
+    failedBuildBadgeCount,
     highlightedReadyCount,
     highlightedWarningCount,
     summaryApprovedPrCount,
