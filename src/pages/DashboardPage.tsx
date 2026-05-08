@@ -93,6 +93,7 @@ export function DashboardPage({
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
+    readyToMergeCount: 0,
     highlightedReadyCount: 0,
     highlightedWarningCount: 0,
     reviewRequestedCount: 0,
@@ -509,7 +510,7 @@ export function DashboardPage({
               <GitHubHeaderShortcuts
                 connectionStatus={gitHubSummaryMetrics.connectionStatus}
                 warningCount={gitHubSummaryMetrics.highlightedWarningCount}
-                readyToMergeCount={gitHubSummaryMetrics.highlightedReadyCount}
+                readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
                 jiraBlockingCount={jiraCounts.blocking}
                 onOpenWarnings={() => navigateToGitHubPrs('all')}
                 onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
@@ -1251,7 +1252,7 @@ function GitHubHeaderShortcuts({
           return null;
         }
 
-        const isDisabled = !isConnected;
+        const isDisabled = !isConnected || item.count === 0;
         const showBadge = isConnected && item.count > 0;
 
         return (

@@ -62,7 +62,7 @@ export function buildDashboardHashNavigation(state: DashboardNavigationState) {
 
   if (state.activeIntegration === 'jira') {
     searchParams.set('view', state.activeJiraView);
-    return `#jira?${searchParams.toString()}`;
+    return `#/jira?${searchParams.toString()}`;
   }
 
   searchParams.set('view', state.activeGitHubView);
@@ -70,7 +70,7 @@ export function buildDashboardHashNavigation(state: DashboardNavigationState) {
     searchParams.set('status', state.githubPrStatusFilter);
   }
 
-  return `#github?${searchParams.toString()}`;
+  return `#/github?${searchParams.toString()}`;
 }
 
 function mergeGitHubPrStatusFilter(filter: string | null): GitHubPrStatusFilter {

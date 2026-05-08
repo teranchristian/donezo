@@ -50,6 +50,7 @@ type GitHubCardProps = {
 export type GitHubSummaryMetrics = {
   connectionStatus: GitHubConnectionStatus;
   missingUsername: boolean;
+  readyToMergeCount: number;
   highlightedReadyCount: number;
   highlightedWarningCount: number;
   reviewRequestedCount: number;
@@ -148,6 +149,7 @@ export function GitHubCard({
   const highlightedReadyCount = resolvedPullRequests.filter((pullRequest) =>
     isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)
   ).length;
+  const readyToMergeCount = resolvedPullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest)).length;
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) =>
     isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)
   ).length;
@@ -299,6 +301,7 @@ export function GitHubCard({
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
+      readyToMergeCount,
       highlightedReadyCount,
       highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
@@ -308,6 +311,7 @@ export function GitHubCard({
   }, [
     data.connectionStatus,
     data.missingUsername,
+    readyToMergeCount,
     highlightedReadyCount,
     highlightedWarningCount,
     summaryApprovedPrCount,

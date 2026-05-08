@@ -112,19 +112,16 @@ export default function App() {
       setSettings(storedSettings);
       setIsGitHubMockReady(!shouldEnableMockMode);
       setIsLoadingSettings(false);
+
+      if (locationMockState.isEnabled !== null || locationMockState.scenarioKey !== null) {
+        clearMockScenarioFromLocation();
+      }
     };
 
     void syncMockStateFromLocation();
 
-    const handleHashChange = () => {
-      void syncMockStateFromLocation();
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-
     return () => {
       active = false;
-      window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
 
@@ -598,7 +595,8 @@ function clearMockScenarioFromLocation() {
   searchParams.delete('dev_mode');
 
   const trimmedHash = window.location.hash.replace(/^#/, '');
-  const [path, rawSearch = ''] = trimmedHash.split('?');
+  const [rawPath, rawSearch = ''] = trimmedHash.split('?');
+  const path = rawPath ? `/${rawPath.replace(/^\/+/, '')}` : '';
   const hashParams = new URLSearchParams(rawSearch);
   hashParams.delete('mock');
   hashParams.delete('dev_mode');
