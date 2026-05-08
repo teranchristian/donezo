@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import {
   getEmptyGitHubDashboardData,
@@ -18,18 +18,40 @@ import {
   type JiraProfile
 } from './lib/jiraApi';
 import {
+  clearStoredGitHubMockScenarioKey,
   getDefaultSettings,
+  getStoredGitHubDevMode,
+  getStoredGitHubMockScenarioKey,
   getStoredSettings,
+  saveStoredGitHubDevMode,
+  saveStoredGitHubMockScenarioKey,
+  saveStoredGitHubPrReadyState,
+  saveStoredGitHubPrWarningState,
   saveStoredSettings,
   type DashboardSettings
 } from './lib/storage';
 import { type TodayFocusRefreshSignal } from './lib/todayFocusSync';
+import {
+  DEFAULT_GITHUB_MOCK_SCENARIO_KEY,
+  getGitHubMockScenarioByKey,
+  getGitHubMockScenarioOptions
+} from './mocks/github/scenarios';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 export default function App() {
   const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isGitHubMockMode, setIsGitHubMockMode] = useState(false);
+  const [gitHubMockScenarioKey, setGitHubMockScenarioKey] = useState<string | null>(null);
+  const gitHubMockScenario = useMemo(
+    () =>
+      isGitHubMockMode
+        ? getGitHubMockScenarioByKey(gitHubMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY)
+        : null,
+    [gitHubMockScenarioKey, isGitHubMockMode]
+  );
+  const [isGitHubMockReady, setIsGitHubMockReady] = useState(false);
   const [gitHubData, setGitHubData] = useState<GitHubDashboardData>(getEmptyGitHubDashboardData());
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isCheckingGitHubActivity, setIsCheckingGitHubActivity] = useState(false);
@@ -61,14 +83,27 @@ export default function App() {
   useEffect(() => {
     let active = true;
 
-    getStoredSettings().then((storedSettings) => {
+    const loadInitialState = async () => {
+      const storedGitHubDevMode = await getStoredGitHubDevMode();
+      const storedMockScenarioKey = await getStoredGitHubMockScenarioKey();
+      const shouldEnableMockMode = storedGitHubDevMode;
+      const nextMockScenarioKey = shouldEnableMockMode
+        ? storedMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY
+        : null;
+
+      const storedSettings = await getStoredSettings();
       if (!active) {
         return;
       }
 
+      setIsGitHubMockMode(shouldEnableMockMode);
+      setGitHubMockScenarioKey(nextMockScenarioKey);
       setSettings(storedSettings);
+      setIsGitHubMockReady(!shouldEnableMockMode);
       setIsLoadingSettings(false);
-    });
+    };
+
+    void loadInitialState();
 
     return () => {
       active = false;
@@ -77,6 +112,22 @@ export default function App() {
 
   useEffect(() => {
     if (isLoadingSettings) {
+      return;
+    }
+
+    if (gitHubMockScenario) {
+      setIsGitHubMockReady(false);
+      void (async () => {
+        await saveStoredGitHubPrReadyState(gitHubMockScenario.readyState);
+        await saveStoredGitHubPrWarningState(gitHubMockScenario.warningState);
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        setGitHubData(gitHubMockScenario.dashboardData);
+        setGitHubSettingsTestStatus(gitHubMockScenario.dashboardData.connectionStatus);
+        setIsGitHubMockReady(true);
+      })();
       return;
     }
 
@@ -103,12 +154,15 @@ export default function App() {
         forceRefresh: Boolean(cachedData),
         showLoadingIndicator: !cachedData
       });
+      if (!isCancelled && isMountedRef.current) {
+        setIsGitHubMockReady(true);
+      }
     })();
 
     return () => {
       isCancelled = true;
     };
-  }, [isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
+  }, [gitHubMockScenario, isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
 
   useEffect(() => {
     if (isLoadingSettings) {
@@ -207,6 +261,10 @@ export default function App() {
       return;
     }
 
+    if (gitHubMockScenario) {
+      return;
+    }
+
     const username = settings.integrations.github.username;
     const token = settings.integrations.github.token.trim();
     if (!token) {
@@ -253,7 +311,7 @@ export default function App() {
       isCancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
+  }, [gitHubMockScenario, isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
 
   async function handleSaveSettings(nextSettings: DashboardSettings) {
     await saveStoredSettings(nextSettings);
@@ -285,12 +343,87 @@ export default function App() {
   }
 
   async function handleRefreshGitHub() {
+    if (gitHubMockScenario) {
+      await saveStoredGitHubPrReadyState(gitHubMockScenario.readyState);
+      await saveStoredGitHubPrWarningState(gitHubMockScenario.warningState);
+      setGitHubData(gitHubMockScenario.dashboardData);
+      setGitHubSettingsTestStatus(gitHubMockScenario.dashboardData.connectionStatus);
+      setIsGitHubMockReady(true);
+      return;
+    }
+
     await refreshGitHubData({
       username: settings.integrations.github.username,
       token: settings.integrations.github.token,
       forceRefresh: true,
       showLoadingIndicator: true
     });
+  }
+
+  async function handleApplyGitHubMockScenario(nextMockScenarioKey: string) {
+    await saveStoredGitHubDevMode(true);
+    await saveStoredGitHubMockScenarioKey(nextMockScenarioKey);
+    setIsGitHubMockMode(true);
+    setGitHubMockScenarioKey(nextMockScenarioKey);
+    setIsGitHubMockReady(false);
+
+    const nextScenario = getGitHubMockScenarioByKey(nextMockScenarioKey);
+    if (!nextScenario) {
+      return;
+    }
+
+    await saveStoredGitHubPrReadyState(nextScenario.readyState);
+    await saveStoredGitHubPrWarningState(nextScenario.warningState);
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setGitHubData(nextScenario.dashboardData);
+    setGitHubSettingsTestStatus(nextScenario.dashboardData.connectionStatus);
+    setIsGitHubMockReady(true);
+  }
+
+  async function handleClearGitHubMockScenario() {
+    await saveStoredGitHubDevMode(false);
+    await clearStoredGitHubMockScenarioKey();
+    await saveStoredGitHubPrReadyState({});
+    await saveStoredGitHubPrWarningState({});
+
+    const cachedData = await getLatestGitHubDashboardData({
+      username: settings.integrations.github.username,
+      token: settings.integrations.github.token
+    });
+    if (cachedData && isMountedRef.current) {
+      setGitHubData(cachedData);
+      setGitHubSettingsTestStatus(cachedData.connectionStatus);
+    }
+
+    await refreshGitHubData({
+      username: settings.integrations.github.username,
+      token: settings.integrations.github.token,
+      forceRefresh: true,
+      showLoadingIndicator: true
+    });
+
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setIsGitHubMockMode(false);
+    setGitHubMockScenarioKey(null);
+    setIsGitHubMockReady(true);
+  }
+
+  async function handleSetGitHubDevMode(isEnabled: boolean) {
+    await saveStoredGitHubDevMode(isEnabled);
+
+    if (isEnabled) {
+      const nextMockScenarioKey = gitHubMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY;
+      await handleApplyGitHubMockScenario(nextMockScenarioKey);
+      return;
+    }
+
+    await handleClearGitHubMockScenario();
   }
 
   async function handleRefreshJira() {
@@ -389,9 +522,14 @@ export default function App() {
     <DashboardPage
       settings={settings}
       gitHubData={gitHubData}
+      gitHubMockScenarioKey={gitHubMockScenarioKey}
+      isGitHubMockMode={isGitHubMockMode}
+      gitHubMockScenarioOptions={getGitHubMockScenarioOptions()}
       isGitHubLoading={isGitHubLoading}
       isCheckingGitHubActivity={isCheckingGitHubActivity}
       lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
+      onClearGitHubMockScenario={() => void handleClearGitHubMockScenario()}
+      onApplyGitHubMockScenario={(mockScenarioKey) => void handleApplyGitHubMockScenario(mockScenarioKey)}
       onRefreshGitHub={() => void handleRefreshGitHub()}
       jiraData={jiraData}
       jiraRefreshSignal={jiraRefreshSignal}
@@ -399,6 +537,10 @@ export default function App() {
       onRefreshJira={() => void handleRefreshJira()}
     />
   );
+
+  if (isLoadingSettings || (isGitHubMockMode && !isGitHubMockReady)) {
+    return <div className="app-background" />;
+  }
 
   return (
     <div className="app-background">
@@ -415,6 +557,8 @@ export default function App() {
               onSave={handleSaveSettings}
               onTestGitHubConnection={handleTestGitHubConnection}
               onTestJiraConnection={handleTestJiraConnection}
+              isGitHubDevModeEnabled={isGitHubMockMode}
+              onSetGitHubDevMode={handleSetGitHubDevMode}
               gitHubTestStatus={gitHubSettingsTestStatus}
               jiraTestStatus={jiraSettingsTestStatus}
               jiraErrorMessage={jiraErrorMessage}

@@ -6,7 +6,7 @@ import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
-import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
+import { GitHubConnectionStatus, GitHubDashboardData, GitHubPullRequestItem } from '../lib/githubApi';
 import {
   getJiraIssueCounts,
   JiraConnectionStatus,
@@ -36,6 +36,7 @@ import {
   type ActiveJiraView,
   type GitHubPrStatusFilter
 } from '../lib/storage';
+import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 import {
   reconcileTodayFocusJiraItems,
   type TodayFocusRefreshSignal
@@ -44,9 +45,14 @@ import {
 type DashboardPageProps = {
   settings: DashboardSettings;
   gitHubData: GitHubDashboardData;
+  gitHubMockScenarioKey: string | null;
+  isGitHubMockMode: boolean;
+  gitHubMockScenarioOptions: GitHubMockScenarioOption[];
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
+  onClearGitHubMockScenario: () => void;
+  onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onRefreshGitHub: () => void;
   jiraData: JiraDashboardData;
   jiraRefreshSignal: TodayFocusRefreshSignal;
@@ -57,9 +63,14 @@ type DashboardPageProps = {
 export function DashboardPage({
   settings,
   gitHubData,
+  gitHubMockScenarioKey,
+  isGitHubMockMode,
+  gitHubMockScenarioOptions,
   isGitHubLoading,
   isCheckingGitHubActivity,
   lastGitHubActivityCheckAt,
+  onClearGitHubMockScenario,
+  onApplyGitHubMockScenario,
   onRefreshGitHub,
   jiraData,
   jiraRefreshSignal,
@@ -82,6 +93,11 @@ export function DashboardPage({
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
+    readyToMergeCount: 0,
+    failedBuildCount: 0,
+    failedBuildBadgeCount: 0,
+    highlightedReadyCount: 0,
+    highlightedWarningCount: 0,
     reviewRequestedCount: 0,
     approvedPrCount: null,
     relevantPrCount: gitHubData.openPrsCount
@@ -161,7 +177,7 @@ export function DashboardPage({
       isActive = false;
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, []);
+  }, [gitHubMockScenarioKey]);
 
   useEffect(() => {
     if (!hasLoadedNavigation) {
@@ -492,7 +508,27 @@ export function DashboardPage({
           <DashboardHeader name={settings.name} />
           <div className="dashboard-header-status gap-3">
             {integrationStatusBar}
-            <HeaderMenu />
+            {activeIntegration === 'github' ? (
+              <GitHubHeaderShortcuts
+                connectionStatus={gitHubSummaryMetrics.connectionStatus}
+                warningCount={gitHubSummaryMetrics.highlightedWarningCount}
+                readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
+                readyToMergeBadgeCount={gitHubSummaryMetrics.highlightedReadyCount}
+                failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
+                failedBuildBadgeCount={gitHubSummaryMetrics.failedBuildBadgeCount}
+                jiraBlockingCount={jiraCounts.blocking}
+                onOpenWarnings={() => navigateToGitHubPrs('all')}
+                onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
+                onOpenJira={() => navigateToJiraView('blocking')}
+              />
+            ) : null}
+            <HeaderMenu
+              isMockMode={isGitHubMockMode}
+              mockScenarioKey={gitHubMockScenarioKey}
+              mockScenarioOptions={gitHubMockScenarioOptions}
+              onApplyMockScenario={onApplyGitHubMockScenario}
+              onClearMockScenario={onClearGitHubMockScenario}
+            />
           </div>
         </div>
 
@@ -545,6 +581,7 @@ export function DashboardPage({
                     username={settings.integrations.github.username}
                     token={settings.integrations.github.token}
                     ownerFilter={settings.integrations.github.ownerFilter}
+                    isMockMode={isGitHubMockMode}
                     isLoading={isGitHubLoading}
                     isCheckingActivity={isCheckingGitHubActivity}
                     lastActivityCheckAt={lastGitHubActivityCheckAt}
@@ -1164,6 +1201,176 @@ function TopBarButton({
     >
       {children}
     </button>
+  );
+}
+
+function GitHubHeaderShortcuts({
+  connectionStatus,
+  warningCount,
+  readyToMergeCount,
+  readyToMergeBadgeCount,
+  failedBuildCount,
+  failedBuildBadgeCount,
+  jiraBlockingCount,
+  onOpenWarnings,
+  onOpenReadyToMerge,
+  onOpenJira
+}: {
+  connectionStatus: GitHubConnectionStatus;
+  warningCount: number;
+  readyToMergeCount: number;
+  readyToMergeBadgeCount: number;
+  failedBuildCount: number;
+  failedBuildBadgeCount: number;
+  jiraBlockingCount: number;
+  onOpenWarnings: () => void;
+  onOpenReadyToMerge: () => void;
+  onOpenJira: () => void;
+}) {
+  const isConnected = connectionStatus === 'connected';
+  const items = [
+    {
+      key: 'notifications',
+      count: warningCount,
+      badgeCount: warningCount,
+      colorClass: 'text-rose-300',
+      label: 'Open pull request warnings',
+      onClick: onOpenWarnings,
+      icon: <HeaderBlockedIcon />
+    },
+    {
+      key: 'open-prs',
+      count: readyToMergeCount,
+      badgeCount: readyToMergeBadgeCount,
+      colorClass: 'text-emerald-400',
+      label: 'Open ready to merge pull requests',
+      onClick: onOpenReadyToMerge,
+      icon: (isDimmed: boolean) => <HeaderReadyPrIcon isDimmed={isDimmed} />
+    },
+    {
+      key: 'failed-build-prs',
+      count: failedBuildCount,
+      badgeCount: failedBuildBadgeCount,
+      colorClass: 'text-emerald-400',
+      label: 'Open pull requests with failed builds',
+      onClick: onOpenWarnings,
+      icon: (isDimmed: boolean) => <HeaderFailedBuildPrIcon isDimmed={isDimmed} />
+    },
+    {
+      key: 'jira',
+      count: jiraBlockingCount,
+      colorClass: 'text-sky-400',
+      label: 'Open Jira blockers',
+      onClick: onOpenJira,
+      icon: <HeaderJiraIcon />,
+      isHidden: true
+    }
+  ];
+
+  return (
+    <div className="flex items-center gap-2">
+      {items.map((item) => {
+        if (item.isHidden) {
+          return null;
+        }
+
+        const effectiveBadgeCount = item.badgeCount ?? item.count;
+        const isDisabled = !isConnected || effectiveBadgeCount === 0;
+        const showBadge = isConnected && effectiveBadgeCount > 0;
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            onClick={item.onClick}
+            disabled={isDisabled}
+            aria-label={item.label}
+            className={`relative inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition ${
+              isDisabled ? 'cursor-default opacity-45' : 'hover:bg-white/10'
+            }`}
+          >
+            <span className={item.colorClass} aria-hidden="true">
+              {typeof item.icon === 'function' ? item.icon(isDisabled) : item.icon}
+            </span>
+            {showBadge ? (
+              <span className="absolute right-1.5 top-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-rose-500 px-1 py-[0.1rem] text-[0.62rem] font-semibold leading-none text-white shadow-[0_4px_12px_rgba(244,63,94,0.28)]">
+                {effectiveBadgeCount > 9 ? '9+' : effectiveBadgeCount}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HeaderBlockedIcon() {
+  return (
+    <span className="text-[1.2rem] leading-none" aria-hidden="true">
+      ⚠
+    </span>
+  );
+}
+
+function HeaderOpenPrIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-[1.12rem] w-[1.12rem]" fill="currentColor" aria-hidden="true">
+      <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
+    </svg>
+  );
+}
+
+function HeaderReadyPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" fill="#1fb236" fillOpacity={isDimmed ? 0.42 : 1} />
+      <circle cx="12" cy="12" r="9.5" fill="url(#ready-pr-glow)" fillOpacity={isDimmed ? 0.16 : 0.3} />
+      <path
+        d="m8.6 12.4 2.3 2.3 4.7-5.2"
+        stroke="#fff"
+        strokeOpacity={isDimmed ? 0.82 : 1}
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <defs>
+        <radialGradient id="ready-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
+          <stop stopColor="#fff" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function HeaderFailedBuildPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" fill="#ef2029" fillOpacity={isDimmed ? 0.42 : 1} />
+      <circle cx="12" cy="12" r="9.5" fill="url(#failed-pr-glow)" fillOpacity={isDimmed ? 0.14 : 0.26} />
+      <path
+        d="m8.8 8.8 6.4 6.4m0-6.4-6.4 6.4"
+        stroke="#fff"
+        strokeOpacity={isDimmed ? 0.82 : 1}
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <defs>
+        <radialGradient id="failed-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
+          <stop stopColor="#fff" stopOpacity="0.4" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
+function HeaderJiraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[1.3rem] w-[1.3rem]" fill="currentColor" aria-hidden="true">
+      <path d="M12 3 21 12l-9 9-9-9 9-9Zm0 4.2L7.2 12 12 16.8 16.8 12 12 7.2Zm0 2.8 2 2-2 2-2-2 2-2Z" />
+    </svg>
   );
 }
 

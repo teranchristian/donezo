@@ -198,6 +198,30 @@ Dev mode is mainly for:
 - Component development
 - Non-extension local state behavior
 
+### Dev Mode Mock Data
+
+The dashboard also supports a stored developer mode for GitHub mock data.
+
+How it works:
+
+- `dev_mode=true` in the URL enables dev mode as a bootstrap step
+- After that, dev mode is stored locally and no longer depends on the URL
+- The active mock scenario is selected from the header menu dropdown
+- The Settings page includes an `Enable dev mode` toggle
+
+Example bootstrap URL:
+
+```text
+chrome-extension://<extension-id>/index.html#github?view=prs&dev_mode=true
+```
+
+Notes:
+
+- `dev_mode=true` turns on dev mode, but scenario selection still happens in the menu
+- Tab and filter navigation should not carry mock flags in the hash anymore
+- Clearing dev mode returns the dashboard to live GitHub data
+- Legacy `mock=true` and older scenario-style mock URLs may still be recognized for compatibility
+
 ## Production Build
 
 Build the extension assets:

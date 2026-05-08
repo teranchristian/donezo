@@ -51,6 +51,10 @@ const JIRA_API_TOKEN_STORAGE_KEY = 'jiraApiToken';
 const ACTIVE_INTEGRATION_STORAGE_KEY = 'activeIntegration';
 const ACTIVE_GITHUB_VIEW_STORAGE_KEY = 'activeGitHubView';
 const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
+const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
+const GITHUB_PR_READY_STATE_STORAGE_KEY = 'github-pr-ready-state';
+const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
+const GITHUB_DEV_MODE_STORAGE_KEY = 'github-dev-mode';
 
 export type DashboardSettings = {
   name: string;
@@ -74,10 +78,22 @@ export type GitHubListSort =
   | 'oldest-updated'
   | 'repository-asc'
   | 'title-asc';
-export type GitHubPrStatusFilter = 'all' | 'approved' | 'waiting-review';
+export type GitHubPrStatusFilter = 'all' | 'approved' | 'ready-to-merge' | 'waiting-review';
 export type ActiveIntegration = 'github' | 'jira';
 export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
 export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-priority';
+export type GitHubPrWarningStateEntry = {
+  activeCaseKeys: string[];
+  highlighted: boolean;
+  updatedAt: number;
+};
+export type GitHubPrWarningState = Record<string, GitHubPrWarningStateEntry>;
+export type GitHubPrReadyStateEntry = {
+  isReady: boolean;
+  highlighted: boolean;
+  updatedAt: number;
+};
+export type GitHubPrReadyState = Record<string, GitHubPrReadyStateEntry>;
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   name: '',
@@ -358,6 +374,114 @@ export async function saveStoredActiveJiraView(activeJiraView: ActiveJiraView) {
   localStorage.setItem(ACTIVE_JIRA_VIEW_STORAGE_KEY, JSON.stringify(activeJiraView));
 }
 
+export async function getStoredGitHubMockScenarioKey() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_MOCK_SCENARIO_STORAGE_KEY]);
+    return mergeGitHubMockScenarioKey(result[GITHUB_MOCK_SCENARIO_STORAGE_KEY] as string | undefined);
+  }
+
+  return mergeGitHubMockScenarioKey(localStorage.getItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY) ?? undefined);
+}
+
+export async function getStoredGitHubDevMode() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_DEV_MODE_STORAGE_KEY]);
+    return mergeGitHubDevMode(result[GITHUB_DEV_MODE_STORAGE_KEY] as boolean | string | undefined);
+  }
+
+  return mergeGitHubDevMode(localStorage.getItem(GITHUB_DEV_MODE_STORAGE_KEY) ?? undefined);
+}
+
+export async function saveStoredGitHubDevMode(isEnabled: boolean) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_DEV_MODE_STORAGE_KEY]: isEnabled });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_DEV_MODE_STORAGE_KEY, JSON.stringify(isEnabled));
+}
+
+export async function saveStoredGitHubMockScenarioKey(mockScenarioKey: string) {
+  const normalizedMockScenarioKey = mergeGitHubMockScenarioKey(mockScenarioKey);
+  if (!normalizedMockScenarioKey) {
+    return;
+  }
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_MOCK_SCENARIO_STORAGE_KEY]: normalizedMockScenarioKey });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY, normalizedMockScenarioKey);
+}
+
+export async function clearStoredGitHubMockScenarioKey() {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.remove(GITHUB_MOCK_SCENARIO_STORAGE_KEY);
+    return;
+  }
+
+  localStorage.removeItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY);
+}
+
+export async function getStoredGitHubPrWarningState() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_PR_WARNING_STATE_STORAGE_KEY]);
+    return mergeGitHubPrWarningState(result[GITHUB_PR_WARNING_STATE_STORAGE_KEY] as GitHubPrWarningState | undefined);
+  }
+
+  const raw = localStorage.getItem(GITHUB_PR_WARNING_STATE_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    return mergeGitHubPrWarningState(JSON.parse(raw) as GitHubPrWarningState);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveStoredGitHubPrWarningState(state: GitHubPrWarningState) {
+  const normalizedState = mergeGitHubPrWarningState(state);
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_PR_WARNING_STATE_STORAGE_KEY]: normalizedState });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_PR_WARNING_STATE_STORAGE_KEY, JSON.stringify(normalizedState));
+}
+
+export async function getStoredGitHubPrReadyState() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_PR_READY_STATE_STORAGE_KEY]);
+    return mergeGitHubPrReadyState(result[GITHUB_PR_READY_STATE_STORAGE_KEY] as GitHubPrReadyState | undefined);
+  }
+
+  const raw = localStorage.getItem(GITHUB_PR_READY_STATE_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    return mergeGitHubPrReadyState(JSON.parse(raw) as GitHubPrReadyState);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveStoredGitHubPrReadyState(state: GitHubPrReadyState) {
+  const normalizedState = mergeGitHubPrReadyState(state);
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_PR_READY_STATE_STORAGE_KEY]: normalizedState });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_PR_READY_STATE_STORAGE_KEY, JSON.stringify(normalizedState));
+}
+
 export function getDefaultSettings() {
   return structuredClone(DEFAULT_SETTINGS);
 }
@@ -436,7 +560,7 @@ function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
 }
 
 function mergeGitHubPrStatusFilter(filter?: string): GitHubPrStatusFilter {
-  return filter === 'approved' || filter === 'waiting-review' || filter === 'all'
+  return filter === 'approved' || filter === 'ready-to-merge' || filter === 'waiting-review' || filter === 'all'
     ? filter
     : DEFAULT_GITHUB_PR_STATUS_FILTER;
 }
@@ -460,6 +584,91 @@ function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
     activeJiraView === 'active'
     ? activeJiraView
     : DEFAULT_ACTIVE_JIRA_VIEW;
+}
+
+function mergeGitHubPrWarningState(state?: GitHubPrWarningState | null) {
+  if (!state || typeof state !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(state)
+      .map(([key, value]) => {
+        if (
+          typeof key !== 'string' ||
+          !value ||
+          typeof value !== 'object' ||
+          !Array.isArray(value.activeCaseKeys) ||
+          typeof value.highlighted !== 'boolean' ||
+          typeof value.updatedAt !== 'number'
+        ) {
+          return null;
+        }
+
+        const activeCaseKeys = value.activeCaseKeys.filter((caseKey): caseKey is string => typeof caseKey === 'string');
+        return [
+          key,
+          {
+            activeCaseKeys,
+            highlighted: value.highlighted,
+            updatedAt: value.updatedAt
+          }
+        ] satisfies [string, GitHubPrWarningStateEntry];
+      })
+      .filter((entry): entry is [string, GitHubPrWarningStateEntry] => entry !== null)
+  );
+}
+
+function mergeGitHubPrReadyState(state?: GitHubPrReadyState | null) {
+  if (!state || typeof state !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(state)
+      .map(([key, value]) => {
+        if (
+          typeof key !== 'string' ||
+          !value ||
+          typeof value !== 'object' ||
+          typeof value.isReady !== 'boolean' ||
+          typeof value.highlighted !== 'boolean' ||
+          typeof value.updatedAt !== 'number'
+        ) {
+          return null;
+        }
+
+        return [
+          key,
+          {
+            isReady: value.isReady,
+            highlighted: value.highlighted,
+            updatedAt: value.updatedAt
+          }
+        ] satisfies [string, GitHubPrReadyStateEntry];
+      })
+      .filter((entry): entry is [string, GitHubPrReadyStateEntry] => entry !== null)
+  );
+}
+
+function mergeGitHubMockScenarioKey(mockScenarioKey?: string | null) {
+  return typeof mockScenarioKey === 'string' && mockScenarioKey.trim() ? mockScenarioKey.trim() : null;
+}
+
+function mergeGitHubDevMode(value?: boolean | string | null) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return false;
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
