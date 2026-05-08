@@ -51,6 +51,7 @@ export type GitHubSummaryMetrics = {
   connectionStatus: GitHubConnectionStatus;
   missingUsername: boolean;
   readyToMergeCount: number;
+  failedBuildCount: number;
   highlightedReadyCount: number;
   highlightedWarningCount: number;
   reviewRequestedCount: number;
@@ -150,6 +151,7 @@ export function GitHubCard({
     isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)
   ).length;
   const readyToMergeCount = resolvedPullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest)).length;
+  const failedBuildCount = resolvedPullRequests.filter((pullRequest) => pullRequest.ciStatus === 'failing').length;
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) =>
     isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)
   ).length;
@@ -302,6 +304,7 @@ export function GitHubCard({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
       readyToMergeCount,
+      failedBuildCount,
       highlightedReadyCount,
       highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
@@ -312,6 +315,7 @@ export function GitHubCard({
     data.connectionStatus,
     data.missingUsername,
     readyToMergeCount,
+    failedBuildCount,
     highlightedReadyCount,
     highlightedWarningCount,
     summaryApprovedPrCount,

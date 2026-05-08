@@ -94,6 +94,7 @@ export function DashboardPage({
     connectionStatus: gitHubData.connectionStatus,
     missingUsername: gitHubData.missingUsername,
     readyToMergeCount: 0,
+    failedBuildCount: 0,
     highlightedReadyCount: 0,
     highlightedWarningCount: 0,
     reviewRequestedCount: 0,
@@ -511,6 +512,7 @@ export function DashboardPage({
                 connectionStatus={gitHubSummaryMetrics.connectionStatus}
                 warningCount={gitHubSummaryMetrics.highlightedWarningCount}
                 readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
+                failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
                 jiraBlockingCount={jiraCounts.blocking}
                 onOpenWarnings={() => navigateToGitHubPrs('all')}
                 onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
@@ -1203,6 +1205,7 @@ function GitHubHeaderShortcuts({
   connectionStatus,
   warningCount,
   readyToMergeCount,
+  failedBuildCount,
   jiraBlockingCount,
   onOpenWarnings,
   onOpenReadyToMerge,
@@ -1211,6 +1214,7 @@ function GitHubHeaderShortcuts({
   connectionStatus: GitHubConnectionStatus;
   warningCount: number;
   readyToMergeCount: number;
+  failedBuildCount: number;
   jiraBlockingCount: number;
   onOpenWarnings: () => void;
   onOpenReadyToMerge: () => void;
@@ -1233,6 +1237,14 @@ function GitHubHeaderShortcuts({
       label: 'Open ready to merge pull requests',
       onClick: onOpenReadyToMerge,
       icon: <HeaderOpenPrIcon />
+    },
+    {
+      key: 'failed-build-prs',
+      count: failedBuildCount,
+      colorClass: 'text-emerald-400',
+      label: 'Open pull requests with failed builds',
+      onClick: onOpenWarnings,
+      icon: <HeaderFailedBuildPrIcon />
     },
     {
       key: 'jira',
@@ -1293,6 +1305,23 @@ function HeaderOpenPrIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-[1.12rem] w-[1.12rem]" fill="currentColor" aria-hidden="true">
       <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
+    </svg>
+  );
+}
+
+function HeaderFailedBuildPrIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-[1.12rem] w-[1.12rem]" fill="none" aria-hidden="true">
+      <path
+        d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"
+        fill="currentColor"
+      />
+      <circle cx="4.35" cy="12.75" r="3.75" fill="#be123c" />
+      <circle cx="4.35" cy="12.75" r="4.15" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.48" />
+      <path
+        d="M2.3 10.75a1 1 0 0 1 1.414 0l.636.636.636-.636a1 1 0 1 1 1.414 1.414l-.636.636.636.636a1 1 0 1 1-1.414 1.414l-.636-.636-.636.636a1 1 0 1 1-1.414-1.414l.636-.636-.636-.636a1 1 0 0 1 0-1.414Z"
+        fill="#fff"
+      />
     </svg>
   );
 }
