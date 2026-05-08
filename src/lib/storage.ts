@@ -54,6 +54,7 @@ const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
 const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
 const GITHUB_PR_READY_STATE_STORAGE_KEY = 'github-pr-ready-state';
 const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
+const GITHUB_DEV_MODE_STORAGE_KEY = 'github-dev-mode';
 
 export type DashboardSettings = {
   name: string;
@@ -382,6 +383,24 @@ export async function getStoredGitHubMockScenarioKey() {
   return mergeGitHubMockScenarioKey(localStorage.getItem(GITHUB_MOCK_SCENARIO_STORAGE_KEY) ?? undefined);
 }
 
+export async function getStoredGitHubDevMode() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_DEV_MODE_STORAGE_KEY]);
+    return mergeGitHubDevMode(result[GITHUB_DEV_MODE_STORAGE_KEY] as boolean | string | undefined);
+  }
+
+  return mergeGitHubDevMode(localStorage.getItem(GITHUB_DEV_MODE_STORAGE_KEY) ?? undefined);
+}
+
+export async function saveStoredGitHubDevMode(isEnabled: boolean) {
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_DEV_MODE_STORAGE_KEY]: isEnabled });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_DEV_MODE_STORAGE_KEY, JSON.stringify(isEnabled));
+}
+
 export async function saveStoredGitHubMockScenarioKey(mockScenarioKey: string) {
   const normalizedMockScenarioKey = mergeGitHubMockScenarioKey(mockScenarioKey);
   if (!normalizedMockScenarioKey) {
@@ -634,6 +653,22 @@ function mergeGitHubPrReadyState(state?: GitHubPrReadyState | null) {
 
 function mergeGitHubMockScenarioKey(mockScenarioKey?: string | null) {
   return typeof mockScenarioKey === 'string' && mockScenarioKey.trim() ? mockScenarioKey.trim() : null;
+}
+
+function mergeGitHubDevMode(value?: boolean | string | null) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return false;
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {

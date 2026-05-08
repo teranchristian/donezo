@@ -158,7 +158,7 @@ export function DashboardPage({
       applyNavigationState(nextState);
 
       if (options?.replaceUrl) {
-        replaceDashboardHash(nextState, isGitHubMockMode);
+        replaceDashboardHash(nextState);
       }
     };
 
@@ -174,7 +174,7 @@ export function DashboardPage({
       isActive = false;
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [gitHubMockScenarioKey, isGitHubMockMode]);
+  }, [gitHubMockScenarioKey]);
 
   useEffect(() => {
     if (!hasLoadedNavigation) {
@@ -312,7 +312,7 @@ export function DashboardPage({
     setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
     setActiveJiraView(nextState.activeJiraView);
     setHasLoadedNavigation(true);
-    window.location.hash = appendMockScenarioToHash(buildDashboardHashNavigation(nextState), isGitHubMockMode);
+    window.location.hash = buildDashboardHashNavigation(nextState);
   }
 
   function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
@@ -632,26 +632,13 @@ function replaceDashboardHash(nextState: {
   activeGitHubView: ActiveGitHubView;
   githubPrStatusFilter: GitHubPrStatusFilter;
   activeJiraView: ActiveJiraView;
-}, isGitHubMockMode: boolean) {
+}) {
   const nextHash = buildDashboardHashNavigation(nextState);
-  const nextHashWithMock = appendMockScenarioToHash(nextHash, isGitHubMockMode);
-  if (window.location.hash === nextHashWithMock) {
+  if (window.location.hash === nextHash) {
     return;
   }
 
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHashWithMock}`);
-}
-
-function appendMockScenarioToHash(hash: string, isGitHubMockMode: boolean) {
-  if (!isGitHubMockMode) {
-    return hash;
-  }
-
-  const trimmedHash = hash.replace(/^#/, '');
-  const [path, rawSearch = ''] = trimmedHash.split('?');
-  const searchParams = new URLSearchParams(rawSearch);
-  searchParams.set('mock', 'true');
-  return `#${path}?${searchParams.toString()}`;
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
 }
 
 function getDefaultTodayFocusItems(): FocusItem[] {

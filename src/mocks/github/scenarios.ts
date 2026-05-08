@@ -191,35 +191,40 @@ export function getGitHubMockScenarioOptions() {
 }
 
 export function getGitHubMockLocationState(search: string, hash: string) {
-  const searchMockValue = new URLSearchParams(search).get('mock')?.trim() ?? '';
-  const hashMockValue = getHashMockValue(hash);
-  const mockValue = hashMockValue || searchMockValue;
+  const searchParams = new URLSearchParams(search);
+  const hashParams = getHashSearchParams(hash);
+  const searchDevModeValue = searchParams.get('dev_mode')?.trim() ?? '';
+  const hashDevModeValue = hashParams.get('dev_mode')?.trim() ?? '';
+  const searchMockValue = searchParams.get('mock')?.trim() ?? '';
+  const hashMockValue = hashParams.get('mock')?.trim() ?? '';
+  const modeValue = hashDevModeValue || searchDevModeValue || hashMockValue || searchMockValue;
+  const scenarioValue = getHashMockValue(hash) || searchMockValue;
 
-  if (!mockValue) {
+  if (!modeValue && !scenarioValue) {
     return {
       isEnabled: null,
       scenarioKey: null
     };
   }
 
-  if (mockValue === 'true') {
+  if (modeValue === 'true') {
     return {
       isEnabled: true,
       scenarioKey: null
     };
   }
 
-  if (mockValue === 'false') {
+  if (modeValue === 'false') {
     return {
       isEnabled: false,
       scenarioKey: null
     };
   }
 
-  if (MOCK_SCENARIOS[mockValue]) {
+  if (scenarioValue && MOCK_SCENARIOS[scenarioValue]) {
     return {
       isEnabled: true,
-      scenarioKey: mockValue
+      scenarioKey: scenarioValue
     };
   }
 
@@ -238,13 +243,22 @@ export function getGitHubMockScenarioByKey(mockKey: string | null | undefined) {
 }
 
 function getHashMockValue(hash: string) {
+  const hashMockValue = getHashSearchParams(hash).get('mock')?.trim() ?? '';
+  if (MOCK_SCENARIOS[hashMockValue]) {
+    return hashMockValue;
+  }
+
+  return '';
+}
+
+function getHashSearchParams(hash: string) {
   const trimmedHash = hash.replace(/^#/, '').trim();
   if (!trimmedHash) {
-    return '';
+    return new URLSearchParams();
   }
 
   const [, rawSearch = ''] = trimmedHash.split('?');
-  return new URLSearchParams(rawSearch).get('mock')?.trim() ?? '';
+  return new URLSearchParams(rawSearch);
 }
 
 function createWarningScenario(
