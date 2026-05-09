@@ -53,6 +53,7 @@ const ACTIVE_GITHUB_VIEW_STORAGE_KEY = 'activeGitHubView';
 const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
 const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
 const GITHUB_PR_READY_STATE_STORAGE_KEY = 'github-pr-ready-state';
+const GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY = 'github-pr-notification-seen-at';
 const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
 const GITHUB_DEV_MODE_STORAGE_KEY = 'github-dev-mode';
 
@@ -94,6 +95,7 @@ export type GitHubPrReadyStateEntry = {
   updatedAt: number;
 };
 export type GitHubPrReadyState = Record<string, GitHubPrReadyStateEntry>;
+export type GitHubPrNotificationSeenAtState = Record<string, number>;
 
 const DEFAULT_SETTINGS: DashboardSettings = {
   name: '',
@@ -482,6 +484,37 @@ export async function saveStoredGitHubPrReadyState(state: GitHubPrReadyState) {
   localStorage.setItem(GITHUB_PR_READY_STATE_STORAGE_KEY, JSON.stringify(normalizedState));
 }
 
+export async function getStoredGitHubPrNotificationSeenAtState() {
+  if (hasChromeStorage()) {
+    const result = await chrome.storage.local.get([GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY]);
+    return mergeGitHubPrNotificationSeenAtState(
+      result[GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY] as GitHubPrNotificationSeenAtState | undefined
+    );
+  }
+
+  const raw = localStorage.getItem(GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    return mergeGitHubPrNotificationSeenAtState(JSON.parse(raw) as GitHubPrNotificationSeenAtState);
+  } catch {
+    return {};
+  }
+}
+
+export async function saveStoredGitHubPrNotificationSeenAtState(state: GitHubPrNotificationSeenAtState) {
+  const normalizedState = mergeGitHubPrNotificationSeenAtState(state);
+
+  if (hasChromeStorage()) {
+    await chrome.storage.local.set({ [GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY]: normalizedState });
+    return;
+  }
+
+  localStorage.setItem(GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY, JSON.stringify(normalizedState));
+}
+
 export function getDefaultSettings() {
   return structuredClone(DEFAULT_SETTINGS);
 }
@@ -648,6 +681,24 @@ function mergeGitHubPrReadyState(state?: GitHubPrReadyState | null) {
         ] satisfies [string, GitHubPrReadyStateEntry];
       })
       .filter((entry): entry is [string, GitHubPrReadyStateEntry] => entry !== null)
+  );
+}
+
+function mergeGitHubPrNotificationSeenAtState(state?: GitHubPrNotificationSeenAtState | null) {
+  if (!state || typeof state !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(state)
+      .map(([key, value]) => {
+        if (typeof key !== 'string' || typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+          return null;
+        }
+
+        return [key, value] satisfies [string, number];
+      })
+      .filter((entry): entry is [string, number] => entry !== null)
   );
 }
 

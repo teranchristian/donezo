@@ -1,11 +1,21 @@
-import { getEmptyGitHubDashboardData, type GitHubDashboardData, type GitHubPullRequestItem } from '../../lib/githubApi';
-import type { GitHubPrReadyState, GitHubPrWarningState } from '../../lib/storage';
+import {
+  getEmptyGitHubDashboardData,
+  type GitHubDashboardData,
+  type GitHubNotification,
+  type GitHubPullRequestItem
+} from '../../lib/githubApi';
+import type {
+  GitHubPrNotificationSeenAtState,
+  GitHubPrReadyState,
+  GitHubPrWarningState
+} from '../../lib/storage';
 
 export type GitHubMockScenario = {
   key: string;
   dashboardData: GitHubDashboardData;
   readyState: GitHubPrReadyState;
   warningState: GitHubPrWarningState;
+  notificationSeenAtState: GitHubPrNotificationSeenAtState;
 };
 
 export type GitHubMockScenarioOption = {
@@ -86,6 +96,7 @@ const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
   { key: 'warning-build-failed-new', label: 'Warning: build failed' },
   { key: 'warning-out-of-date-new', label: 'Warning: out of date' },
   { key: 'warning-already-seen', label: 'Warning: already seen' },
+  { key: 'comment-badges', label: 'Comment badges' },
   { key: 'mixed', label: 'Mixed' }
 ];
 
@@ -94,7 +105,8 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     key: DEFAULT_GITHUB_MOCK_SCENARIO_KEY,
     dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),
     readyState: {},
-    warningState: {}
+    warningState: {},
+    notificationSeenAtState: {}
   },
   'ready-to-merge': {
     key: 'ready-to-merge',
@@ -111,7 +123,8 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         updatedAt: Date.now() - 10_000
       }
     },
-    warningState: {}
+    warningState: {},
+    notificationSeenAtState: {}
   },
   'warning-conflict-new': createWarningScenario('warning-conflict-new', 'DIRTY', 'has-conflicts'),
   'warning-build-failed-new': createWarningScenario('warning-build-failed-new', 'CLEAN', 'failed-checks'),
@@ -138,6 +151,76 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           highlighted: false,
           updatedAt: Date.now() - 10_000
         }
+      },
+      notificationSeenAtState: {}
+    };
+  })(),
+  'comment-badges': (() => {
+    const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
+    dashboardData.pullRequests = dashboardData.pullRequests.map((pullRequest) => {
+      if (pullRequest.pullNumber === 1533) {
+        return {
+          ...pullRequest,
+          title: 'PR with new comments',
+          totalCommentCount: 4,
+          updatedAt: '2026-05-06T09:48:00.000Z'
+        };
+      }
+
+      if (pullRequest.pullNumber === 1534) {
+        return {
+          ...pullRequest,
+          title: 'PR with comments already seen',
+          totalCommentCount: 2,
+          updatedAt: '2026-05-06T09:25:00.000Z'
+        };
+      }
+
+      if (pullRequest.pullNumber === 88) {
+        return {
+          ...pullRequest,
+          title: 'PR with zero comments',
+          totalCommentCount: 0
+        };
+      }
+
+      return pullRequest;
+    });
+    dashboardData.notifications = [
+      createNotification({
+        id: 'comment-new-1',
+        repositoryName: 'acme/platform-web',
+        pullNumber: 1533,
+        title: 'PR with new comments',
+        updatedAt: '2026-05-06T09:47:00.000Z',
+        authorLogin: 'reginald'
+      }),
+      createNotification({
+        id: 'comment-new-2',
+        repositoryName: 'acme/platform-web',
+        pullNumber: 1533,
+        title: 'PR with new comments',
+        updatedAt: '2026-05-06T09:46:00.000Z',
+        authorLogin: 'reginald'
+      }),
+      createNotification({
+        id: 'comment-seen-1',
+        repositoryName: 'acme/platform-web',
+        pullNumber: 1534,
+        title: 'PR with comments already seen',
+        updatedAt: '2026-05-06T09:20:00.000Z',
+        authorLogin: 'reginald'
+      })
+    ];
+    dashboardData.notificationsCount = dashboardData.notifications.length;
+
+    return {
+      key: 'comment-badges',
+      dashboardData,
+      readyState: {},
+      warningState: {},
+      notificationSeenAtState: {
+        [getStateKey('acme/platform-web', 1534)]: Date.parse('2026-05-06T09:30:00.000Z')
       }
     };
   })(),
@@ -181,7 +264,8 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           highlighted: false,
           updatedAt: Date.now() - 10_000
         }
-      }
+      },
+      notificationSeenAtState: {}
     };
   })()
 };
@@ -227,7 +311,8 @@ function createWarningScenario(
         highlighted: false,
         updatedAt: Date.now() - 10_000
       }
-    }
+    },
+    notificationSeenAtState: {}
   };
 }
 
@@ -254,6 +339,7 @@ function createPullRequest(
     owner: overrides.owner,
     repo: overrides.repo,
     pullNumber: overrides.pullNumber,
+    totalCommentCount: overrides.totalCommentCount ?? 0,
     authorLogin: overrides.authorLogin ?? 'xtian',
     isDraft: overrides.reviewStatus === 'draft',
     updatedAt: overrides.updatedAt,
@@ -272,7 +358,8 @@ function cloneScenario(scenario: GitHubMockScenario): GitHubMockScenario {
     key: scenario.key,
     dashboardData: cloneDashboardData(scenario.dashboardData),
     readyState: structuredClone(scenario.readyState),
-    warningState: structuredClone(scenario.warningState)
+    warningState: structuredClone(scenario.warningState),
+    notificationSeenAtState: structuredClone(scenario.notificationSeenAtState)
   };
 }
 
@@ -285,4 +372,39 @@ function cloneDashboardData(data: GitHubDashboardData): GitHubDashboardData {
 
 function getStateKey(repositoryName: string, pullNumber: number) {
   return `${repositoryName}#${pullNumber}`;
+}
+
+function createNotification({
+  id,
+  repositoryName,
+  pullNumber,
+  title,
+  updatedAt,
+  authorLogin
+}: {
+  id: string;
+  repositoryName: string;
+  pullNumber: number;
+  title: string;
+  updatedAt: string;
+  authorLogin?: string;
+}): GitHubNotification {
+  const [owner, repo] = repositoryName.split('/');
+
+  return {
+    id,
+    unread: true,
+    updated_at: updatedAt,
+    reason: 'comment',
+    authorLogin,
+    repository: {
+      full_name: repositoryName
+    },
+    subject: {
+      title,
+      type: 'PullRequest',
+      url: `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
+      latest_comment_url: `https://api.github.com/repos/${owner}/${repo}/issues/comments/${pullNumber}`
+    }
+  };
 }

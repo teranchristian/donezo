@@ -26,6 +26,7 @@ export type GitHubPullRequestItem = {
   owner: string;
   repo: string;
   pullNumber: number;
+  totalCommentCount: number;
   authorLogin: string;
   isDraft: boolean;
   updatedAt: string;

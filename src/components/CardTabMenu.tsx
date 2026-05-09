@@ -15,7 +15,7 @@ type CardTabMenuProps = {
 export function CardTabMenu({ items, className = '' }: CardTabMenuProps) {
   return (
     <div
-      className={`flex min-w-0 items-center gap-0.5 overflow-x-auto border-b border-white/[0.035] pb-0 ${className}`}
+      className={`flex min-w-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden border-b border-white/[0.035] pb-0 ${className}`}
     >
       {items.map((item) => (
         <button

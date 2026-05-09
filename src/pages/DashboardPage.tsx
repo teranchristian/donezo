@@ -1,21 +1,28 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { DashboardHeader } from '../components/DashboardHeader';
-import { GitHubCard, type GitHubSummaryMetrics } from '../components/GitHubCard';
+import {
+  GitHubCard,
+  type GitHubSummaryMetrics,
+} from '../components/GitHubCard';
 import { HeaderMenu } from '../components/HeaderMenu';
 import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
-import { GitHubConnectionStatus, GitHubDashboardData, GitHubPullRequestItem } from '../lib/githubApi';
+import {
+  GitHubConnectionStatus,
+  GitHubDashboardData,
+  GitHubPullRequestItem,
+} from '../lib/githubApi';
 import {
   getJiraIssueCounts,
   JiraConnectionStatus,
   JiraDashboardData,
-  loadJiraIssuesByKeys
+  loadJiraIssuesByKeys,
 } from '../lib/jiraApi';
 import {
   buildDashboardHashNavigation,
-  parseDashboardHashNavigation
+  parseDashboardHashNavigation,
 } from '../lib/dashboardRouting';
 import {
   DashboardSettings,
@@ -34,12 +41,12 @@ import {
   type ActiveGitHubView,
   type ActiveIntegration,
   type ActiveJiraView,
-  type GitHubPrStatusFilter
+  type GitHubPrStatusFilter,
 } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 import {
   reconcileTodayFocusJiraItems,
-  type TodayFocusRefreshSignal
+  type TodayFocusRefreshSignal,
 } from '../lib/todayFocusSync';
 
 type DashboardPageProps = {
@@ -58,6 +65,7 @@ type DashboardPageProps = {
   jiraRefreshSignal: TodayFocusRefreshSignal;
   isJiraLoading: boolean;
   onRefreshJira: () => void;
+  onGitHubSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
 };
 
 export function DashboardPage({
@@ -75,33 +83,42 @@ export function DashboardPage({
   jiraData,
   jiraRefreshSignal,
   isJiraLoading,
-  onRefreshJira
+  onRefreshJira,
+  onGitHubSummaryMetricsChange,
 }: DashboardPageProps) {
-  const [activeIntegration, setActiveIntegration] = useState<ActiveIntegration>('github');
-  const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
-  const [githubPrStatusFilter, setGitHubPrStatusFilter] = useState<GitHubPrStatusFilter>('all');
-  const [activeJiraView, setActiveJiraView] = useState<ActiveJiraView>('active');
+  const [activeIntegration, setActiveIntegration] =
+    useState<ActiveIntegration>('github');
+  const [activeGitHubView, setActiveGitHubView] =
+    useState<ActiveGitHubView>('prs');
+  const [githubPrStatusFilter, setGitHubPrStatusFilter] =
+    useState<GitHubPrStatusFilter>('all');
+  const [activeJiraView, setActiveJiraView] =
+    useState<ActiveJiraView>('active');
   const [hasLoadedNavigation, setHasLoadedNavigation] = useState(false);
   const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
-  const [hasLoadedTodayFocusItems, setHasLoadedTodayFocusItems] = useState(false);
-  const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(null);
+  const [hasLoadedTodayFocusItems, setHasLoadedTodayFocusItems] =
+    useState(false);
+  const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(
+    null,
+  );
   const hasLoadedTodayFocusItemsRef = useRef(false);
   const hasRunInitialFocusedJiraFallbackRef = useRef(false);
   const isFocusedJiraFallbackInFlightRef = useRef(false);
   const lastFocusedJiraFallbackAtRef = useRef<number | null>(null);
   const todayFocusItemsRef = useRef<FocusItem[]>([]);
-  const [gitHubSummaryMetrics, setGitHubSummaryMetrics] = useState<GitHubSummaryMetrics>({
-    connectionStatus: gitHubData.connectionStatus,
-    missingUsername: gitHubData.missingUsername,
-    readyToMergeCount: 0,
-    failedBuildCount: 0,
-    failedBuildBadgeCount: 0,
-    highlightedReadyCount: 0,
-    highlightedWarningCount: 0,
-    reviewRequestedCount: 0,
-    approvedPrCount: null,
-    relevantPrCount: gitHubData.openPrsCount
-  });
+  const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
+    useState<GitHubSummaryMetrics>({
+      connectionStatus: gitHubData.connectionStatus,
+      missingUsername: gitHubData.missingUsername,
+      readyToMergeCount: 0,
+      failedBuildCount: 0,
+      failedBuildBadgeCount: 0,
+      highlightedReadyCount: 0,
+      highlightedWarningCount: 0,
+      reviewRequestedCount: 0,
+      approvedPrCount: null,
+      relevantPrCount: gitHubData.openPrsCount,
+    });
   const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
 
   useEffect(() => {
@@ -128,7 +145,9 @@ export function DashboardPage({
       setHasLoadedNavigation(true);
     };
 
-    const syncFromHashOrStorage = async (options?: { replaceUrl?: boolean }) => {
+    const syncFromHashOrStorage = async (options?: {
+      replaceUrl?: boolean;
+    }) => {
       const hashState = parseDashboardHashNavigation(window.location.hash);
       if (hashState) {
         applyNavigationState(hashState);
@@ -139,12 +158,12 @@ export function DashboardPage({
         storedActiveIntegration,
         storedActiveGitHubView,
         storedGitHubPrStatusFilter,
-        storedActiveJiraView
+        storedActiveJiraView,
       ] = await Promise.all([
         getStoredActiveIntegration(),
         getStoredActiveGitHubView(),
         getStoredGitHubPrStatusFilter(),
-        getStoredActiveJiraView()
+        getStoredActiveJiraView(),
       ]);
 
       if (!isActive) {
@@ -155,7 +174,7 @@ export function DashboardPage({
         activeIntegration: storedActiveIntegration,
         activeGitHubView: storedActiveGitHubView,
         githubPrStatusFilter: storedGitHubPrStatusFilter,
-        activeJiraView: storedActiveJiraView
+        activeJiraView: storedActiveJiraView,
       };
 
       applyNavigationState(nextState);
@@ -188,14 +207,14 @@ export function DashboardPage({
       saveStoredActiveIntegration(activeIntegration),
       saveStoredActiveGitHubView(activeGitHubView),
       saveStoredGitHubPrStatusFilter(githubPrStatusFilter),
-      saveStoredActiveJiraView(activeJiraView)
+      saveStoredActiveJiraView(activeJiraView),
     ]);
   }, [
     activeGitHubView,
     activeIntegration,
     activeJiraView,
     githubPrStatusFilter,
-    hasLoadedNavigation
+    hasLoadedNavigation,
   ]);
 
   useEffect(() => {
@@ -225,16 +244,23 @@ export function DashboardPage({
     setGitHubSummaryMetrics((current) => ({
       ...current,
       connectionStatus: gitHubData.connectionStatus,
-      missingUsername: gitHubData.missingUsername
+      missingUsername: gitHubData.missingUsername,
     }));
   }, [gitHubData.connectionStatus, gitHubData.missingUsername]);
+
+  useEffect(() => {
+    onGitHubSummaryMetricsChange(gitHubSummaryMetrics);
+  }, [gitHubSummaryMetrics, onGitHubSummaryMetricsChange]);
 
   useEffect(() => {
     if (!hasLoadedTodayFocusItemsRef.current) {
       return;
     }
 
-    const syncResult = reconcileTodayFocusJiraItems(todayFocusItemsRef.current, jiraData.issues);
+    const syncResult = reconcileTodayFocusJiraItems(
+      todayFocusItemsRef.current,
+      jiraData.issues,
+    );
     if (syncResult.items === todayFocusItemsRef.current) {
       return;
     }
@@ -243,7 +269,10 @@ export function DashboardPage({
   }, [hasLoadedTodayFocusItems, jiraData.issues]);
 
   useEffect(() => {
-    if (!hasLoadedTodayFocusItemsRef.current || jiraRefreshSignal.lastCompletedAt === null) {
+    if (
+      !hasLoadedTodayFocusItemsRef.current ||
+      jiraRefreshSignal.lastCompletedAt === null
+    ) {
       return;
     }
 
@@ -255,7 +284,8 @@ export function DashboardPage({
 
     if (
       lastFocusedJiraFallbackAtRef.current !== null &&
-      jiraRefreshSignal.lastCompletedAt - lastFocusedJiraFallbackAtRef.current < 5 * 60 * 1000
+      jiraRefreshSignal.lastCompletedAt - lastFocusedJiraFallbackAtRef.current <
+        5 * 60 * 1000
     ) {
       return;
     }
@@ -267,11 +297,14 @@ export function DashboardPage({
     jiraData.issues,
     settings.integrations.jira.apiToken,
     settings.integrations.jira.baseUrl,
-    settings.integrations.jira.email
+    settings.integrations.jira.email,
   ]);
 
   useEffect(() => {
-    if (!hasLoadedTodayFocusItemsRef.current || jiraRefreshSignal.lastManualAt === null) {
+    if (
+      !hasLoadedTodayFocusItemsRef.current ||
+      jiraRefreshSignal.lastManualAt === null
+    ) {
       return;
     }
 
@@ -281,7 +314,7 @@ export function DashboardPage({
     jiraRefreshSignal.lastManualAt,
     settings.integrations.jira.apiToken,
     settings.integrations.jira.baseUrl,
-    settings.integrations.jira.email
+    settings.integrations.jira.email,
   ]);
 
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
@@ -301,7 +334,7 @@ export function DashboardPage({
     },
     onOpenApprovedPrs: () => {
       navigateToGitHubPrs('approved');
-    }
+    },
   });
 
   function updateDashboardNavigation(nextState: {
@@ -323,7 +356,7 @@ export function DashboardPage({
       activeIntegration: 'github',
       activeGitHubView: 'prs',
       githubPrStatusFilter: prStatusFilter,
-      activeJiraView
+      activeJiraView,
     });
   }
 
@@ -332,7 +365,7 @@ export function DashboardPage({
       activeIntegration: 'jira',
       activeGitHubView,
       githubPrStatusFilter,
-      activeJiraView: view
+      activeJiraView: view,
     });
   }
 
@@ -341,7 +374,7 @@ export function DashboardPage({
       activeIntegration: nextIntegration,
       activeGitHubView,
       githubPrStatusFilter,
-      activeJiraView
+      activeJiraView,
     });
   }
 
@@ -350,16 +383,18 @@ export function DashboardPage({
       activeIntegration: 'github',
       activeGitHubView: view,
       githubPrStatusFilter,
-      activeJiraView
+      activeJiraView,
     });
   }
 
-  function handleGitHubPrStatusFilterChange(prStatusFilter: GitHubPrStatusFilter) {
+  function handleGitHubPrStatusFilterChange(
+    prStatusFilter: GitHubPrStatusFilter,
+  ) {
     updateDashboardNavigation({
       activeIntegration: 'github',
       activeGitHubView: 'prs',
       githubPrStatusFilter: prStatusFilter,
-      activeJiraView
+      activeJiraView,
     });
   }
 
@@ -368,7 +403,7 @@ export function DashboardPage({
       activeIntegration: 'jira',
       activeGitHubView,
       githubPrStatusFilter,
-      activeJiraView: view
+      activeJiraView: view,
     });
   }
 
@@ -390,10 +425,17 @@ export function DashboardPage({
     commitTodayFocusItems(nextItems);
   }
 
-  function handleNestNewTodayFocusPullRequest(parentId: string, item: FocusPullRequestItem) {
+  function handleNestNewTodayFocusPullRequest(
+    parentId: string,
+    item: FocusPullRequestItem,
+  ) {
     setTodayFocusWarning(null);
 
-    const nextState = nestNewPullRequestUnderJira(todayFocusItems, parentId, item);
+    const nextState = nestNewPullRequestUnderJira(
+      todayFocusItems,
+      parentId,
+      item,
+    );
     if (nextState.warning) {
       setTodayFocusWarning(nextState.warning);
       return;
@@ -402,15 +444,29 @@ export function DashboardPage({
     commitTodayFocusItems(nextState.items);
   }
 
-  function handleNestExistingTodayFocusPullRequest(parentId: string, itemId: string) {
+  function handleNestExistingTodayFocusPullRequest(
+    parentId: string,
+    itemId: string,
+  ) {
     setTodayFocusWarning(null);
-    const nextItems = moveStandalonePullRequestUnderJira(todayFocusItems, parentId, itemId);
+    const nextItems = moveStandalonePullRequestUnderJira(
+      todayFocusItems,
+      parentId,
+      itemId,
+    );
     commitTodayFocusItems(nextItems);
   }
 
-  function handleReorderTopLevelTodayFocusItem(itemId: string, targetId: string) {
+  function handleReorderTopLevelTodayFocusItem(
+    itemId: string,
+    targetId: string,
+  ) {
     setTodayFocusWarning(null);
-    const nextItems = reorderTopLevelTodayFocusItems(todayFocusItems, itemId, targetId);
+    const nextItems = reorderTopLevelTodayFocusItems(
+      todayFocusItems,
+      itemId,
+      targetId,
+    );
     commitTodayFocusItems(nextItems);
   }
 
@@ -420,9 +476,18 @@ export function DashboardPage({
     commitTodayFocusItems(nextItems);
   }
 
-  function handleReorderNestedTodayFocusPullRequest(parentId: string, itemId: string, targetId: string) {
+  function handleReorderNestedTodayFocusPullRequest(
+    parentId: string,
+    itemId: string,
+    targetId: string,
+  ) {
     setTodayFocusWarning(null);
-    const nextItems = reorderNestedPullRequests(todayFocusItems, parentId, itemId, targetId);
+    const nextItems = reorderNestedPullRequests(
+      todayFocusItems,
+      parentId,
+      itemId,
+      targetId,
+    );
     commitTodayFocusItems(nextItems);
   }
 
@@ -434,11 +499,19 @@ export function DashboardPage({
 
   async function runFocusedJiraFallback() {
     const { baseUrl, email, apiToken } = settings.integrations.jira;
-    if (!baseUrl.trim() || !email.trim() || !apiToken.trim() || isFocusedJiraFallbackInFlightRef.current) {
+    if (
+      !baseUrl.trim() ||
+      !email.trim() ||
+      !apiToken.trim() ||
+      isFocusedJiraFallbackInFlightRef.current
+    ) {
       return;
     }
 
-    const syncResult = reconcileTodayFocusJiraItems(todayFocusItemsRef.current, jiraData.issues);
+    const syncResult = reconcileTodayFocusJiraItems(
+      todayFocusItemsRef.current,
+      jiraData.issues,
+    );
     if (syncResult.missingKeys.length === 0) {
       return;
     }
@@ -451,14 +524,17 @@ export function DashboardPage({
         baseUrl,
         email,
         apiToken,
-        issueKeys: syncResult.missingKeys
+        issueKeys: syncResult.missingKeys,
       });
 
       if (fallbackIssues.length === 0) {
         return;
       }
 
-      const fallbackSyncResult = reconcileTodayFocusJiraItems(todayFocusItemsRef.current, fallbackIssues);
+      const fallbackSyncResult = reconcileTodayFocusJiraItems(
+        todayFocusItemsRef.current,
+        fallbackIssues,
+      );
       if (fallbackSyncResult.items !== todayFocusItemsRef.current) {
         commitTodayFocusItems(fallbackSyncResult.items);
       }
@@ -513,9 +589,13 @@ export function DashboardPage({
                 connectionStatus={gitHubSummaryMetrics.connectionStatus}
                 warningCount={gitHubSummaryMetrics.highlightedWarningCount}
                 readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
-                readyToMergeBadgeCount={gitHubSummaryMetrics.highlightedReadyCount}
+                readyToMergeBadgeCount={
+                  gitHubSummaryMetrics.highlightedReadyCount
+                }
                 failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
-                failedBuildBadgeCount={gitHubSummaryMetrics.failedBuildBadgeCount}
+                failedBuildBadgeCount={
+                  gitHubSummaryMetrics.failedBuildBadgeCount
+                }
                 jiraBlockingCount={jiraCounts.blocking}
                 onOpenWarnings={() => navigateToGitHubPrs('all')}
                 onOpenReadyToMerge={() => navigateToGitHubPrs('ready-to-merge')}
@@ -547,11 +627,15 @@ export function DashboardPage({
                 warning={todayFocusWarning}
                 onAddItem={handleAddTodayFocusItem}
                 onNestNewPullRequest={handleNestNewTodayFocusPullRequest}
-                onNestExistingPullRequest={handleNestExistingTodayFocusPullRequest}
+                onNestExistingPullRequest={
+                  handleNestExistingTodayFocusPullRequest
+                }
                 onRemoveItem={handleRemoveTodayFocusItem}
                 onReorderTopLevelItem={handleReorderTopLevelTodayFocusItem}
                 onMoveTopLevelItemToEnd={handleMoveTopLevelTodayFocusItemToEnd}
-                onReorderNestedPullRequest={handleReorderNestedTodayFocusPullRequest}
+                onReorderNestedPullRequest={
+                  handleReorderNestedTodayFocusPullRequest
+                }
               />
               <NotesCard />
               <PlaceholderCard
@@ -575,7 +659,11 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'github'}
                 >
                   <GitHubCard
-                    topBar={activeIntegration === 'github' ? integrationSwitcher : undefined}
+                    topBar={
+                      activeIntegration === 'github'
+                        ? integrationSwitcher
+                        : undefined
+                    }
                     data={gitHubData}
                     todayFocusItemIds={todayFocusItemIds}
                     username={settings.integrations.github.username}
@@ -598,7 +686,11 @@ export function DashboardPage({
                   aria-hidden={activeIntegration !== 'jira'}
                 >
                   <JiraCard
-                    topBar={activeIntegration === 'jira' ? integrationSwitcher : undefined}
+                    topBar={
+                      activeIntegration === 'jira'
+                        ? integrationSwitcher
+                        : undefined
+                    }
                     baseUrl={settings.integrations.jira.baseUrl}
                     data={jiraData}
                     todayFocusItemIds={todayFocusItemIds}
@@ -644,7 +736,11 @@ function replaceDashboardHash(nextState: {
     return;
   }
 
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash}`);
+  window.history.replaceState(
+    null,
+    '',
+    `${window.location.pathname}${window.location.search}${nextHash}`,
+  );
 }
 
 function getDefaultTodayFocusItems(): FocusItem[] {
@@ -667,10 +763,10 @@ function getDefaultTodayFocusItems(): FocusItem[] {
           title: 'CLK-112 Fix venue provision defaults',
           statusLabel: 'Approved',
           statusTone: 'emerald',
-          jiraKey: 'CLK-112'
-        }
-      ]
-    }
+          jiraKey: 'CLK-112',
+        },
+      ],
+    },
   ];
 }
 
@@ -693,7 +789,7 @@ function addTodayFocusItem(items: FocusItem[], item: FocusItem) {
 
   return {
     items: [...items, normalizeTopLevelTodayFocusItem(item)],
-    warning: null
+    warning: null,
   };
 }
 
@@ -712,8 +808,8 @@ function removeTodayFocusItem(items: FocusItem[], itemId: string) {
           ? item
           : {
               ...item,
-              children: nextChildren
-            }
+              children: nextChildren,
+            },
       );
       continue;
     }
@@ -725,10 +821,19 @@ function removeTodayFocusItem(items: FocusItem[], itemId: string) {
 }
 
 function hasTodayFocusItem(items: FocusItem[], itemId: string) {
-  return items.some((item) => item.id === itemId || (item.source === 'jira' && item.children.some((child) => child.id === itemId)));
+  return items.some(
+    (item) =>
+      item.id === itemId ||
+      (item.source === 'jira' &&
+        item.children.some((child) => child.id === itemId)),
+  );
 }
 
-function nestNewPullRequestUnderJira(items: FocusItem[], parentId: string, pullRequest: FocusPullRequestItem) {
+function nestNewPullRequestUnderJira(
+  items: FocusItem[],
+  parentId: string,
+  pullRequest: FocusPullRequestItem,
+) {
   if (hasTodayFocusItem(items, pullRequest.id)) {
     return { items, warning: 'That item is already in Today focus.' };
   }
@@ -742,20 +847,28 @@ function nestNewPullRequestUnderJira(items: FocusItem[], parentId: string, pullR
       item.id === parentId && item.source === 'jira'
         ? {
             ...item,
-            children: [...item.children, pullRequest]
+            children: [...item.children, pullRequest],
           }
-        : item
+        : item,
     ),
-    warning: null
+    warning: null,
   };
 }
 
-function moveStandalonePullRequestUnderJira(items: FocusItem[], parentId: string, itemId: string) {
+function moveStandalonePullRequestUnderJira(
+  items: FocusItem[],
+  parentId: string,
+  itemId: string,
+) {
   const standalonePullRequest = items.find(
-    (item): item is FocusPullRequestItem => item.id === itemId && item.source === 'github'
+    (item): item is FocusPullRequestItem =>
+      item.id === itemId && item.source === 'github',
   );
 
-  if (!standalonePullRequest || !items.some((item) => item.id === parentId && item.source === 'jira')) {
+  if (
+    !standalonePullRequest ||
+    !items.some((item) => item.id === parentId && item.source === 'jira')
+  ) {
     return items;
   }
 
@@ -767,7 +880,7 @@ function moveStandalonePullRequestUnderJira(items: FocusItem[], parentId: string
     if (item.id === parentId && item.source === 'jira') {
       nextItems.push({
         ...item,
-        children: [...item.children, standalonePullRequest]
+        children: [...item.children, standalonePullRequest],
       });
       return nextItems;
     }
@@ -777,7 +890,11 @@ function moveStandalonePullRequestUnderJira(items: FocusItem[], parentId: string
   }, []);
 }
 
-function reorderTopLevelTodayFocusItems(items: FocusItem[], itemId: string, targetId: string) {
+function reorderTopLevelTodayFocusItems(
+  items: FocusItem[],
+  itemId: string,
+  targetId: string,
+) {
   if (itemId === targetId) {
     return items;
   }
@@ -807,7 +924,12 @@ function moveTopLevelTodayFocusItemToEnd(items: FocusItem[], itemId: string) {
   return nextItems;
 }
 
-function reorderNestedPullRequests(items: FocusItem[], parentId: string, itemId: string, targetId: string) {
+function reorderNestedPullRequests(
+  items: FocusItem[],
+  parentId: string,
+  itemId: string,
+  targetId: string,
+) {
   if (itemId === targetId) {
     return items;
   }
@@ -835,7 +957,7 @@ function reorderNestedPullRequests(items: FocusItem[], parentId: string, itemId:
 
     return {
       ...item,
-      children: nextChildren
+      children: nextChildren,
     };
   });
 }
@@ -844,7 +966,7 @@ function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
   return item.source === 'jira'
     ? {
         ...item,
-        children: item.children ?? []
+        children: item.children ?? [],
       }
     : item;
 }
@@ -871,7 +993,7 @@ function getDashboardAlerts(options: {
     onOpenGitHubPrs,
     onOpenReviewRequestedPrs,
     onOpenBlockedIssues,
-    onOpenApprovedPrs
+    onOpenApprovedPrs,
   } = options;
 
   return [
@@ -886,48 +1008,54 @@ function getDashboardAlerts(options: {
       onClick:
         gitHubMetrics.connectionStatus === 'connected' && !isGitHubLoading
           ? onOpenReviewRequestedPrs
-          : undefined
+          : undefined,
     },
     {
       value: isJiraLoading ? '0' : String(jiraCounts.blocking),
-      title: jiraCounts.blocking === 1 ? 'Blocked item' : 'Blocked items',
+      title: jiraCounts.blocking === 1 ? 'Blocked item' : 'Blocked tickets',
       detail: isJiraLoading ? 'Checking Jira blockers.' : 'Needs your input.',
       tone: 'rose',
-      onClick: !isJiraLoading ? onOpenBlockedIssues : undefined
+      onClick: !isJiraLoading ? onOpenBlockedIssues : undefined,
     },
     {
       value:
-        isGitHubLoading || gitHubMetrics.approvedPrCount === null ? '0' : String(gitHubMetrics.approvedPrCount),
+        isGitHubLoading || gitHubMetrics.approvedPrCount === null
+          ? '0'
+          : String(gitHubMetrics.approvedPrCount),
       title: 'PRs approved',
       detail:
         gitHubMetrics.connectionStatus === 'connected'
-          ? 'Ready to merge or follow through.'
+          ? 'Ready to merge.'
           : 'Available once GitHub is connected.',
       tone: 'emerald',
       onClick:
-        gitHubMetrics.connectionStatus === 'connected' && gitHubMetrics.approvedPrCount !== null
+        gitHubMetrics.connectionStatus === 'connected' &&
+        gitHubMetrics.approvedPrCount !== null
           ? onOpenApprovedPrs
-          : undefined
+          : undefined,
     },
     {
       value:
         isGitHubLoading || gitHubMetrics.connectionStatus !== 'connected'
           ? '0'
           : String(gitHubMetrics.relevantPrCount),
-      title: 'PRs open',
+      title: 'Open PRs',
       detail:
         gitHubMetrics.connectionStatus === 'connected'
           ? 'Across repositories.'
           : 'Available once GitHub is connected.',
       tone: 'blue',
-      onClick: gitHubMetrics.connectionStatus === 'connected' ? onOpenGitHubPrs : undefined
-    }
+      onClick:
+        gitHubMetrics.connectionStatus === 'connected'
+          ? onOpenGitHubPrs
+          : undefined,
+    },
   ];
 }
 
 function getReviewAlertDetail(
   gitHubMetrics: GitHubSummaryMetrics,
-  isGitHubLoading: boolean
+  isGitHubLoading: boolean,
 ) {
   if (isGitHubLoading) {
     return 'Loading GitHub review activity.';
@@ -949,7 +1077,9 @@ function getReviewAlertDetail(
     return 'Add your GitHub username in Settings.';
   }
 
-  return gitHubMetrics.reviewRequestedCount > 0 ? 'Waiting on your review.' : 'No review requests waiting.';
+  return gitHubMetrics.reviewRequestedCount > 0
+    ? 'Waiting on your review.'
+    : 'No review requests waiting.';
 }
 
 function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
@@ -963,9 +1093,7 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
           : 'bg-sky-500/14 text-sky-300';
 
   const content = (
-    <div
-      className="flex h-full min-h-[84px] items-center gap-2.5 rounded-[var(--radius-card)] border border-white/[0.06] bg-[rgba(255,255,255,0.028)] px-3 py-2.5 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)]"
-    >
+    <div className="flex h-full min-h-[84px] items-center gap-2.5 rounded-[var(--radius-card)] border border-white/[0.06] bg-[rgba(255,255,255,0.028)] px-3 py-2.5 shadow-[var(--shadow-card)] backdrop-blur-[var(--card-blur)]">
       <span
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconWrapClass}`}
         aria-hidden="true"
@@ -977,9 +1105,13 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
           <p className="shrink-0 text-[1.7rem] font-semibold leading-none tracking-[-0.045em] text-primary">
             {alert.value}
           </p>
-          <p className="min-w-0 truncate text-[0.82rem] font-medium leading-4 text-primary">{alert.title}</p>
+          <p className="min-w-0 truncate text-[0.82rem] font-medium leading-4 text-primary">
+            {alert.title}
+          </p>
         </div>
-        <p className="mt-0.5 text-[0.72rem] leading-4 text-secondary">{alert.detail}</p>
+        <p className="mt-0.5 text-[0.72rem] leading-4 text-secondary">
+          {alert.detail}
+        </p>
       </div>
     </div>
   );
@@ -999,14 +1131,16 @@ function DashboardAlert({ alert }: { alert: DashboardAlertItem }) {
   );
 }
 
-function DashboardAlertIcon({
-  tone
-}: {
-  tone: DashboardAlertItem['tone'];
-}) {
+function DashboardAlertIcon({ tone }: { tone: DashboardAlertItem['tone'] }) {
   if (tone === 'amber') {
     return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <circle cx="12" cy="12" r="8" />
         <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -1015,7 +1149,13 @@ function DashboardAlertIcon({
 
   if (tone === 'rose') {
     return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <circle cx="12" cy="12" r="8" />
         <path d="M12 8v5" strokeLinecap="round" />
         <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
@@ -1025,15 +1165,31 @@ function DashboardAlertIcon({
 
   if (tone === 'emerald') {
     return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <circle cx="12" cy="12" r="8" />
-        <path d="m8.5 12 2.4 2.4L15.8 9.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="m8.5 12 2.4 2.4L15.8 9.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     );
   }
 
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <circle cx="6.5" cy="6.5" r="1.6" />
       <circle cx="17.5" cy="6.5" r="1.6" />
       <circle cx="12" cy="17.5" r="1.6" />
@@ -1047,7 +1203,7 @@ function DashboardAlertIcon({
 function IntegrationTabButton({
   label,
   isActive,
-  onClick
+  onClick,
 }: {
   label: string;
   isActive: boolean;
@@ -1074,7 +1230,7 @@ function GitHubIntegrationStatusBar({
   isCheckingActivity,
   lastUpdatedAt,
   lastCheckedAt,
-  onRefresh
+  onRefresh,
 }: {
   connectionStatus: GitHubConnectionStatus;
   isLoading: boolean;
@@ -1126,7 +1282,7 @@ function JiraIntegrationStatusBar({
   connectionStatus,
   isLoading,
   lastUpdatedAt,
-  onRefresh
+  onRefresh,
 }: {
   connectionStatus: JiraConnectionStatus;
   isLoading: boolean;
@@ -1156,7 +1312,10 @@ function JiraIntegrationStatusBar({
     <div className="ml-auto flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         <TopBarBadge className={toneClass}>{label}</TopBarBadge>
-        <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus === 'not-connected'}>
+        <TopBarButton
+          onClick={onRefresh}
+          disabled={isLoading || connectionStatus === 'not-connected'}
+        >
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </TopBarButton>
       </div>
@@ -1169,7 +1328,7 @@ function JiraIntegrationStatusBar({
 
 function TopBarBadge({
   children,
-  className
+  className,
 }: {
   children: ReactNode;
   className: string;
@@ -1186,7 +1345,7 @@ function TopBarBadge({
 function TopBarButton({
   children,
   disabled,
-  onClick
+  onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
@@ -1214,7 +1373,7 @@ function GitHubHeaderShortcuts({
   jiraBlockingCount,
   onOpenWarnings,
   onOpenReadyToMerge,
-  onOpenJira
+  onOpenJira,
 }: {
   connectionStatus: GitHubConnectionStatus;
   warningCount: number;
@@ -1233,28 +1392,30 @@ function GitHubHeaderShortcuts({
       key: 'notifications',
       count: warningCount,
       badgeCount: warningCount,
-      colorClass: 'text-rose-300',
+      colorClass: 'text-primary',
       label: 'Open pull request warnings',
       onClick: onOpenWarnings,
-      icon: <HeaderBlockedIcon />
+      icon: <HeaderBlockedIcon />,
     },
     {
       key: 'open-prs',
       count: readyToMergeCount,
       badgeCount: readyToMergeBadgeCount,
-      colorClass: 'text-emerald-400',
+      colorClass: 'text-primary',
       label: 'Open ready to merge pull requests',
       onClick: onOpenReadyToMerge,
-      icon: (isDimmed: boolean) => <HeaderReadyPrIcon isDimmed={isDimmed} />
+      icon: (isDimmed: boolean) => <HeaderReadyPrIcon isDimmed={isDimmed} />,
     },
     {
       key: 'failed-build-prs',
       count: failedBuildCount,
       badgeCount: failedBuildBadgeCount,
-      colorClass: 'text-emerald-400',
+      colorClass: 'text-primary',
       label: 'Open pull requests with failed builds',
       onClick: onOpenWarnings,
-      icon: (isDimmed: boolean) => <HeaderFailedBuildPrIcon isDimmed={isDimmed} />
+      icon: (isDimmed: boolean) => (
+        <HeaderFailedBuildPrIcon isDimmed={isDimmed} />
+      ),
     },
     {
       key: 'jira',
@@ -1263,8 +1424,8 @@ function GitHubHeaderShortcuts({
       label: 'Open Jira blockers',
       onClick: onOpenJira,
       icon: <HeaderJiraIcon />,
-      isHidden: true
-    }
+      isHidden: true,
+    },
   ];
 
   return (
@@ -1290,7 +1451,9 @@ function GitHubHeaderShortcuts({
             }`}
           >
             <span className={item.colorClass} aria-hidden="true">
-              {typeof item.icon === 'function' ? item.icon(isDisabled) : item.icon}
+              {typeof item.icon === 'function'
+                ? item.icon(isDisabled)
+                : item.icon}
             </span>
             {showBadge ? (
               <span className="absolute right-1.5 top-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-rose-500 px-1 py-[0.1rem] text-[0.62rem] font-semibold leading-none text-white shadow-[0_4px_12px_rgba(244,63,94,0.28)]">
@@ -1306,15 +1469,37 @@ function GitHubHeaderShortcuts({
 
 function HeaderBlockedIcon() {
   return (
-    <span className="text-[1.2rem] leading-none" aria-hidden="true">
-      ⚠
-    </span>
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[1.35rem] w-[1.35rem]"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M12 5.2 18.6 17H5.4L12 5.2Z"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 9.5v3.9"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="15.9" r="1" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
 function HeaderOpenPrIcon() {
   return (
-    <svg viewBox="0 0 16 16" className="h-[1.12rem] w-[1.12rem]" fill="currentColor" aria-hidden="true">
+    <svg
+      viewBox="0 0 16 16"
+      className="h-[1.12rem] w-[1.12rem]"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
     </svg>
   );
@@ -1322,53 +1507,68 @@ function HeaderOpenPrIcon() {
 
 function HeaderReadyPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.5" fill="#1fb236" fillOpacity={isDimmed ? 0.42 : 1} />
-      <circle cx="12" cy="12" r="9.5" fill="url(#ready-pr-glow)" fillOpacity={isDimmed ? 0.16 : 0.3} />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[1.7rem] w-[1.7rem]"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9.5"
+        stroke="currentColor"
+        strokeOpacity={isDimmed ? 0.58 : 0.9}
+        strokeWidth="1.8"
+      />
       <path
         d="m8.6 12.4 2.3 2.3 4.7-5.2"
-        stroke="#fff"
-        strokeOpacity={isDimmed ? 0.82 : 1}
-        strokeWidth="2.4"
+        stroke="currentColor"
+        strokeOpacity={isDimmed ? 0.58 : 0.9}
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <defs>
-        <radialGradient id="ready-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
-          <stop stopColor="#fff" stopOpacity="0.45" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
     </svg>
   );
 }
 
 function HeaderFailedBuildPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.5" fill="#ef2029" fillOpacity={isDimmed ? 0.42 : 1} />
-      <circle cx="12" cy="12" r="9.5" fill="url(#failed-pr-glow)" fillOpacity={isDimmed ? 0.14 : 0.26} />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[1.7rem] w-[1.7rem]"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9.5"
+        stroke="currentColor"
+        strokeOpacity={isDimmed ? 0.58 : 0.9}
+        strokeWidth="1.8"
+      />
       <path
         d="m8.8 8.8 6.4 6.4m0-6.4-6.4 6.4"
-        stroke="#fff"
-        strokeOpacity={isDimmed ? 0.82 : 1}
-        strokeWidth="2.6"
+        stroke="currentColor"
+        strokeOpacity={isDimmed ? 0.58 : 0.9}
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <defs>
-        <radialGradient id="failed-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
-          <stop stopColor="#fff" stopOpacity="0.4" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
     </svg>
   );
 }
 
 function HeaderJiraIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-[1.3rem] w-[1.3rem]" fill="currentColor" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[1.3rem] w-[1.3rem]"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M12 3 21 12l-9 9-9-9 9-9Zm0 4.2L7.2 12 12 16.8 16.8 12 12 7.2Zm0 2.8 2 2-2 2-2-2 2-2Z" />
     </svg>
   );
@@ -1381,6 +1581,6 @@ function formatDashboardTime(value: number | null) {
 
   return new Date(value).toLocaleTimeString([], {
     hour: 'numeric',
-    minute: '2-digit'
+    minute: '2-digit',
   });
 }
