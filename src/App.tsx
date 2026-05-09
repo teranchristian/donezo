@@ -66,6 +66,11 @@ const PR_WARNING_FAVICON_PATHS: FaviconPaths = {
   '32x32': '/icons/icon-32-pr-warning.png'
 };
 
+const PR_ERROR_FAVICON_PATHS: FaviconPaths = {
+  '16x16': '/icons/icon-16-pr-error.png',
+  '32x32': '/icons/icon-32-pr-error.png'
+};
+
 const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
   connectionStatus: 'not-connected',
   missingUsername: true,
@@ -81,6 +86,11 @@ const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
 
 // Order matters: the first matching variant wins.
 const FAVICON_VARIANTS: FaviconVariant[] = [
+  {
+    key: 'pr-error',
+    matches: (metrics) => metrics.failedBuildBadgeCount > 0,
+    paths: PR_ERROR_FAVICON_PATHS
+  },
   {
     key: 'pr-warning',
     matches: (metrics) => metrics.highlightedWarningCount > 0,
