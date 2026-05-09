@@ -25,6 +25,7 @@ import {
   getStoredSettings,
   saveStoredGitHubDevMode,
   saveStoredGitHubMockScenarioKey,
+  saveStoredGitHubPrNotificationSeenAtState,
   saveStoredGitHubPrReadyState,
   saveStoredGitHubPrWarningState,
   saveStoredSettings,
@@ -120,6 +121,7 @@ export default function App() {
       void (async () => {
         await saveStoredGitHubPrReadyState(gitHubMockScenario.readyState);
         await saveStoredGitHubPrWarningState(gitHubMockScenario.warningState);
+        await saveStoredGitHubPrNotificationSeenAtState(gitHubMockScenario.notificationSeenAtState);
         if (!isMountedRef.current) {
           return;
         }
@@ -346,6 +348,7 @@ export default function App() {
     if (gitHubMockScenario) {
       await saveStoredGitHubPrReadyState(gitHubMockScenario.readyState);
       await saveStoredGitHubPrWarningState(gitHubMockScenario.warningState);
+      await saveStoredGitHubPrNotificationSeenAtState(gitHubMockScenario.notificationSeenAtState);
       setGitHubData(gitHubMockScenario.dashboardData);
       setGitHubSettingsTestStatus(gitHubMockScenario.dashboardData.connectionStatus);
       setIsGitHubMockReady(true);
@@ -374,6 +377,7 @@ export default function App() {
 
     await saveStoredGitHubPrReadyState(nextScenario.readyState);
     await saveStoredGitHubPrWarningState(nextScenario.warningState);
+    await saveStoredGitHubPrNotificationSeenAtState(nextScenario.notificationSeenAtState);
     if (!isMountedRef.current) {
       return;
     }
@@ -388,6 +392,7 @@ export default function App() {
     await clearStoredGitHubMockScenarioKey();
     await saveStoredGitHubPrReadyState({});
     await saveStoredGitHubPrWarningState({});
+    await saveStoredGitHubPrNotificationSeenAtState({});
 
     const cachedData = await getLatestGitHubDashboardData({
       username: settings.integrations.github.username,
