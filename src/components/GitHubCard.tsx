@@ -742,8 +742,10 @@ function PullRequestRow({
           </div>
         </div>
         <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 self-center whitespace-nowrap">
-          <PullRequestCommentBadge newCount={newNotificationCount} totalCount={pullRequest.totalCommentCount} />
-          <StatusBadge label={status.label} className="whitespace-nowrap" />
+          {pullRequest.totalCommentCount > 0 ? (
+            <PullRequestCommentBadge newCount={newNotificationCount} totalCount={pullRequest.totalCommentCount} />
+          ) : null}
+          <StatusBadge label={status.label} className="inline-flex min-w-[8.75rem] justify-end whitespace-nowrap" />
         </div>
         <p className="col-start-2 row-start-2 mt-0.25 self-start whitespace-nowrap text-right text-[0.64rem] leading-4 text-white/38">
           updated {formatRelativeTime(pullRequest.updatedAt)}
@@ -773,7 +775,7 @@ function PullRequestCommentBadge({
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.64rem] font-medium leading-none text-white/60"
+      className="inline-flex min-w-[5.5rem] items-center justify-center gap-1 px-2 py-0.5 text-[0.64rem] font-medium leading-none text-white/60"
       title={label}
     >
       <svg
