@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "Donezo",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzKy8Z0hFcbE2ldnOCiLes8j8Xt8dSy9eLa++4BBKr1TOrJAtIWJQF3ZldPcOBOsi74XYn9jG6Xzlp1P4i2/6wyzhzqrGtcUyI+Vs0OEB2htx3eK8nSmmBbcRal2oACppGC9Aw72JU20n4ciUlr/HeGlUhjuV+QomDgq1Va9kEm+caXjkR2dlHVqMf2upsYFkBQI7tgwPHl+mNGQYhIZOpSADac3ixmXXP4fuC3pxceG6qz6GwdpgUBVfdKiG9wBdKIhzJSFq+MYu1vuxOE6uMSch+Gf2QL/kIZyRaqqFZjZ0zgR4hDwoUA/K3CMOxLlOVrGJaXpMTQgTzDXCkHZeZwIDAQAB",
   "description": "A personal work dashboard that replaces the Chrome new tab page.",
   "permissions": [
     "storage"
