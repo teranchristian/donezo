@@ -1239,7 +1239,7 @@ function GitHubHeaderShortcuts({
       key: 'notifications',
       count: warningCount,
       badgeCount: warningCount,
-      colorClass: 'text-rose-300',
+      colorClass: 'text-primary',
       label: 'Open pull request warnings',
       onClick: onOpenWarnings,
       icon: <HeaderBlockedIcon />
@@ -1248,7 +1248,7 @@ function GitHubHeaderShortcuts({
       key: 'open-prs',
       count: readyToMergeCount,
       badgeCount: readyToMergeBadgeCount,
-      colorClass: 'text-emerald-400',
+      colorClass: 'text-primary',
       label: 'Open ready to merge pull requests',
       onClick: onOpenReadyToMerge,
       icon: (isDimmed: boolean) => <HeaderReadyPrIcon isDimmed={isDimmed} />
@@ -1257,7 +1257,7 @@ function GitHubHeaderShortcuts({
       key: 'failed-build-prs',
       count: failedBuildCount,
       badgeCount: failedBuildBadgeCount,
-      colorClass: 'text-emerald-400',
+      colorClass: 'text-primary',
       label: 'Open pull requests with failed builds',
       onClick: onOpenWarnings,
       icon: (isDimmed: boolean) => <HeaderFailedBuildPrIcon isDimmed={isDimmed} />
@@ -1312,9 +1312,16 @@ function GitHubHeaderShortcuts({
 
 function HeaderBlockedIcon() {
   return (
-    <span className="text-[1.2rem] leading-none" aria-hidden="true">
-      ⚠
-    </span>
+    <svg viewBox="0 0 24 24" className="h-[1.35rem] w-[1.35rem]" fill="none" aria-hidden="true">
+      <path
+        d="M12 5.2 18.6 17H5.4L12 5.2Z"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+      <path d="M12 9.5v3.9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <circle cx="12" cy="15.9" r="1" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
@@ -1329,22 +1336,15 @@ function HeaderOpenPrIcon() {
 function HeaderReadyPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.5" fill="#1fb236" fillOpacity={isDimmed ? 0.42 : 1} />
-      <circle cx="12" cy="12" r="9.5" fill="url(#ready-pr-glow)" fillOpacity={isDimmed ? 0.16 : 0.3} />
+      <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeOpacity={isDimmed ? 0.58 : 0.9} strokeWidth="1.8" />
       <path
         d="m8.6 12.4 2.3 2.3 4.7-5.2"
-        stroke="#fff"
-        strokeOpacity={isDimmed ? 0.82 : 1}
-        strokeWidth="2.4"
+        stroke="currentColor"
+        strokeOpacity={isDimmed ? 0.58 : 0.9}
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <defs>
-        <radialGradient id="ready-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
-          <stop stopColor="#fff" stopOpacity="0.45" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
     </svg>
   );
 }
@@ -1352,22 +1352,15 @@ function HeaderReadyPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
 function HeaderFailedBuildPrIcon({ isDimmed = false }: { isDimmed?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" className="h-[1.7rem] w-[1.7rem]" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.5" fill="#ef2029" fillOpacity={isDimmed ? 0.42 : 1} />
-      <circle cx="12" cy="12" r="9.5" fill="url(#failed-pr-glow)" fillOpacity={isDimmed ? 0.14 : 0.26} />
+      <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeOpacity={isDimmed ? 0.58 : 0.9} strokeWidth="1.8" />
       <path
         d="m8.8 8.8 6.4 6.4m0-6.4-6.4 6.4"
-        stroke="#fff"
-        strokeOpacity={isDimmed ? 0.82 : 1}
-        strokeWidth="2.6"
+        stroke="currentColor"
+        strokeOpacity={isDimmed ? 0.58 : 0.9}
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <defs>
-        <radialGradient id="failed-pr-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(9 8) rotate(45) scale(13)">
-          <stop stopColor="#fff" stopOpacity="0.4" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
     </svg>
   );
 }
