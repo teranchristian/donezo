@@ -58,6 +58,7 @@ type DashboardPageProps = {
   jiraRefreshSignal: TodayFocusRefreshSignal;
   isJiraLoading: boolean;
   onRefreshJira: () => void;
+  onGitHubSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
 };
 
 export function DashboardPage({
@@ -75,7 +76,8 @@ export function DashboardPage({
   jiraData,
   jiraRefreshSignal,
   isJiraLoading,
-  onRefreshJira
+  onRefreshJira,
+  onGitHubSummaryMetricsChange
 }: DashboardPageProps) {
   const [activeIntegration, setActiveIntegration] = useState<ActiveIntegration>('github');
   const [activeGitHubView, setActiveGitHubView] = useState<ActiveGitHubView>('prs');
@@ -228,6 +230,10 @@ export function DashboardPage({
       missingUsername: gitHubData.missingUsername
     }));
   }, [gitHubData.connectionStatus, gitHubData.missingUsername]);
+
+  useEffect(() => {
+    onGitHubSummaryMetricsChange(gitHubSummaryMetrics);
+  }, [gitHubSummaryMetrics, onGitHubSummaryMetricsChange]);
 
   useEffect(() => {
     if (!hasLoadedTodayFocusItemsRef.current) {

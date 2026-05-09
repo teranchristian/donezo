@@ -37,8 +37,51 @@ import {
   getGitHubMockScenarioByKey,
   getGitHubMockScenarioOptions
 } from './mocks/github/scenarios';
+import { type GitHubSummaryMetrics } from './components/GitHubCard';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
+
+type FaviconSize = '16x16' | '32x32';
+
+type FaviconPaths = Record<FaviconSize, string>;
+
+type FaviconVariant = {
+  key: string;
+  matches: (metrics: GitHubSummaryMetrics) => boolean;
+  paths: FaviconPaths;
+};
+
+const DEFAULT_FAVICON_PATHS: FaviconPaths = {
+  '16x16': '/icons/icon-16.png',
+  '32x32': '/icons/icon-32.png'
+};
+
+const PR_READY_FAVICON_PATHS: FaviconPaths = {
+  '16x16': '/icons/icon-16-pr-ready.png',
+  '32x32': '/icons/icon-32-pr-ready.png'
+};
+
+const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
+  connectionStatus: 'not-connected',
+  missingUsername: true,
+  readyToMergeCount: 0,
+  failedBuildCount: 0,
+  failedBuildBadgeCount: 0,
+  highlightedReadyCount: 0,
+  highlightedWarningCount: 0,
+  reviewRequestedCount: 0,
+  approvedPrCount: null,
+  relevantPrCount: 0
+};
+
+// Order matters: the first matching variant wins.
+const FAVICON_VARIANTS: FaviconVariant[] = [
+  {
+    key: 'pr-ready',
+    matches: (metrics) => metrics.highlightedReadyCount > 0,
+    paths: PR_READY_FAVICON_PATHS
+  }
+];
 
 export default function App() {
   const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
@@ -71,6 +114,8 @@ export default function App() {
     lastManualAt: null
   });
   const [isJiraLoading, setIsJiraLoading] = useState(false);
+  const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
+    useState<GitHubSummaryMetrics>(DEFAULT_GITHUB_SUMMARY_METRICS);
   const isMountedRef = useRef(true);
   const isGitHubRefreshInFlightRef = useRef(false);
   const isJiraRefreshInFlightRef = useRef(false);
@@ -80,6 +125,10 @@ export default function App() {
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    syncFaviconVariant(selectFaviconVariant(gitHubSummaryMetrics));
+  }, [gitHubSummaryMetrics]);
 
   useEffect(() => {
     let active = true;
@@ -540,6 +589,7 @@ export default function App() {
       jiraRefreshSignal={jiraRefreshSignal}
       isJiraLoading={isJiraLoading}
       onRefreshJira={() => void handleRefreshJira()}
+      onGitHubSummaryMetricsChange={setGitHubSummaryMetrics}
     />
   );
 
@@ -576,4 +626,38 @@ export default function App() {
       </Routes>
     </div>
   );
+}
+
+function selectFaviconVariant(metrics: GitHubSummaryMetrics) {
+  return FAVICON_VARIANTS.find((variant) => variant.matches(metrics)) ?? {
+    key: 'default',
+    matches: () => true,
+    paths: DEFAULT_FAVICON_PATHS
+  };
+}
+
+function syncFaviconVariant(variant: FaviconVariant) {
+  updateFaviconLink('16x16', variant.paths['16x16']);
+  updateFaviconLink('32x32', variant.paths['32x32']);
+}
+
+function updateFaviconLink(size: FaviconSize, href: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const selector = `link[rel="icon"][sizes="${size}"]`;
+  const existingLink = document.querySelector<HTMLLinkElement>(selector);
+
+  if (existingLink) {
+    existingLink.href = href;
+    return;
+  }
+
+  const nextLink = document.createElement('link');
+  nextLink.rel = 'icon';
+  nextLink.type = 'image/png';
+  nextLink.sizes = size;
+  nextLink.href = href;
+  document.head.append(nextLink);
 }
