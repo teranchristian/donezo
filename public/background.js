@@ -36,6 +36,9 @@ const GITHUB_PULL_REQUESTS_QUERY = `
     url
     isDraft
     updatedAt
+    comments {
+      totalCount
+    }
     reviewDecision
     mergeStateStatus
     mergeQueueEntry {
@@ -527,6 +530,7 @@ function mapGraphQlPullRequest(pullRequest, source) {
     owner,
     repo,
     pullNumber: pullRequest.number,
+    totalCommentCount: Number(pullRequest.comments?.totalCount ?? 0),
     authorLogin: pullRequest.author?.login ?? '',
     isDraft: pullRequest.isDraft,
     updatedAt: pullRequest.updatedAt,

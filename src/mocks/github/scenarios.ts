@@ -254,6 +254,7 @@ function createPullRequest(
     owner: overrides.owner,
     repo: overrides.repo,
     pullNumber: overrides.pullNumber,
+    totalCommentCount: overrides.totalCommentCount ?? 0,
     authorLogin: overrides.authorLogin ?? 'xtian',
     isDraft: overrides.reviewStatus === 'draft',
     updatedAt: overrides.updatedAt,

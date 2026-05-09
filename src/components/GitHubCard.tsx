@@ -10,14 +10,17 @@ import {
 import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
 import {
+  getStoredGitHubPrNotificationSeenAtState,
   getStoredGitHubPrReadyState,
   getStoredGitHubPrWarningState,
   getStoredGitHubSortOrder,
+  saveStoredGitHubPrNotificationSeenAtState,
   saveStoredGitHubPrReadyState,
   saveStoredGitHubPrWarningState,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
   type GitHubPrReadyState,
+  type GitHubPrNotificationSeenAtState,
   type GitHubPrWarningState,
   type GitHubPrStatusFilter,
   type GitHubListSort
@@ -116,6 +119,9 @@ export function GitHubCard({
   const [hasLoadedGitHubPrReadyState, setHasLoadedGitHubPrReadyState] = useState(false);
   const [gitHubPrWarningState, setGitHubPrWarningState] = useState<GitHubPrWarningState>({});
   const [hasLoadedGitHubPrWarningState, setHasLoadedGitHubPrWarningState] = useState(false);
+  const [gitHubPrNotificationSeenAtState, setGitHubPrNotificationSeenAtState] =
+    useState<GitHubPrNotificationSeenAtState>({});
+  const [hasLoadedGitHubPrNotificationSeenAtState, setHasLoadedGitHubPrNotificationSeenAtState] = useState(false);
   const [isResolvingNotificationStates, setIsResolvingNotificationStates] = useState(false);
   const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
     Record<string, GitHubPullRequestState>
@@ -127,6 +133,10 @@ export function GitHubCard({
     (pullRequest) => pullRequest.source === 'review-requested'
   );
   const notifications = (data.notifications ?? []).filter(shouldDisplayNotification);
+  const pullRequestNewNotificationCountByKey = getPullRequestNewNotificationCountByKey(
+    notifications,
+    gitHubPrNotificationSeenAtState
+  );
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
   const notificationItems = notifications.map((notification) => ({
     kind: 'notification' as const,
@@ -244,6 +254,15 @@ export function GitHubCard({
       setHasLoadedGitHubPrWarningState(true);
     });
 
+    getStoredGitHubPrNotificationSeenAtState().then((storedSeenAtState) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setGitHubPrNotificationSeenAtState(storedSeenAtState);
+      setHasLoadedGitHubPrNotificationSeenAtState(true);
+    });
+
     return () => {
       isMounted = false;
     };
@@ -274,6 +293,14 @@ export function GitHubCard({
   }, [gitHubPrWarningState, hasLoadedGitHubPrWarningState]);
 
   useEffect(() => {
+    if (!hasLoadedGitHubPrNotificationSeenAtState) {
+      return;
+    }
+
+    void saveStoredGitHubPrNotificationSeenAtState(gitHubPrNotificationSeenAtState);
+  }, [gitHubPrNotificationSeenAtState, hasLoadedGitHubPrNotificationSeenAtState]);
+
+  useEffect(() => {
     if (!hasLoadedGitHubPrReadyState) {
       return;
     }
@@ -294,6 +321,40 @@ export function GitHubCard({
       return areGitHubPrWarningStatesEqual(currentState, nextState) ? currentState : nextState;
     });
   }, [hasLoadedGitHubPrWarningState, resolvedPullRequests]);
+
+  useEffect(() => {
+    if (!hasLoadedGitHubPrNotificationSeenAtState || data.connectionStatus !== 'connected' || isLoading) {
+      return;
+    }
+
+    const activePullRequestKeys = new Set(
+      resolvedPullRequests.map((pullRequest) => getGitHubPullRequestAttentionStateKey(pullRequest))
+    );
+
+    setGitHubPrNotificationSeenAtState((currentState) => {
+      const nextState = Object.fromEntries(
+        Object.entries(currentState).filter(([key]) => activePullRequestKeys.has(key))
+      );
+
+      return Object.keys(nextState).length === Object.keys(currentState).length ? currentState : nextState;
+    });
+  }, [data.connectionStatus, hasLoadedGitHubPrNotificationSeenAtState, isLoading, resolvedPullRequests]);
+
+  function handleMarkPullRequestNotificationsSeen(pullRequest: GitHubPullRequestItem) {
+    const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
+    const nextSeenAt = Date.now();
+
+    setGitHubPrNotificationSeenAtState((currentState) => {
+      if (currentState[pullRequestKey] === nextSeenAt) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        [pullRequestKey]: nextSeenAt
+      };
+    });
+  }
 
   useEffect(() => {
     const activeNotificationIds = new Set((data.notifications ?? []).map((notification) => notification.id));
@@ -505,6 +566,8 @@ export function GitHubCard({
                 todayFocusItemIds={todayFocusItemIds}
                 gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}
+                pullRequestNewNotificationCountByKey={pullRequestNewNotificationCountByKey}
+                onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
                 onClearWarningHighlight={handleClearWarningHighlight}
               />
             ) : (
@@ -520,9 +583,13 @@ export function GitHubCard({
                     <PullRequestRow
                       key={item.key}
                       pullRequest={item.value}
+                      newNotificationCount={
+                        pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(item.value)] ?? 0
+                      }
                       isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(item.value).id)}
                       isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, item.value)}
                       isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, item.value)}
+                      onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
                       onClearWarningHighlight={handleClearWarningHighlight}
                     />
                   )
@@ -570,15 +637,19 @@ type GitHubViewItem =
 
 function PullRequestRow({
   pullRequest,
+  newNotificationCount,
   isInTodayFocus,
   isReadyHighlighted = false,
   isWarningHighlighted = false,
+  onMarkNotificationsSeen,
   onClearWarningHighlight
 }: {
   pullRequest: GitHubPullRequestItem;
+  newNotificationCount: number;
   isInTodayFocus: boolean;
   isReadyHighlighted?: boolean;
   isWarningHighlighted?: boolean;
+  onMarkNotificationsSeen?: (pullRequest: GitHubPullRequestItem) => void;
   onClearWarningHighlight?: (pullRequest: GitHubPullRequestItem) => void;
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
@@ -600,7 +671,10 @@ function PullRequestRow({
         event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
         event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
       }}
-      onClick={() => onClearWarningHighlight?.(pullRequest)}
+      onClick={() => {
+        onMarkNotificationsSeen?.(pullRequest);
+        onClearWarningHighlight?.(pullRequest);
+      }}
       className={`group -mx-2 block cursor-pointer px-2 py-1.5 transition ${
         isWarningHighlighted
           ? 'bg-amber-400/[0.08] shadow-[inset_0_0_0_1px_rgba(251,191,36,0.22)] hover:bg-amber-400/[0.12]'
@@ -609,7 +683,7 @@ function PullRequestRow({
           : 'hover:bg-white/[0.03]'
       }`}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 gap-x-3">
         <div className="row-span-2 flex min-w-0 items-start gap-1.5">
           <GitHubItemIcon kind="pull-request" isDraft={pullRequest.reviewStatus === 'draft'} />
           <div className="min-w-0 flex-1">
@@ -667,10 +741,11 @@ function PullRequestRow({
             </div>
           </div>
         </div>
-        <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
-          <StatusBadge label={status.label} />
+        <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 self-center whitespace-nowrap">
+          <PullRequestCommentBadge newCount={newNotificationCount} totalCount={pullRequest.totalCommentCount} />
+          <StatusBadge label={status.label} className="whitespace-nowrap" />
         </div>
-        <p className="col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 text-white/38">
+        <p className="col-start-2 row-start-2 mt-0.25 self-start whitespace-nowrap text-right text-[0.64rem] leading-4 text-white/38">
           updated {formatRelativeTime(pullRequest.updatedAt)}
         </p>
       </div>
@@ -684,6 +759,34 @@ function PullRequestTrailingIcon({
   pullRequest: GitHubPullRequestItem;
 }) {
   return <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />;
+}
+
+function PullRequestCommentBadge({
+  newCount,
+  totalCount
+}: {
+  newCount: number;
+  totalCount: number;
+}) {
+  const label =
+    newCount > 0 ? `${newCount} new · ${totalCount} total` : `${totalCount} total`;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[0.64rem] font-medium leading-none text-white/60"
+      title={label}
+    >
+      <svg
+        viewBox="0 0 16 16"
+        aria-hidden="true"
+        className="h-3.5 w-3.5 shrink-0 text-white/42"
+        fill="currentColor"
+      >
+        <path d="M2.25 3.75A2.25 2.25 0 0 1 4.5 1.5h7a2.25 2.25 0 0 1 2.25 2.25v4.5A2.25 2.25 0 0 1 11.5 10.5H8.78l-2.5 2.1a.75.75 0 0 1-1.23-.57V10.5H4.5a2.25 2.25 0 0 1-2.25-2.25v-4.5Z" />
+      </svg>
+      <span>{label}</span>
+    </span>
+  );
 }
 
 function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusItem {
@@ -795,12 +898,16 @@ function PullRequestList({
   todayFocusItemIds,
   gitHubPrReadyState,
   gitHubPrWarningState,
+  pullRequestNewNotificationCountByKey,
+  onMarkNotificationsSeen,
   onClearWarningHighlight
 }: {
   pullRequests: GitHubPullRequestItem[];
   todayFocusItemIds: Set<string>;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
+  pullRequestNewNotificationCountByKey: Record<string, number>;
+  onMarkNotificationsSeen: (pullRequest: GitHubPullRequestItem) => void;
   onClearWarningHighlight: (pullRequest: GitHubPullRequestItem) => void;
 }) {
   const readyToClose = pullRequests.filter((pullRequest) => isPullRequestReadyToClose(pullRequest));
@@ -813,9 +920,13 @@ function PullRequestList({
           <PullRequestRow
             key={pullRequest.url}
             pullRequest={pullRequest}
+            newNotificationCount={
+              pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(pullRequest)] ?? 0
+            }
             isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
             isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
             isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+            onMarkNotificationsSeen={onMarkNotificationsSeen}
             onClearWarningHighlight={onClearWarningHighlight}
           />
         ))}
@@ -829,9 +940,13 @@ function PullRequestList({
         <PullRequestRow
           key={pullRequest.url}
           pullRequest={pullRequest}
+          newNotificationCount={
+            pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(pullRequest)] ?? 0
+          }
           isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
           isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
           isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+          onMarkNotificationsSeen={onMarkNotificationsSeen}
           onClearWarningHighlight={onClearWarningHighlight}
         />
       ))}
@@ -840,9 +955,13 @@ function PullRequestList({
           <PullRequestRow
             key={pullRequest.url}
             pullRequest={pullRequest}
+            newNotificationCount={
+              pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(pullRequest)] ?? 0
+            }
             isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
             isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
             isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+            onMarkNotificationsSeen={onMarkNotificationsSeen}
             onClearWarningHighlight={onClearWarningHighlight}
           />
         ))
@@ -1205,6 +1324,29 @@ function getNotificationTypeLabel(notification: GitHubNotification) {
   }
 
   return formatReason(notification.reason);
+}
+
+function getPullRequestNewNotificationCountByKey(
+  notifications: GitHubNotification[],
+  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState
+) {
+  return notifications.reduce<Record<string, number>>((counts, notification) => {
+    const identity = getPullRequestIdentityFromNotification(notification);
+    if (!identity) {
+      return counts;
+    }
+
+    const key = getPullRequestIdentityKey(identity);
+    const seenAt = gitHubPrNotificationSeenAtState[key];
+    const updatedAt = Date.parse(notification.updated_at);
+    const isNew = typeof seenAt !== 'number' || (Number.isFinite(updatedAt) && updatedAt > seenAt);
+
+    if (isNew) {
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+
+    return counts;
+  }, {});
 }
 
 function getNotificationIconKind(subjectType: string): 'pull-request' | 'issue' | 'commit' | 'discussion' {
