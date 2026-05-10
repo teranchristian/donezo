@@ -83,6 +83,7 @@ type GitHubConnectionResponse = {
 type GitHubNotificationActivityResponse = {
   success: boolean;
   hasChanges?: boolean;
+  data?: GitHubDashboardData;
   changedNotificationIds?: string[];
   error?: string;
 };
@@ -210,6 +211,7 @@ export async function pollGitHubNotificationActivity(options: {
   if (!token) {
     return {
       hasChanges: false,
+      data: undefined,
       changedNotificationIds: []
     };
   }
@@ -217,6 +219,7 @@ export async function pollGitHubNotificationActivity(options: {
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
     return {
       hasChanges: false,
+      data: undefined,
       changedNotificationIds: []
     };
   }
@@ -232,11 +235,13 @@ export async function pollGitHubNotificationActivity(options: {
 
     return {
       hasChanges: Boolean(response?.hasChanges),
+      data: response?.data,
       changedNotificationIds: response?.changedNotificationIds ?? []
     };
   } catch {
     return {
       hasChanges: false,
+      data: undefined,
       changedNotificationIds: []
     };
   }

@@ -361,12 +361,12 @@ export default function App() {
           return;
         }
 
-        await refreshGitHubData({
-          username,
-          token,
-          forceRefresh: true,
-          showLoadingIndicator: false
-        });
+        if (!result.data || isCancelled || !isMountedRef.current) {
+          return;
+        }
+
+        setGitHubData(result.data);
+        setGitHubSettingsTestStatus(result.data.connectionStatus);
       } finally {
         if (!isCancelled && isMountedRef.current) {
           setIsCheckingGitHubActivity(false);

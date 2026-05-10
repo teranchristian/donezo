@@ -271,14 +271,28 @@ function getChangedSignalIds(previousSignals, nextSignals) {
 }
 
 async function fetchGitHub(url, token) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`
-    }
-  });
+  let response;
+
+  try {
+    response = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`
+      }
+    });
+  } catch (error) {
+    throw new GitHubApiError(0, 'network', 'GitHub could not be reached right now.');
+  }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new GitHubApiError(response.status, 'invalid-token', 'GitHub rejected the saved token.');
+    }
+
+    if (response.status === 403) {
+      throw new GitHubApiError(response.status, 'rate-limit', 'GitHub rate limit reached. Try again soon.');
+    }
+
     throw new GitHubApiError(response.status);
   }
 
@@ -498,6 +512,37 @@ async function getDashboardPullRequests(username, token) {
   };
 }
 
+async function buildGitHubDashboardDataFromFetchResults(options) {
+  const notifications = Array.isArray(options.notifications) ? options.notifications : [];
+  const pullRequestResult = options.pullRequestResult ?? {
+    authored: { items: [], total_count: 0 },
+    reviewRequested: { items: [], total_count: 0 }
+  };
+  const token = normalizeGitHubToken(options.token);
+  const notificationAuthorLogins = await getGitHubNotificationAuthorLogins(notifications, token);
+  const enrichedNotifications = notifications.map((notification) =>
+    notificationAuthorLogins[notification.id]
+      ? { ...notification, authorLogin: notificationAuthorLogins[notification.id] }
+      : notification
+  );
+  const pullRequests = mergePullRequestSeeds(
+    pullRequestResult.authored.items,
+    pullRequestResult.reviewRequested.items
+  );
+
+  return {
+    connectionStatus: 'connected',
+    notificationsCount: enrichedNotifications.length,
+    openPrsCount: pullRequestResult.authored.total_count,
+    reviewRequestedCount: pullRequestResult.reviewRequested.total_count,
+    notifications: enrichedNotifications,
+    pullRequests,
+    errorMessage: null,
+    missingUsername: false,
+    lastUpdatedAt: Date.now()
+  };
+}
+
 function mergePullRequests(items) {
   const deduped = new Map();
   for (const item of items) {
@@ -698,21 +743,6 @@ async function loadGitHubDashboardData(payload) {
     }
   }
 
-  const connectionStatus = await testGitHubConnection(token);
-  if (connectionStatus === 'invalid') {
-    return {
-      ...getEmptyGitHubDashboardData('invalid'),
-      errorMessage: 'GitHub rejected the saved token.'
-    };
-  }
-
-  if (connectionStatus === 'error') {
-    return {
-      ...getEmptyGitHubDashboardData('error'),
-      errorMessage: 'GitHub could not be reached right now.'
-    };
-  }
-
   if (!username) {
     const data = {
       ...getEmptyGitHubDashboardData('connected'),
@@ -726,37 +756,24 @@ async function loadGitHubDashboardData(payload) {
   }
 
   try {
+    console.log('[GitHub] loadGitHubDashboardData: fetching notifications and pull requests', {
+      username,
+      forceRefresh: Boolean(payload.forceRefresh)
+    });
     const [notifications, pullRequestResult] = await Promise.all([
       getGitHubNotifications(token),
       getDashboardPullRequests(username, token)
     ]);
-    const notificationAuthorLogins = await getGitHubNotificationAuthorLogins(notifications, token);
-    const enrichedNotifications = notifications.map((notification) =>
-      notificationAuthorLogins[notification.id]
-        ? { ...notification, authorLogin: notificationAuthorLogins[notification.id] }
-        : notification
-    );
-    const pullRequests = mergePullRequestSeeds(
-      pullRequestResult.authored.items,
-      pullRequestResult.reviewRequested.items
-    );
-
-    const data = {
-      connectionStatus: 'connected',
-      notificationsCount: enrichedNotifications.length,
-      openPrsCount: pullRequestResult.authored.total_count,
-      reviewRequestedCount: pullRequestResult.reviewRequested.total_count,
-      notifications: enrichedNotifications,
-      pullRequests,
-      errorMessage: null,
-      missingUsername: false,
-      lastUpdatedAt: Date.now()
-    };
+    const data = await buildGitHubDashboardDataFromFetchResults({
+      notifications,
+      pullRequestResult,
+      token
+    });
 
     await Promise.all([
       saveCachedGitHubDashboardData(cacheToken, data),
-      saveCachedGitHubNotificationSignals(cacheToken, enrichedNotifications),
-      saveCachedGitHubPullRequestSignals(cacheToken, pullRequests)
+      saveCachedGitHubNotificationSignals(cacheToken, data.notifications),
+      saveCachedGitHubPullRequestSignals(cacheToken, data.pullRequests)
     ]);
     return data;
   } catch (error) {
@@ -780,6 +797,9 @@ async function pollGitHubNotificationActivity(payload) {
     getCachedGitHubNotificationSignals(cacheToken),
     getCachedGitHubPullRequestSignals(cacheToken)
   ]);
+  console.log('[GitHub] pollGitHubNotificationActivity: fetching notifications and pull requests', {
+    username
+  });
   const [notifications, pullRequestResult] = await Promise.all([
     getGitHubNotifications(token),
     username ? getDashboardPullRequests(username, token) : null
@@ -795,13 +815,29 @@ async function pollGitHubNotificationActivity(payload) {
   );
   const changedPullRequestIds = getChangedSignalIds(previousPullRequestSignals, nextPullRequestSignals);
 
+  const hasChanges = changedNotificationIds.length > 0 || changedPullRequestIds.length > 0;
+  let data;
+
+  if (hasChanges) {
+    data = await buildGitHubDashboardDataFromFetchResults({
+      notifications,
+      pullRequestResult: pullRequestResult ?? {
+        authored: { items: [], total_count: 0 },
+        reviewRequested: { items: [], total_count: 0 }
+      },
+      token
+    });
+  }
+
   await Promise.all([
-    saveCachedGitHubNotificationSignals(cacheToken, notifications),
-    saveCachedGitHubPullRequestSignals(cacheToken, pullRequests)
+    saveCachedGitHubNotificationSignals(cacheToken, data?.notifications ?? notifications),
+    saveCachedGitHubPullRequestSignals(cacheToken, data?.pullRequests ?? pullRequests),
+    ...(data ? [saveCachedGitHubDashboardData(cacheToken, data)] : [])
   ]);
 
   return {
-    hasChanges: changedNotificationIds.length > 0 || changedPullRequestIds.length > 0,
+    hasChanges,
+    data,
     changedNotificationIds: [...new Set([...changedNotificationIds, ...changedPullRequestIds])]
   };
 }
