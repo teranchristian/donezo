@@ -87,6 +87,17 @@ const gitHubDashboardRequests = new Map();
 const gitHubActivityPollRequests = new Map();
 const gitHubPullRequestStateRequests = new Map();
 const gitHubPullRequestStatesRequests = new Map();
+const GITHUB_NOTIFICATION_SIGNAL_KEYS = ['id', 'updatedAt', 'unread'];
+const GITHUB_PULL_REQUEST_SIGNAL_KEYS = [
+  'id',
+  'updatedAt',
+  'reviewStatus',
+  'ciStatus',
+  'mergeStateStatus',
+  'mergeQueueEntryState',
+  'mergeQueueEntryPosition',
+  'isDraft'
+];
 
 function normalizeJiraBaseUrl(baseUrl) {
   return String(baseUrl ?? '').trim().replace(/\/+$/, '');
@@ -250,13 +261,39 @@ function getDashboardPullRequestSignals(pullRequests) {
   }));
 }
 
-function getChangedSignalIds(previousSignals, nextSignals) {
-  const previousById = new Map(previousSignals.map((signal) => [signal.id, JSON.stringify(signal)]));
+function getSignalSignature(signal, expectedKeys, kind) {
+  const actualKeys = Object.keys(signal).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+
+  if (
+    actualKeys.length !== sortedExpectedKeys.length ||
+    actualKeys.some((key, index) => key !== sortedExpectedKeys[index])
+  ) {
+    throw new Error(
+      `[GitHub] ${kind} signal shape changed. Update ${kind} comparison keys. ` +
+        `Expected keys: ${sortedExpectedKeys.join(', ')}. ` +
+        `Actual keys: ${actualKeys.join(', ')}.`
+    );
+  }
+
+  return expectedKeys.map((key) => JSON.stringify(signal[key] ?? null)).join('|');
+}
+
+function getChangedSignalIds(previousSignals, nextSignals, options) {
+  const previousById = new Map(
+    previousSignals.map((signal) => [
+      signal.id,
+      getSignalSignature(signal, options.expectedKeys, options.kind)
+    ])
+  );
   const nextIds = new Set(nextSignals.map((signal) => signal.id));
   const changedIds = [];
 
   for (const signal of nextSignals) {
-    if (previousById.get(signal.id) !== JSON.stringify(signal)) {
+    if (
+      previousById.get(signal.id) !==
+      getSignalSignature(signal, options.expectedKeys, options.kind)
+    ) {
       changedIds.push(signal.id);
     }
   }
@@ -268,6 +305,24 @@ function getChangedSignalIds(previousSignals, nextSignals) {
   }
 
   return changedIds;
+}
+
+function getSignalById(signals, id) {
+  return signals.find((signal) => signal.id === id) ?? null;
+}
+
+function logSignalChanges(kind, previousSignals, nextSignals, changedIds) {
+  if (changedIds.length === 0) {
+    return;
+  }
+
+  const firstChangedId = changedIds[0];
+  console.log(`[GitHub] ${kind} signals changed`, {
+    changedCount: changedIds.length,
+    firstChangedId,
+    previous: getSignalById(previousSignals, firstChangedId),
+    next: getSignalById(nextSignals, firstChangedId)
+  });
 }
 
 async function fetchGitHub(url, token) {
@@ -811,9 +866,28 @@ async function pollGitHubNotificationActivity(payload) {
   const nextPullRequestSignals = getDashboardPullRequestSignals(pullRequests);
   const changedNotificationIds = getChangedSignalIds(
     previousNotificationSignals,
-    nextNotificationSignals
+    nextNotificationSignals,
+    {
+      expectedKeys: GITHUB_NOTIFICATION_SIGNAL_KEYS,
+      kind: 'notification'
+    }
   );
-  const changedPullRequestIds = getChangedSignalIds(previousPullRequestSignals, nextPullRequestSignals);
+  const changedPullRequestIds = getChangedSignalIds(previousPullRequestSignals, nextPullRequestSignals, {
+    expectedKeys: GITHUB_PULL_REQUEST_SIGNAL_KEYS,
+    kind: 'pull request'
+  });
+  logSignalChanges(
+    'notification',
+    previousNotificationSignals,
+    nextNotificationSignals,
+    changedNotificationIds
+  );
+  logSignalChanges(
+    'pull request',
+    previousPullRequestSignals,
+    nextPullRequestSignals,
+    changedPullRequestIds
+  );
 
   const hasChanges = changedNotificationIds.length > 0 || changedPullRequestIds.length > 0;
   let data;
