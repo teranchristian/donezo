@@ -2,13 +2,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
 import { InfoBanner } from '../components/InfoBanner';
-import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
+import { GitHubConnectionStatus } from '../lib/githubApi';
 import { JiraConnectionStatus } from '../lib/jiraApi';
 import { DashboardSettings } from '../lib/storage';
 
 type SettingsPageProps = {
   settings: DashboardSettings;
-  gitHubData: GitHubDashboardData;
+  gitHubOwnerOptions: string[];
   onSave: (settings: DashboardSettings) => Promise<void>;
   isGitHubDevModeEnabled: boolean;
   onSetGitHubDevMode: (isEnabled: boolean) => Promise<void>;
@@ -43,7 +43,7 @@ const JIRA_TEST_STATUS_COPY: Record<JiraConnectionStatus, string> = {
 
 export function SettingsPage({
   settings,
-  gitHubData,
+  gitHubOwnerOptions,
   onSave,
   isGitHubDevModeEnabled,
   onSetGitHubDevMode,
@@ -58,10 +58,19 @@ export function SettingsPage({
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [lastSuccessfulGitHubTestToken, setLastSuccessfulGitHubTestToken] = useState(
+    gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
+  );
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
+
+  useEffect(() => {
+    setLastSuccessfulGitHubTestToken(
+      gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
+    );
+  }, [gitHubTestStatus, settings.integrations.github.token]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -91,7 +100,8 @@ export function SettingsPage({
 
   async function handleTestConnection() {
     setSaveMessage('');
-    await onTestGitHubConnection(draft.integrations.github.token);
+    const status = await onTestGitHubConnection(draft.integrations.github.token);
+    setLastSuccessfulGitHubTestToken(status === 'connected' ? draft.integrations.github.token.trim() : '');
   }
 
   async function handleTestJira() {
@@ -103,7 +113,10 @@ export function SettingsPage({
     );
   }
 
-  const ownerOptions = getGitHubOwnerOptions(gitHubData, draft.integrations.github.username, draft.integrations.github.ownerFilter);
+  const ownerOptions = getGitHubOwnerOptions(gitHubOwnerOptions, draft.integrations.github.ownerFilter);
+  const hasValidatedCurrentGitHubToken =
+    gitHubTestStatus === 'connected' && draft.integrations.github.token.trim() === lastSuccessfulGitHubTestToken;
+  const shouldShowOwnerFilter = hasValidatedCurrentGitHubToken && ownerOptions.length > 0;
 
   return (
     <main className="min-h-screen px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
@@ -244,34 +257,36 @@ export function SettingsPage({
                 />
               </label>
 
-              <label className="block">
-                <span className="mb-2 block text-sm text-stone-300">Dashboard owner or org</span>
-                <select
-                  value={draft.integrations.github.ownerFilter.trim() || 'all'}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      integrations: {
-                        ...current.integrations,
-                        github: {
-                          ...current.integrations.github,
-                          ownerFilter: event.target.value === 'all' ? '' : event.target.value
+              {shouldShowOwnerFilter ? (
+                <label className="block">
+                  <span className="mb-2 block text-sm text-stone-300">Dashboard owner or org</span>
+                  <select
+                    value={draft.integrations.github.ownerFilter.trim() || 'all'}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        integrations: {
+                          ...current.integrations,
+                          github: {
+                            ...current.integrations.github,
+                            ownerFilter: event.target.value === 'all' ? '' : event.target.value
+                          }
                         }
-                      }
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
-                >
-                  {ownerOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-panel text-stone-100">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-2 text-sm leading-6 text-stone-400">
-                  Controls which GitHub owner or org the dashboard shows by default. Leave it on All to keep your current combined view.
-                </p>
-              </label>
+                      }))
+                    }
+                    className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
+                  >
+                    {ownerOptions.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-panel text-stone-100">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-sm leading-6 text-stone-400">
+                    Loaded from GitHub after a successful connection test. Leave it on All to keep your combined view.
+                  </p>
+                </label>
+              ) : null}
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -432,34 +447,22 @@ export function SettingsPage({
   );
 }
 
-function getGitHubOwnerOptions(
-  gitHubData: GitHubDashboardData,
-  username: string,
-  selectedOwner: string
-) {
+function getGitHubOwnerOptions(ownerOptions: string[], selectedOwner: string) {
   const owners = new Set<string>();
 
-  for (const pullRequest of gitHubData.pullRequests) {
-    owners.add(getOwnerFromRepositoryName(pullRequest.repositoryName));
+  for (const owner of ownerOptions) {
+    const trimmedOwner = owner.trim();
+    if (trimmedOwner) {
+      owners.add(trimmedOwner);
+    }
   }
 
-  for (const notification of gitHubData.notifications ?? []) {
-    owners.add(getOwnerFromRepositoryName(notification.repository.full_name));
-  }
-
-  const trimmedUsername = username.trim();
   const trimmedSelectedOwner = selectedOwner.trim();
-  const sortedOwners = [...owners].filter(Boolean).sort((left, right) => left.localeCompare(right));
+  const sortedOwners = [...owners].sort((left, right) => left.localeCompare(right));
   const options = [{ value: 'all', label: 'All' }];
 
-  if (trimmedUsername) {
-    options.push({ value: trimmedUsername, label: trimmedUsername });
-  }
-
   for (const owner of sortedOwners) {
-    if (owner !== trimmedUsername) {
-      options.push({ value: owner, label: owner });
-    }
+    options.push({ value: owner, label: owner });
   }
 
   if (
@@ -471,8 +474,4 @@ function getGitHubOwnerOptions(
   }
 
   return options;
-}
-
-function getOwnerFromRepositoryName(repositoryName: string) {
-  return repositoryName.split('/')[0] ?? '';
 }

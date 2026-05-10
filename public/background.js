@@ -411,6 +411,42 @@ async function testGitHubConnection(token) {
   }
 }
 
+async function getGitHubOwnerOptions(payload) {
+  const token = normalizeGitHubToken(payload.token);
+  if (!token) {
+    return [];
+  }
+
+  const viewerResponse = await fetchGitHub('https://api.github.com/user', token);
+  const viewer = await viewerResponse.json();
+  const viewerLogin = String(viewer?.login ?? '').trim();
+  const owners = new Set();
+
+  if (viewerLogin) {
+    owners.add(viewerLogin);
+  }
+
+  try {
+    const organizationsResponse = await fetchGitHub('https://api.github.com/user/orgs?per_page=100', token);
+    const organizations = await organizationsResponse.json();
+
+    if (Array.isArray(organizations)) {
+      for (const organization of organizations) {
+        const login = String(organization?.login ?? '').trim();
+        if (login) {
+          owners.add(login);
+        }
+      }
+    }
+  } catch (error) {
+    if (error instanceof GitHubApiError && error.kind === 'invalid-token') {
+      throw error;
+    }
+  }
+
+  return [...owners].sort((left, right) => left.localeCompare(right));
+}
+
 function getGitHubNotificationsSinceIso() {
   return new Date(Date.now() - GITHUB_NOTIFICATIONS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -1306,6 +1342,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (
     ![
       'TEST_GITHUB_CONNECTION',
+      'FETCH_GITHUB_OWNER_OPTIONS',
       'FETCH_GITHUB_DASHBOARD',
       'POLL_GITHUB_ACTIVITY',
       'FETCH_GITHUB_PULL_REQUEST_STATE',
@@ -1355,6 +1392,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           success: false,
           error: error instanceof Error ? error.message : 'Failed to load GitHub dashboard'
+        });
+      }
+
+      return;
+    }
+
+    if (message.type === 'FETCH_GITHUB_OWNER_OPTIONS') {
+      try {
+        const owners = await getGitHubOwnerOptions(payload);
+        sendResponse({ success: true, owners });
+      } catch (error) {
+        sendResponse({
+          success: false,
+          owners: [],
+          error: error instanceof Error ? error.message : 'Failed to load GitHub owner options'
         });
       }
 

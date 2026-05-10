@@ -80,6 +80,12 @@ type GitHubConnectionResponse = {
   error?: string;
 };
 
+type GitHubOwnerOptionsResponse = {
+  success: boolean;
+  owners?: string[];
+  error?: string;
+};
+
 type GitHubNotificationActivityResponse = {
   success: boolean;
   hasChanges?: boolean;
@@ -139,6 +145,30 @@ export async function testGitHubConnection(token: string): Promise<GitHubConnect
     return response?.status ?? 'error';
   } catch {
     return 'error';
+  }
+}
+
+export async function fetchGitHubOwnerOptions(token: string): Promise<string[]> {
+  const trimmedToken = token.trim();
+  if (!trimmedToken) {
+    return [];
+  }
+
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return [];
+  }
+
+  try {
+    const response = await sendMessage<GitHubOwnerOptionsResponse>({
+      type: 'FETCH_GITHUB_OWNER_OPTIONS',
+      payload: {
+        token: trimmedToken
+      }
+    });
+
+    return Array.isArray(response?.owners) ? response.owners : [];
+  } catch {
+    return [];
   }
 }
 

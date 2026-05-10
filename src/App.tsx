@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import {
+  fetchGitHubOwnerOptions,
   getEmptyGitHubDashboardData,
   getLatestGitHubDashboardData,
   loadGitHubDashboardData,
@@ -120,6 +121,7 @@ export default function App() {
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isCheckingGitHubActivity, setIsCheckingGitHubActivity] = useState(false);
   const [lastGitHubActivityCheckAt, setLastGitHubActivityCheckAt] = useState<number | null>(null);
+  const [gitHubOwnerOptions, setGitHubOwnerOptions] = useState<string[]>([]);
   const [gitHubSettingsTestStatus, setGitHubSettingsTestStatus] =
     useState<GitHubConnectionStatus>('not-connected');
   const [isTestingGitHubSettings, setIsTestingGitHubSettings] = useState(false);
@@ -234,6 +236,32 @@ export default function App() {
       isCancelled = true;
     };
   }, [gitHubMockScenario, isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
+
+  useEffect(() => {
+    if (isLoadingSettings || gitHubMockScenario) {
+      return;
+    }
+
+    const token = settings.integrations.github.token.trim();
+    if (!token || gitHubSettingsTestStatus !== 'connected') {
+      setGitHubOwnerOptions([]);
+      return;
+    }
+
+    let isCancelled = false;
+
+    void fetchGitHubOwnerOptions(token).then((owners) => {
+      if (isCancelled || !isMountedRef.current) {
+        return;
+      }
+
+      setGitHubOwnerOptions(owners);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [gitHubMockScenario, gitHubSettingsTestStatus, isLoadingSettings, settings.integrations.github.token]);
 
   useEffect(() => {
     if (isLoadingSettings) {
@@ -396,6 +424,14 @@ export default function App() {
     const status = await testGitHubConnection(token);
 
     setGitHubSettingsTestStatus(status);
+    if (status === 'connected') {
+      const owners = await fetchGitHubOwnerOptions(token);
+      if (isMountedRef.current) {
+        setGitHubOwnerOptions(owners);
+      }
+    } else if (isMountedRef.current) {
+      setGitHubOwnerOptions([]);
+    }
     setIsTestingGitHubSettings(false);
     return status;
   }
@@ -628,7 +664,7 @@ export default function App() {
           element={
             <SettingsPage
               settings={settings}
-              gitHubData={gitHubData}
+              gitHubOwnerOptions={gitHubOwnerOptions}
               onSave={handleSaveSettings}
               onTestGitHubConnection={handleTestGitHubConnection}
               onTestJiraConnection={handleTestJiraConnection}
