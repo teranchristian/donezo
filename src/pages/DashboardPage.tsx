@@ -564,7 +564,6 @@ export function DashboardPage({
         isLoading={isGitHubLoading}
         isCheckingActivity={isCheckingGitHubActivity}
         lastUpdatedAt={gitHubData.lastUpdatedAt}
-        lastCheckedAt={lastGitHubActivityCheckAt}
         onRefresh={onRefreshGitHub}
       />
     ) : (
@@ -1229,27 +1228,19 @@ function GitHubIntegrationStatusBar({
   isLoading,
   isCheckingActivity,
   lastUpdatedAt,
-  lastCheckedAt,
   onRefresh,
 }: {
   connectionStatus: GitHubConnectionStatus;
   isLoading: boolean;
   isCheckingActivity: boolean;
   lastUpdatedAt: number | null;
-  lastCheckedAt: number | null;
   onRefresh: () => void;
 }) {
-  const toneClass =
+  const buttonLabel =
     connectionStatus === 'connected'
-      ? 'bg-emerald-200/10 text-emerald-100'
-      : connectionStatus === 'invalid'
-        ? 'bg-rose-200/10 text-rose-100'
-        : connectionStatus === 'testing' || connectionStatus === 'error'
-          ? 'bg-amber-200/10 text-amber-100'
-          : 'bg-white/6 text-stone-300';
-  const label =
-    connectionStatus === 'connected'
-      ? 'Connected'
+      ? isLoading
+        ? 'Refreshing...'
+        : 'Refresh'
       : connectionStatus === 'invalid'
         ? 'Invalid token'
         : connectionStatus === 'testing'
@@ -1257,22 +1248,26 @@ function GitHubIntegrationStatusBar({
           : connectionStatus === 'error'
             ? 'Connection error'
             : 'Not connected';
+  const statusText =
+    connectionStatus === 'connected'
+      ? `Updated ${formatDashboardTime(lastUpdatedAt)}`
+      : connectionStatus === 'invalid'
+        ? 'Invalid token'
+      : connectionStatus === 'testing'
+        ? 'Testing'
+        : connectionStatus === 'error'
+          ? 'Connection error'
+          : 'Not connected';
 
   return (
     <div className="ml-auto flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <TopBarBadge className={toneClass}>{label}</TopBarBadge>
-        <TopBarButton onClick={onRefresh} disabled={isLoading}>
-          {isLoading ? 'Refreshing...' : 'Refresh'}
+      <div className="flex flex-wrap items-center justify-end">
+        <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus !== 'connected'}>
+          {buttonLabel}
         </TopBarButton>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[0.68rem] text-white/32">
-        <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
-        <span>·</span>
-        <span>
-          Checked {formatDashboardTime(lastCheckedAt)}
-          {isCheckingActivity ? ' · Checking…' : ''}
-        </span>
+      <div className="flex flex-wrap items-center justify-end gap-y-1 text-[0.68rem] text-white/32">
+        <span>{statusText}</span>
       </div>
     </div>
   );
@@ -1289,17 +1284,11 @@ function JiraIntegrationStatusBar({
   lastUpdatedAt: number | null;
   onRefresh: () => void;
 }) {
-  const toneClass =
+  const buttonLabel =
     connectionStatus === 'connected'
-      ? 'bg-emerald-200/10 text-emerald-100'
-      : connectionStatus === 'invalid'
-        ? 'bg-rose-200/10 text-rose-100'
-        : connectionStatus === 'testing' || connectionStatus === 'error'
-          ? 'bg-amber-200/10 text-amber-100'
-          : 'bg-white/6 text-stone-300';
-  const label =
-    connectionStatus === 'connected'
-      ? 'Connected'
+      ? isLoading
+        ? 'Refreshing...'
+        : 'Refresh'
       : connectionStatus === 'invalid'
         ? 'Invalid credentials'
         : connectionStatus === 'testing'
@@ -1307,38 +1296,28 @@ function JiraIntegrationStatusBar({
           : connectionStatus === 'error'
             ? 'API error'
             : 'Not connected';
+  const statusText =
+    connectionStatus === 'connected'
+      ? `Updated ${formatDashboardTime(lastUpdatedAt)}`
+      : connectionStatus === 'invalid'
+        ? 'Invalid credentials'
+      : connectionStatus === 'testing'
+          ? 'Testing'
+          : connectionStatus === 'error'
+            ? 'API error'
+            : 'Not connected';
 
   return (
     <div className="ml-auto flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <TopBarBadge className={toneClass}>{label}</TopBarBadge>
-        <TopBarButton
-          onClick={onRefresh}
-          disabled={isLoading || connectionStatus === 'not-connected'}
-        >
-          {isLoading ? 'Refreshing...' : 'Refresh'}
+      <div className="flex flex-wrap items-center justify-end">
+        <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus !== 'connected'}>
+          {buttonLabel}
         </TopBarButton>
       </div>
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[0.68rem] text-white/32">
-        <span>Updated {formatDashboardTime(lastUpdatedAt)}</span>
+      <div className="flex flex-wrap items-center justify-end gap-y-1 text-[0.68rem] text-white/32">
+        <span>{statusText}</span>
       </div>
     </div>
-  );
-}
-
-function TopBarBadge({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className: string;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.62rem] font-medium uppercase tracking-[0.14em] ${className}`}
-    >
-      {children}
-    </span>
   );
 }
 
