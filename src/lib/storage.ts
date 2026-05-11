@@ -10,6 +10,7 @@ type FocusItemBase = {
   id: string;
   sourceLabel: string;
   reference: string;
+  url?: string;
   title: string;
   statusLabel: string;
   statusTone: FocusStatusTone;
@@ -34,6 +35,7 @@ type LegacyFocusItem = {
   source: 'jira' | 'github';
   sourceLabel: string;
   reference: string;
+  url?: string;
   title: string;
   statusLabel: string;
   statusTone: FocusStatusTone;
@@ -750,6 +752,7 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
     id: item.id,
     sourceLabel: item.sourceLabel.trim(),
     reference: item.reference.trim(),
+    url: typeof item.url === 'string' && item.url.trim() ? item.url.trim() : undefined,
     title: item.title.trim(),
     statusLabel: item.statusLabel.trim(),
     statusTone: item.statusTone

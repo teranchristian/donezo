@@ -623,6 +623,7 @@ export function DashboardPage({
             <section className="dashboard-side-column">
               <SummaryCard
                 items={todayFocusItems}
+                jiraBaseUrl={settings.integrations.jira.baseUrl}
                 warning={todayFocusWarning}
                 onAddItem={handleAddTodayFocusItem}
                 onNestNewPullRequest={handleNestNewTodayFocusPullRequest}

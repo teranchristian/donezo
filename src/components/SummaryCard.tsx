@@ -2,6 +2,7 @@ import { FocusEvent, useEffect, useState } from 'react';
 import { CardShell } from './CardShell';
 import { type FocusItem, type FocusJiraItem, type FocusPullRequestItem } from '../lib/storage';
 import { FocusTargetIcon } from './TodayFocusIndicator';
+import { getJiraBrowseUrl, normalizeJiraBaseUrl } from '../lib/jiraApi';
 
 export const TODAY_FOCUS_MAX_ITEMS = 3;
 export const TODAY_FOCUS_DRAG_MIME = 'application/x-dashboard-today-focus-item';
@@ -16,6 +17,7 @@ type FocusInternalDragPayload = {
 
 type SummaryCardProps = {
   items: FocusItem[];
+  jiraBaseUrl?: string;
   limit?: number;
   warning?: string | null;
   onRemoveItem: (itemId: string) => void;
@@ -29,6 +31,7 @@ type SummaryCardProps = {
 
 export function SummaryCard({
   items,
+  jiraBaseUrl,
   limit = TODAY_FOCUS_MAX_ITEMS,
   warning,
   onRemoveItem,
@@ -129,6 +132,7 @@ export function SummaryCard({
             />
             <FocusItemCard
               item={item}
+              jiraBaseUrl={jiraBaseUrl}
               onRemove={onRemoveItem}
               activeInternalDrag={activeInternalDrag}
               onInternalDragEnd={handleInternalDragEnd}
@@ -188,6 +192,7 @@ export function SummaryCard({
 
 function FocusItemCard({
   item,
+  jiraBaseUrl,
   onRemove,
   activeInternalDrag,
   onInternalDragEnd,
@@ -197,6 +202,7 @@ function FocusItemCard({
   onReorderNestedPullRequest
 }: {
   item: FocusItem;
+  jiraBaseUrl?: string;
   onRemove: (itemId: string) => void;
   activeInternalDrag: FocusInternalDragPayload | null;
   onInternalDragEnd: () => void;
@@ -209,6 +215,7 @@ function FocusItemCard({
     return (
       <FocusJiraCard
         item={item}
+        jiraBaseUrl={jiraBaseUrl}
         onRemove={onRemove}
         activeInternalDrag={activeInternalDrag}
         onInternalDragEnd={onInternalDragEnd}
@@ -223,6 +230,7 @@ function FocusItemCard({
   return (
     <FocusPullRequestCard
       item={item}
+      jiraBaseUrl={jiraBaseUrl}
       onRemove={() => onRemove(item.id)}
       isNested={false}
       onInternalDragEnd={onInternalDragEnd}
@@ -233,6 +241,7 @@ function FocusItemCard({
 
 function FocusJiraCard({
   item,
+  jiraBaseUrl,
   onRemove,
   activeInternalDrag,
   onInternalDragEnd,
@@ -242,6 +251,7 @@ function FocusJiraCard({
   onReorderNestedPullRequest
 }: {
   item: FocusJiraItem;
+  jiraBaseUrl?: string;
   onRemove: (itemId: string) => void;
   activeInternalDrag: FocusInternalDragPayload | null;
   onInternalDragEnd: () => void;
@@ -255,6 +265,7 @@ function FocusJiraCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const hasLinkedPrs = item.children.length > 0;
   const shouldExpandList = hasLinkedPrs && (isExpanded || isNestTargetActive);
+  const issueUrl = getFocusItemUrl(item, jiraBaseUrl);
 
   useEffect(() => {
     if (!hasLinkedPrs) {
@@ -367,7 +378,9 @@ function FocusJiraCard({
                   <span className="shrink-0 text-[0.63rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     {item.sourceLabel}
                   </span>
-                  <span className="shrink-0 text-[0.7rem] font-semibold text-white/62">{item.reference}</span>
+                  <FocusReferenceLink href={issueUrl} className="shrink-0 text-[0.7rem] font-semibold text-white/62">
+                    {item.reference}
+                  </FocusReferenceLink>
                 </div>
                 <p className="mt-1 line-clamp-2 text-[0.82rem] font-medium leading-4.5 text-primary">{item.title}</p>
               </div>
@@ -429,6 +442,7 @@ function FocusJiraCard({
                         />
                         <FocusPullRequestCard
                           item={child}
+                          jiraBaseUrl={jiraBaseUrl}
                           onRemove={() => onRemove(child.id)}
                           isNested
                           parentId={item.id}
@@ -456,6 +470,7 @@ function FocusJiraCard({
 
 function FocusPullRequestCard({
   item,
+  jiraBaseUrl,
   onRemove,
   isNested,
   parentId,
@@ -463,6 +478,7 @@ function FocusPullRequestCard({
   onInternalDragStart
 }: {
   item: FocusPullRequestItem;
+  jiraBaseUrl?: string;
   onRemove: () => void;
   isNested: boolean;
   parentId?: string;
@@ -470,6 +486,7 @@ function FocusPullRequestCard({
   onInternalDragStart: (payload: FocusInternalDragPayload) => void;
 }) {
   const statusToneClass = getStatusToneClass(item.statusTone);
+  const pullRequestUrl = getFocusItemUrl(item, jiraBaseUrl);
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     const payload = {
@@ -517,7 +534,9 @@ function FocusPullRequestCard({
             {isNested ? (
               <>
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="shrink-0 text-[0.69rem] font-semibold text-white/74">{item.reference}</span>
+                  <FocusReferenceLink href={pullRequestUrl} className="shrink-0 text-[0.69rem] font-semibold text-white/74">
+                    {item.reference}
+                  </FocusReferenceLink>
                   <span className={`inline-flex h-2 w-2 shrink-0 rounded-full ${getStatusDotClass(item.statusTone)}`} aria-hidden="true" />
                   <span className="truncate text-[0.61rem] font-medium uppercase tracking-[0.1em] text-white/42">
                     {item.statusLabel}
@@ -531,7 +550,9 @@ function FocusPullRequestCard({
                   <span className="shrink-0 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     {item.sourceLabel}
                   </span>
-                  <span className="shrink-0 text-[0.68rem] font-semibold text-white/58">{item.reference}</span>
+                  <FocusReferenceLink href={pullRequestUrl} className="shrink-0 text-[0.68rem] font-semibold text-white/58">
+                    {item.reference}
+                  </FocusReferenceLink>
                 </div>
                 <p className="mt-1 line-clamp-2 text-[0.79rem] font-medium leading-4.5 text-primary">{item.title}</p>
               </>
@@ -758,6 +779,52 @@ function normalizeDroppedItem(item: FocusItem): FocusItem {
         children: item.children ?? []
       }
     : item;
+}
+
+function getFocusItemUrl(item: FocusItem, jiraBaseUrl?: string) {
+  if (item.url) {
+    return item.url;
+  }
+
+  if (item.source === 'jira') {
+    const normalizedBaseUrl = normalizeJiraBaseUrl(jiraBaseUrl ?? '');
+    return normalizedBaseUrl ? getJiraBrowseUrl(normalizedBaseUrl, item.jiraKey) : undefined;
+  }
+
+  const match = item.id.match(/^github:([^#]+)#(\d+)$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const [, repositoryName, pullNumber] = match;
+  return `https://github.com/${repositoryName}/pull/${pullNumber}`;
+}
+
+function FocusReferenceLink({
+  href,
+  className,
+  children
+}: {
+  href?: string;
+  className: string;
+  children: string;
+}) {
+  if (!href) {
+    return <span className={className}>{children}</span>;
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      draggable={false}
+      className={`${className} underline decoration-white/20 underline-offset-4 transition hover:text-white hover:decoration-white/45`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {children}
+    </a>
+  );
 }
 
 function getStatusToneClass(statusTone: FocusItem['statusTone']) {
