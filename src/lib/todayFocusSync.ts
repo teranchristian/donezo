@@ -1,5 +1,9 @@
+import {
+  type GitHubPullRequestItem,
+  type GitHubPullRequestState,
+} from './githubApi';
 import { JiraIssue, getJiraIssueFocusTone } from './jiraApi';
-import { FocusItem, FocusJiraItem } from './storage';
+import { FocusItem, FocusJiraItem, FocusPullRequestItem } from './storage';
 
 export type TodayFocusRefreshSignal = {
   lastCompletedAt: number | null;
@@ -9,6 +13,16 @@ export type TodayFocusRefreshSignal = {
 export type TodayFocusJiraSyncResult = {
   items: FocusItem[];
   missingKeys: string[];
+};
+
+export type TodayFocusGitHubSyncResult = {
+  items: FocusItem[];
+  missingPullRequests: Array<{
+    id: string;
+    owner: string;
+    repo: string;
+    pullNumber: number;
+  }>;
 };
 
 export function reconcileTodayFocusJiraItems(
@@ -63,4 +77,228 @@ function applyJiraIssueToFocusItem(item: FocusJiraItem, issue: JiraIssue): Focus
     statusLabel: nextStatusLabel,
     statusTone: nextStatusTone
   };
+}
+
+export function reconcileTodayFocusGitHubItems(
+  items: FocusItem[],
+  pullRequests: GitHubPullRequestItem[]
+): TodayFocusGitHubSyncResult {
+  const pullRequestsById = new Map(
+    pullRequests.map((pullRequest) => [getFocusPullRequestId(pullRequest), pullRequest] as const)
+  );
+  const missingPullRequests = new Map<
+    string,
+    {
+      id: string;
+      owner: string;
+      repo: string;
+      pullNumber: number;
+    }
+  >();
+  let hasChanges = false;
+
+  const nextItems = items.map((item) => {
+    if (item.source === 'jira') {
+      const nextChildren = item.children.map((child) => {
+        const nextChild = reconcileGitHubFocusPullRequestItem(
+          child,
+          pullRequestsById,
+          missingPullRequests
+        );
+        if (nextChild !== child) {
+          hasChanges = true;
+        }
+        return nextChild;
+      });
+
+      return nextChildren.some((child, index) => child !== item.children[index])
+        ? {
+            ...item,
+            children: nextChildren
+          }
+        : item;
+    }
+
+    const nextItem = reconcileGitHubFocusPullRequestItem(item, pullRequestsById, missingPullRequests);
+    if (nextItem !== item) {
+      hasChanges = true;
+    }
+
+    return nextItem;
+  });
+
+  return {
+    items: hasChanges ? nextItems : items,
+    missingPullRequests: Array.from(missingPullRequests.values())
+  };
+}
+
+export function applyGitHubPullRequestStatesToTodayFocusItems(
+  items: FocusItem[],
+  pullRequestStates: Record<string, GitHubPullRequestState>
+): FocusItem[] {
+  let hasChanges = false;
+
+  const nextItems = items.map((item) => {
+    if (item.source === 'jira') {
+      const nextChildren = item.children.map((child) => {
+        const nextChild = applyGitHubPullRequestStateToFocusItem(child, pullRequestStates);
+        if (nextChild !== child) {
+          hasChanges = true;
+        }
+        return nextChild;
+      });
+
+      return nextChildren.some((child, index) => child !== item.children[index])
+        ? {
+            ...item,
+            children: nextChildren
+          }
+        : item;
+    }
+
+    const nextItem = applyGitHubPullRequestStateToFocusItem(item, pullRequestStates);
+    if (nextItem !== item) {
+      hasChanges = true;
+    }
+
+    return nextItem;
+  });
+
+  return hasChanges ? nextItems : items;
+}
+
+function reconcileGitHubFocusPullRequestItem(
+  item: FocusPullRequestItem,
+  pullRequestsById: Map<string, GitHubPullRequestItem>,
+  missingPullRequests: Map<
+    string,
+    {
+      id: string;
+      owner: string;
+      repo: string;
+      pullNumber: number;
+    }
+  >
+) {
+  if (isTerminalGitHubFocusStatus(item.statusLabel)) {
+    return item;
+  }
+
+  const pullRequest = pullRequestsById.get(item.id);
+  if (!pullRequest) {
+    const identity = parseGitHubFocusPullRequestIdentity(item.id);
+    if (identity) {
+      missingPullRequests.set(item.id, identity);
+    }
+    return item;
+  }
+
+  const nextTitle = pullRequest.title.trim();
+  const nextStatusLabel = getGitHubFocusStatusLabel(pullRequest.reviewStatus);
+  const nextStatusTone = getGitHubFocusStatusTone(pullRequest.reviewStatus);
+  const nextUrl = pullRequest.url;
+
+  if (
+    item.title === nextTitle &&
+    item.statusLabel === nextStatusLabel &&
+    item.statusTone === nextStatusTone &&
+    item.url === nextUrl
+  ) {
+    return item;
+  }
+
+  return {
+    ...item,
+    title: nextTitle,
+    statusLabel: nextStatusLabel,
+    statusTone: nextStatusTone,
+    url: nextUrl
+  };
+}
+
+function applyGitHubPullRequestStateToFocusItem(
+  item: FocusPullRequestItem,
+  pullRequestStates: Record<string, GitHubPullRequestState>
+) {
+  if (isTerminalGitHubFocusStatus(item.statusLabel)) {
+    return item;
+  }
+
+  const state = pullRequestStates[item.id];
+  if (!state || state === 'open') {
+    return item;
+  }
+
+  const nextStatusLabel = state === 'merged' ? 'Merged' : 'Closed';
+  const nextStatusTone: FocusPullRequestItem['statusTone'] =
+    state === 'merged' ? 'emerald' : 'amber';
+  if (item.statusLabel === nextStatusLabel && item.statusTone === nextStatusTone) {
+    return item;
+  }
+
+  return {
+    ...item,
+    statusLabel: nextStatusLabel,
+    statusTone: nextStatusTone
+  };
+}
+
+function parseGitHubFocusPullRequestIdentity(value: string) {
+  const match = value.match(/^github:([^/]+)\/([^#]+)#(\d+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const [, owner, repo, pullNumberValue] = match;
+  const pullNumber = Number(pullNumberValue);
+  if (!owner || !repo || !Number.isFinite(pullNumber) || pullNumber <= 0) {
+    return null;
+  }
+
+  return {
+    id: value,
+    owner,
+    repo,
+    pullNumber
+  };
+}
+
+function getFocusPullRequestId(pullRequest: GitHubPullRequestItem) {
+  return `github:${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
+}
+
+function getGitHubFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
+  if (reviewStatus === 'approved') {
+    return 'Approved';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'Changes Requested';
+  }
+
+  if (reviewStatus === 'waiting-review') {
+    return 'Waiting Review';
+  }
+
+  if (reviewStatus === 'draft') {
+    return 'Draft';
+  }
+
+  return 'Open';
+}
+
+function getGitHubFocusStatusTone(
+  reviewStatus: GitHubPullRequestItem['reviewStatus']
+): FocusPullRequestItem['statusTone'] {
+  if (reviewStatus === 'approved') {
+    return 'emerald';
+  }
+
+  return reviewStatus === 'changes-requested' ? 'amber' : 'violet';
+}
+
+function isTerminalGitHubFocusStatus(statusLabel: string) {
+  const normalizedStatus = statusLabel.trim().toLowerCase();
+  return normalizedStatus === 'merged' || normalizedStatus === 'closed';
 }
