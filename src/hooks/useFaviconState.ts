@@ -8,8 +8,11 @@ type FaviconPaths = Record<FaviconSize, string>;
 type FaviconVariant = {
   key: string;
   matches: (metrics: GitHubSummaryMetrics) => boolean;
+  count: (metrics: GitHubSummaryMetrics) => number;
   paths: FaviconPaths;
 };
+
+const DEFAULT_TITLE = 'Donezo';
 
 const DEFAULT_FAVICON_PATHS: FaviconPaths = {
   '16x16': '/icons/icon-16.png',
@@ -40,28 +43,34 @@ const FAVICON_VARIANTS: FaviconVariant[] = [
   {
     key: 'pr-error',
     matches: (metrics) => metrics.failedBuildBadgeCount > 0,
+    count: (metrics) => metrics.failedBuildBadgeCount,
     paths: PR_ERROR_FAVICON_PATHS
   },
   {
     key: 'pr-warning',
     matches: (metrics) => metrics.highlightedWarningCount > 0,
+    count: (metrics) => metrics.highlightedWarningCount,
     paths: PR_WARNING_FAVICON_PATHS
   },
   {
     key: 'pr-comment',
     matches: (metrics) => metrics.highlightedCommentCount > 0,
+    count: (metrics) => metrics.highlightedCommentCount,
     paths: PR_COMMENT_FAVICON_PATHS
   },
   {
     key: 'pr-ready',
     matches: (metrics) => metrics.highlightedReadyCount > 0,
+    count: (metrics) => metrics.highlightedReadyCount,
     paths: PR_READY_FAVICON_PATHS
   }
 ];
 
 export function useFaviconState(metrics: GitHubSummaryMetrics) {
   useEffect(() => {
-    syncFaviconVariant(selectFaviconVariant(metrics));
+    const variant = selectFaviconVariant(metrics);
+    syncFaviconVariant(variant);
+    syncDocumentTitle(variant, metrics);
   }, [metrics]);
 }
 
@@ -69,6 +78,7 @@ function selectFaviconVariant(metrics: GitHubSummaryMetrics) {
   return FAVICON_VARIANTS.find((variant) => variant.matches(metrics)) ?? {
     key: 'default',
     matches: () => true,
+    count: () => 0,
     paths: DEFAULT_FAVICON_PATHS
   };
 }
@@ -97,4 +107,13 @@ function updateFaviconLink(size: FaviconSize, href: string) {
   nextLink.sizes = size;
   nextLink.href = href;
   document.head.append(nextLink);
+}
+
+function syncDocumentTitle(variant: FaviconVariant, metrics: GitHubSummaryMetrics) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const count = variant.count(metrics);
+  document.title = count > 0 ? `(${count}) ${DEFAULT_TITLE}` : DEFAULT_TITLE;
 }

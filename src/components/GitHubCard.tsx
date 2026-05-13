@@ -185,10 +185,10 @@ export function GitHubCard({
       pullRequest.ciStatus === 'failing' &&
       Boolean(gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted)
   ).length;
-  const highlightedCommentCount = myOpenPRs.filter((pullRequest) => {
+  const highlightedCommentCount = myOpenPRs.reduce((count, pullRequest) => {
     const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-    return (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0) > 0;
-  }).length;
+    return count + (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0);
+  }, 0);
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
     const warningEntry = gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
     if (!warningEntry?.highlighted) {
