@@ -13,6 +13,7 @@ import {
   GitHubConnectionStatus,
   GitHubDashboardData,
   GitHubPullRequestItem,
+  getGitHubPullRequestStates,
 } from '../lib/githubApi';
 import {
   getJiraIssueCounts,
@@ -45,6 +46,8 @@ import {
 } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 import {
+  applyGitHubPullRequestStatesToTodayFocusItems,
+  reconcileTodayFocusGitHubItems,
   reconcileTodayFocusJiraItems,
   type TodayFocusRefreshSignal,
 } from '../lib/todayFocusSync';
@@ -105,6 +108,7 @@ export function DashboardPage({
   const hasRunInitialFocusedJiraFallbackRef = useRef(false);
   const isFocusedJiraFallbackInFlightRef = useRef(false);
   const lastFocusedJiraFallbackAtRef = useRef<number | null>(null);
+  const isFocusedGitHubFallbackInFlightRef = useRef(false);
   const todayFocusItemsRef = useRef<FocusItem[]>([]);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
     useState<GitHubSummaryMetrics>({
@@ -269,6 +273,32 @@ export function DashboardPage({
   }, [hasLoadedTodayFocusItems, jiraData.issues]);
 
   useEffect(() => {
+    if (!hasLoadedTodayFocusItemsRef.current) {
+      return;
+    }
+
+    const groupedItems = syncTodayFocusJiraLinkedPullRequests(
+      todayFocusItemsRef.current,
+      gitHubData.pullRequests,
+    );
+    const syncResult = reconcileTodayFocusGitHubItems(
+      groupedItems,
+      gitHubData.pullRequests,
+    );
+    if (syncResult.items !== todayFocusItemsRef.current) {
+      commitTodayFocusItems(syncResult.items);
+      return;
+    }
+
+    void runFocusedGitHubFallback();
+  }, [
+    hasLoadedTodayFocusItems,
+    gitHubData.lastUpdatedAt,
+    gitHubData.pullRequests,
+    settings.integrations.github.token,
+  ]);
+
+  useEffect(() => {
     if (
       !hasLoadedTodayFocusItemsRef.current ||
       jiraRefreshSignal.lastCompletedAt === null
@@ -410,7 +440,7 @@ export function DashboardPage({
   function handleAddTodayFocusItem(item: FocusItem) {
     setTodayFocusWarning(null);
 
-    const addResult = addTodayFocusItem(todayFocusItems, item);
+    const addResult = addTodayFocusItem(todayFocusItems, item, gitHubData.pullRequests);
     if (addResult.warning) {
       setTodayFocusWarning(addResult.warning);
       return;
@@ -543,6 +573,43 @@ export function DashboardPage({
     }
   }
 
+  async function runFocusedGitHubFallback() {
+    const token = settings.integrations.github.token.trim();
+    if (!token || isFocusedGitHubFallbackInFlightRef.current) {
+      return;
+    }
+
+    const syncResult = reconcileTodayFocusGitHubItems(
+      todayFocusItemsRef.current,
+      gitHubData.pullRequests,
+    );
+    if (syncResult.missingPullRequests.length === 0) {
+      return;
+    }
+
+    isFocusedGitHubFallbackInFlightRef.current = true;
+
+    try {
+      const pullRequestStates = await getGitHubPullRequestStates({
+        token,
+        pullRequests: syncResult.missingPullRequests,
+      });
+      if (Object.keys(pullRequestStates).length === 0) {
+        return;
+      }
+
+      const nextItems = applyGitHubPullRequestStatesToTodayFocusItems(
+        todayFocusItemsRef.current,
+        pullRequestStates,
+      );
+      if (nextItems !== todayFocusItemsRef.current) {
+        commitTodayFocusItems(nextItems);
+      }
+    } finally {
+      isFocusedGitHubFallbackInFlightRef.current = false;
+    }
+  }
+
   const integrationSwitcher = (
     <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-white/[0.035] bg-white/[0.025] p-1">
       <IntegrationTabButton
@@ -623,6 +690,7 @@ export function DashboardPage({
             <section className="dashboard-side-column">
               <SummaryCard
                 items={todayFocusItems}
+                jiraBaseUrl={settings.integrations.jira.baseUrl}
                 warning={todayFocusWarning}
                 onAddItem={handleAddTodayFocusItem}
                 onNestNewPullRequest={handleNestNewTodayFocusPullRequest}
@@ -777,7 +845,11 @@ type DashboardAlertItem = {
   onClick?: () => void;
 };
 
-function addTodayFocusItem(items: FocusItem[], item: FocusItem) {
+function addTodayFocusItem(
+  items: FocusItem[],
+  item: FocusItem,
+  pullRequests: GitHubPullRequestItem[],
+) {
   if (hasTodayFocusItem(items, item.id)) {
     return { items, warning: 'That item is already in Today focus.' };
   }
@@ -786,10 +858,136 @@ function addTodayFocusItem(items: FocusItem[], item: FocusItem) {
     return { items, warning: 'Today focus already has 3 items.' };
   }
 
+  if (item.source === 'jira') {
+    const normalizedItem: FocusItem = normalizeTopLevelTodayFocusItem(item);
+    if (normalizedItem.source !== 'jira') {
+      return { items, warning: null };
+    }
+
+    const matchingPullRequests = getMatchingGitHubFocusPullRequests(
+      pullRequests,
+      normalizedItem.jiraKey,
+    );
+    const existingMatchingStandalonePullRequests = items.filter(
+      (focusItem): focusItem is FocusPullRequestItem =>
+        focusItem.source === 'github' &&
+        focusItem.jiraKey === normalizedItem.jiraKey,
+    );
+    const nextChildrenById = new Map<string, FocusPullRequestItem>();
+
+    for (const child of normalizedItem.children) {
+      nextChildrenById.set(child.id, child);
+    }
+
+    for (const pullRequest of matchingPullRequests) {
+      nextChildrenById.set(pullRequest.id, pullRequest);
+    }
+
+    for (const pullRequest of existingMatchingStandalonePullRequests) {
+      nextChildrenById.set(pullRequest.id, pullRequest);
+    }
+
+    return {
+      items: [
+        ...items.filter(
+          (focusItem) =>
+            !(
+              focusItem.source === 'github' &&
+              focusItem.jiraKey === normalizedItem.jiraKey
+            ),
+        ),
+        {
+          ...normalizedItem,
+          children: Array.from(nextChildrenById.values()),
+        },
+      ],
+      warning: null,
+    };
+  }
+
   return {
     items: [...items, normalizeTopLevelTodayFocusItem(item)],
     warning: null,
   };
+}
+
+function syncTodayFocusJiraLinkedPullRequests(
+  items: FocusItem[],
+  pullRequests: GitHubPullRequestItem[],
+) {
+  const jiraKeys = new Set(
+    items
+      .filter((item): item is Extract<FocusItem, { source: 'jira' }> => item.source === 'jira')
+      .map((item) => item.jiraKey),
+  );
+  if (jiraKeys.size === 0) {
+    return items;
+  }
+
+  const matchingPullRequestsByJiraKey = new Map<string, FocusPullRequestItem[]>();
+  for (const pullRequest of pullRequests) {
+    const jiraKey = extractJiraKeyFromPullRequestTitle(pullRequest.title);
+    if (!jiraKey || !jiraKeys.has(jiraKey)) {
+      continue;
+    }
+
+    const nextItem = mapGitHubPullRequestToFocusItem(pullRequest);
+    const currentItems = matchingPullRequestsByJiraKey.get(jiraKey) ?? [];
+    currentItems.push(nextItem);
+    matchingPullRequestsByJiraKey.set(jiraKey, currentItems);
+  }
+
+  let hasChanges = false;
+  const nextItems: FocusItem[] = [];
+
+  for (const item of items) {
+    if (item.source === 'jira') {
+      const nextChildrenById = new Map<string, FocusPullRequestItem>();
+
+      for (const child of item.children) {
+        nextChildrenById.set(child.id, child);
+      }
+
+      for (const pullRequest of matchingPullRequestsByJiraKey.get(item.jiraKey) ?? []) {
+        const previousChild = nextChildrenById.get(pullRequest.id);
+        if (
+          !previousChild ||
+          previousChild.title !== pullRequest.title ||
+          previousChild.statusLabel !== pullRequest.statusLabel ||
+          previousChild.statusTone !== pullRequest.statusTone ||
+          previousChild.url !== pullRequest.url
+        ) {
+          hasChanges = true;
+        }
+        nextChildrenById.set(pullRequest.id, pullRequest);
+      }
+
+      const nextChildren = Array.from(nextChildrenById.values());
+      if (
+        nextChildren.length !== item.children.length ||
+        nextChildren.some((child, index) => child !== item.children[index])
+      ) {
+        hasChanges = true;
+        nextItems.push({
+          ...item,
+          children: nextChildren,
+        });
+        continue;
+      }
+
+      nextItems.push(item);
+      continue;
+    }
+
+    if (item.jiraKey && jiraKeys.has(item.jiraKey)) {
+      hasChanges = true;
+      continue;
+    }
+
+    nextItems.push(item);
+  }
+
+  return hasChanges ? nextItems : items;
 }
 
 function removeTodayFocusItem(items: FocusItem[], itemId: string) {
@@ -972,6 +1170,74 @@ function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
 
 function getNestedPullRequestEndTargetId(parentId: string) {
   return `__end__:${parentId}`;
+}
+
+function getMatchingGitHubFocusPullRequests(
+  pullRequests: GitHubPullRequestItem[],
+  jiraKey: string,
+) {
+  return pullRequests
+    .filter(
+      (pullRequest) => extractJiraKeyFromPullRequestTitle(pullRequest.title) === jiraKey,
+    )
+    .map((pullRequest) => mapGitHubPullRequestToFocusItem(pullRequest));
+}
+
+function mapGitHubPullRequestToFocusItem(
+  pullRequest: GitHubPullRequestItem,
+): FocusPullRequestItem {
+  return {
+    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
+    source: 'github',
+    sourceLabel: 'GitHub',
+    reference: `#${pullRequest.pullNumber}`,
+    url: pullRequest.url,
+    title: pullRequest.title,
+    statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
+    statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
+    jiraKey: extractJiraKeyFromPullRequestTitle(pullRequest.title),
+  };
+}
+
+function extractJiraKeyFromPullRequestTitle(value: string) {
+  const match = value.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function getGitHubFocusStatusLabel(
+  reviewStatus: GitHubPullRequestItem['reviewStatus'],
+) {
+  if (reviewStatus === 'approved') {
+    return 'Approved';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'Changes Requested';
+  }
+
+  if (reviewStatus === 'waiting-review') {
+    return 'Waiting Review';
+  }
+
+  if (reviewStatus === 'draft') {
+    return 'Draft';
+  }
+
+  return 'Open';
+}
+
+function getGitHubFocusStatusTone(
+  reviewStatus: GitHubPullRequestItem['reviewStatus'],
+): FocusItem['statusTone'] {
+  if (reviewStatus === 'approved') {
+    return 'emerald';
+  }
+
+  if (reviewStatus === 'changes-requested') {
+    return 'amber';
+  }
+
+  return 'violet';
 }
 
 function getDashboardAlerts(options: {

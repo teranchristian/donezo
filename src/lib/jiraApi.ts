@@ -323,7 +323,12 @@ export function getJiraSearchUrl(baseUrl: string) {
 }
 
 export function normalizeJiraBaseUrl(baseUrl: string) {
-  return baseUrl.trim().replace(/\/+$/, '');
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return '';
+  }
+
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
 export const JIRA_ACTIVE_ISSUES_JQL =

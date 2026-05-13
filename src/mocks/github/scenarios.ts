@@ -91,6 +91,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
 
 const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
   { key: DEFAULT_GITHUB_MOCK_SCENARIO_KEY, label: 'Base' },
+  { key: 'jira-auto-group', label: 'Jira auto group' },
   { key: 'ready-to-merge', label: 'Ready to merge' },
   { key: 'warning-conflict-new', label: 'Warning: conflict' },
   { key: 'warning-build-failed-new', label: 'Warning: build failed' },
@@ -108,6 +109,73 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     warningState: {},
     notificationSeenAtState: {}
   },
+  'jira-auto-group': (() => {
+    const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
+    dashboardData.pullRequests = [
+      createPullRequest({
+        id: 201,
+        title: 'CLK-112 Fix venue provision defaults',
+        repositoryName: 'acme/chrome-home-page',
+        owner: 'acme',
+        repo: 'chrome-home-page',
+        pullNumber: 142,
+        reviewStatus: 'approved',
+        ciStatus: 'passing',
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-05-06T09:48:00.000Z'
+      }),
+      createPullRequest({
+        id: 202,
+        title: 'CLK-112 Venue play pause schedule update',
+        repositoryName: 'acme/platform-web',
+        owner: 'acme',
+        repo: 'platform-web',
+        pullNumber: 2,
+        reviewStatus: 'open',
+        ciStatus: 'pending',
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-05-06T09:34:00.000Z'
+      }),
+      createPullRequest({
+        id: 203,
+        title: 'CLK-118 Tighten homepage review banner spacing',
+        repositoryName: 'acme/chrome-home-page',
+        owner: 'acme',
+        repo: 'chrome-home-page',
+        pullNumber: 91,
+        reviewStatus: 'waiting-review',
+        ciStatus: 'no-checks',
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-05-06T09:18:00.000Z'
+      }),
+      createPullRequest({
+        id: 204,
+        title: 'General cleanup for dashboard filters',
+        repositoryName: 'acme/platform-web',
+        owner: 'acme',
+        repo: 'platform-web',
+        pullNumber: 1540,
+        reviewStatus: 'approved',
+        ciStatus: 'passing',
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-05-06T08:58:00.000Z'
+      })
+    ];
+    dashboardData.openPrsCount = dashboardData.pullRequests.filter(
+      (pullRequest) => pullRequest.source === 'authored'
+    ).length;
+    dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
+      (pullRequest) => pullRequest.source === 'review-requested'
+    ).length;
+
+    return {
+      key: 'jira-auto-group',
+      dashboardData,
+      readyState: {},
+      warningState: {},
+      notificationSeenAtState: {}
+    };
+  })(),
   'ready-to-merge': {
     key: 'ready-to-merge',
     dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),

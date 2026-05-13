@@ -797,6 +797,7 @@ function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusIte
     source: 'github',
     sourceLabel: 'GitHub',
     reference: `#${pullRequest.pullNumber}`,
+    url: pullRequest.url,
     title: pullRequest.title,
     statusLabel: getFocusStatusLabel(pullRequest.reviewStatus),
     statusTone: getFocusStatusTone(pullRequest.reviewStatus),
