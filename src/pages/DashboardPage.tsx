@@ -9,10 +9,7 @@ import { JiraCard } from '../components/JiraCard';
 import { NotesCard } from '../components/NotesCard';
 import { PlaceholderCard } from '../components/PlaceholderCard';
 import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
-import {
-  GitHubConnectionStatus,
-  GitHubDashboardData,
-} from '../lib/githubApi';
+import { GitHubConnectionStatus, GitHubDashboardData } from '../lib/githubApi';
 import {
   getJiraIssueCounts,
   JiraConnectionStatus,
@@ -253,19 +250,7 @@ export function DashboardPage({
                   handleReorderNestedTodayFocusPullRequest
                 }
               />
-              <NotesCard />
-              <PlaceholderCard
-                title="Calendar"
-                subtitle="Placeholder"
-                description="Upcoming meetings and focus blocks will fit here once calendar integration is added."
-                className="min-h-[220px]"
-              />
-              <PlaceholderCard
-                title="Workspace"
-                subtitle="Later"
-                description="This area can hold quick links, streaks, or a small pomodoro widget when you want to expand the dashboard."
-                className="min-h-[220px]"
-              />
+              {/* <NotesCard /> */}
             </section>
 
             <section className="dashboard-panel-column">
@@ -332,7 +317,6 @@ type DashboardAlertItem = {
   tone: 'amber' | 'rose' | 'emerald' | 'blue';
   onClick?: () => void;
 };
-
 
 function getDashboardAlerts(options: {
   gitHubMetrics: GitHubSummaryMetrics;
@@ -613,16 +597,19 @@ function GitHubIntegrationStatusBar({
       ? `Updated ${formatDashboardTime(lastUpdatedAt)}`
       : connectionStatus === 'invalid'
         ? 'Invalid token'
-      : connectionStatus === 'testing'
-        ? 'Testing'
-        : connectionStatus === 'error'
-          ? 'Connection error'
-          : 'Not connected';
+        : connectionStatus === 'testing'
+          ? 'Testing'
+          : connectionStatus === 'error'
+            ? 'Connection error'
+            : 'Not connected';
 
   return (
     <div className="ml-auto flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center justify-end">
-        <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus !== 'connected'}>
+        <TopBarButton
+          onClick={onRefresh}
+          disabled={isLoading || connectionStatus !== 'connected'}
+        >
           {buttonLabel}
         </TopBarButton>
       </div>
@@ -661,7 +648,7 @@ function JiraIntegrationStatusBar({
       ? `Updated ${formatDashboardTime(lastUpdatedAt)}`
       : connectionStatus === 'invalid'
         ? 'Invalid credentials'
-      : connectionStatus === 'testing'
+        : connectionStatus === 'testing'
           ? 'Testing'
           : connectionStatus === 'error'
             ? 'API error'
@@ -670,7 +657,10 @@ function JiraIntegrationStatusBar({
   return (
     <div className="ml-auto flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center justify-end">
-        <TopBarButton onClick={onRefresh} disabled={isLoading || connectionStatus !== 'connected'}>
+        <TopBarButton
+          onClick={onRefresh}
+          disabled={isLoading || connectionStatus !== 'connected'}
+        >
           {buttonLabel}
         </TopBarButton>
       </div>
