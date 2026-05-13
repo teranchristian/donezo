@@ -28,6 +28,7 @@ const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
   approvedPrCount: null,
   relevantPrCount: 0
 };
+const DASHBOARD_LOADING_OVERLAY_DELAY_MS = 400;
 
 export default function App() {
   const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
@@ -44,6 +45,8 @@ export default function App() {
     settings: settings.integrations.jira,
     isLoadingSettings
   });
+  const [shouldShowDelayedDashboardLoader, setShouldShowDelayedDashboardLoader] =
+    useState(false);
 
   useFaviconState(gitHubSummaryMetrics);
 
@@ -72,34 +75,56 @@ export default function App() {
     setSettings(nextSettings);
   }
 
+  const isDashboardReady =
+    gitHubDashboard.isGitHubInitialized &&
+    jiraDashboard.isJiraInitialized &&
+    (!gitHubMockMode.isGitHubMockMode || gitHubDashboard.isGitHubMockReady);
+
+  useEffect(() => {
+    if (isLoadingSettings || gitHubMockMode.isLoading || isDashboardReady) {
+      setShouldShowDelayedDashboardLoader(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShouldShowDelayedDashboardLoader(true);
+    }, DASHBOARD_LOADING_OVERLAY_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [gitHubMockMode.isLoading, isDashboardReady, isLoadingSettings]);
+
   const dashboardElement = (
-    <DashboardPage
-      settings={settings}
-      gitHubData={gitHubDashboard.gitHubData}
-      gitHubMockScenarioKey={gitHubMockMode.gitHubMockScenarioKey}
-      isGitHubMockMode={gitHubMockMode.isGitHubMockMode}
-      gitHubMockScenarioOptions={getGitHubMockScenarioOptions()}
-      isGitHubLoading={gitHubDashboard.isGitHubLoading}
-      isCheckingGitHubActivity={gitHubDashboard.isCheckingGitHubActivity}
-      lastGitHubActivityCheckAt={gitHubDashboard.lastGitHubActivityCheckAt}
-      onClearGitHubMockScenario={() => void gitHubMockMode.clearMockScenario()}
-      onApplyGitHubMockScenario={(mockScenarioKey) => void gitHubMockMode.applyMockScenario(mockScenarioKey)}
-      onRefreshGitHub={() => void gitHubDashboard.refresh()}
-      jiraData={jiraDashboard.jiraData}
-      jiraRefreshSignal={jiraDashboard.jiraRefreshSignal}
-      isJiraLoading={jiraDashboard.isJiraLoading}
-      onRefreshJira={() => void jiraDashboard.refresh()}
-      onGitHubSummaryMetricsChange={setGitHubSummaryMetrics}
-    />
+    isDashboardReady ? (
+      <DashboardPage
+        settings={settings}
+        gitHubData={gitHubDashboard.gitHubData}
+        gitHubMockScenarioKey={gitHubMockMode.gitHubMockScenarioKey}
+        isGitHubMockMode={gitHubMockMode.isGitHubMockMode}
+        gitHubMockScenarioOptions={getGitHubMockScenarioOptions()}
+        isGitHubLoading={gitHubDashboard.isGitHubLoading}
+        isCheckingGitHubActivity={gitHubDashboard.isCheckingGitHubActivity}
+        lastGitHubActivityCheckAt={gitHubDashboard.lastGitHubActivityCheckAt}
+        onClearGitHubMockScenario={() => void gitHubMockMode.clearMockScenario()}
+        onApplyGitHubMockScenario={(mockScenarioKey) => void gitHubMockMode.applyMockScenario(mockScenarioKey)}
+        onRefreshGitHub={() => void gitHubDashboard.refresh()}
+        jiraData={jiraDashboard.jiraData}
+        jiraRefreshSignal={jiraDashboard.jiraRefreshSignal}
+        isJiraLoading={jiraDashboard.isJiraLoading}
+        onRefreshJira={() => void jiraDashboard.refresh()}
+        onGitHubSummaryMetricsChange={setGitHubSummaryMetrics}
+      />
+    ) : (
+      shouldShowDelayedDashboardLoader ? (
+        <DashboardLoadingScreen />
+      ) : (
+        <div className="app-background" />
+      )
+    )
   );
 
-  if (
-    isLoadingSettings ||
-    !gitHubDashboard.isGitHubInitialized ||
-    !jiraDashboard.isJiraInitialized ||
-    gitHubMockMode.isLoading ||
-    (gitHubMockMode.isGitHubMockMode && !gitHubDashboard.isGitHubMockReady)
-  ) {
+  if (isLoadingSettings || gitHubMockMode.isLoading) {
     return <div className="app-background" />;
   }
 
@@ -131,5 +156,36 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
+  );
+}
+
+function DashboardLoadingScreen() {
+  return (
+    <main className="flex min-h-screen items-center justify-center px-6 py-10 text-stone-100">
+      <div className="flex max-w-md flex-col items-center text-center">
+        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-[var(--shadow-card)]">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-10 w-10 text-white/72"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 16V6" />
+            <path d="m8.5 9.5 3.5-3.5 3.5 3.5" />
+            <path d="M5 18.5h14" />
+          </svg>
+        </div>
+        <h1 className="mt-6 text-[1.5rem] font-semibold tracking-[-0.03em] text-primary">
+          Updating dashboard
+        </h1>
+        <p className="mt-2 max-w-sm text-sm leading-6 text-secondary">
+          Loading the latest GitHub and Jira data for this dashboard view.
+        </p>
+      </div>
+    </main>
   );
 }

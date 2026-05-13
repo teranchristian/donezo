@@ -69,6 +69,7 @@ export function useGitHubDashboard({
     async (options: {
       username: string;
       token: string;
+      ownerFilter: string;
       forceRefresh?: boolean;
       showLoadingIndicator: boolean;
     }) => {
@@ -85,6 +86,7 @@ export function useGitHubDashboard({
         const data = await loadGitHubDashboardData({
           username: options.username,
           token: options.token,
+          ownerFilter: options.ownerFilter,
           forceRefresh: options.forceRefresh
         });
 
@@ -123,7 +125,8 @@ export function useGitHubDashboard({
     void (async () => {
       const cachedData = await getLatestGitHubDashboardData({
         username: settings.username,
-        token: settings.token
+        token: settings.token,
+        ownerFilter: settings.ownerFilter
       });
 
       if (isCancelled || !isMountedRef.current) {
@@ -139,6 +142,7 @@ export function useGitHubDashboard({
       await refreshGitHubData({
         username: settings.username,
         token: settings.token,
+        ownerFilter: settings.ownerFilter,
         forceRefresh: Boolean(cachedData),
         showLoadingIndicator: !cachedData
       });
@@ -147,7 +151,7 @@ export function useGitHubDashboard({
     return () => {
       isCancelled = true;
     };
-  }, [applyMockScenarioData, gitHubMockScenario, isLoadingSettings, refreshGitHubData, settings.token, settings.username]);
+  }, [applyMockScenarioData, gitHubMockScenario, isLoadingSettings, refreshGitHubData, settings.ownerFilter, settings.token, settings.username]);
 
   useEffect(() => {
     if (isLoadingSettings || gitHubMockScenario) {
@@ -196,7 +200,11 @@ export function useGitHubDashboard({
       setIsCheckingGitHubActivity(true);
 
       try {
-        const result = await pollGitHubNotificationActivity({ username, token });
+        const result = await pollGitHubNotificationActivity({
+          username,
+          token,
+          ownerFilter: settings.ownerFilter
+        });
         if (!isCancelled && isMountedRef.current) {
           setLastGitHubActivityCheckAt(Date.now());
         }
@@ -222,7 +230,7 @@ export function useGitHubDashboard({
       isCancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [gitHubMockScenario, isLoadingSettings, settings.token, settings.username]);
+  }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
 
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) {
@@ -249,7 +257,8 @@ export function useGitHubDashboard({
       void (async () => {
         const cachedData = await getLatestGitHubDashboardData({
           username: settings.username,
-          token: settings.token
+          token: settings.token,
+          ownerFilter: settings.ownerFilter
         });
 
         if (!cachedData || isCancelled || !isMountedRef.current) {
@@ -267,7 +276,7 @@ export function useGitHubDashboard({
       isCancelled = true;
       chrome.storage.onChanged.removeListener(handleStorageChanged);
     };
-  }, [gitHubMockScenario, isLoadingSettings, settings.token, settings.username]);
+  }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
 
   useEffect(() => {
     if (isLoadingSettings || gitHubMockScenario) {
@@ -284,7 +293,8 @@ export function useGitHubDashboard({
       void (async () => {
         const cachedData = await getLatestGitHubDashboardData({
           username: settings.username,
-          token: settings.token
+          token: settings.token,
+          ownerFilter: settings.ownerFilter
         });
 
         if (!cachedData || isCancelled || !isMountedRef.current) {
@@ -304,7 +314,7 @@ export function useGitHubDashboard({
       document.removeEventListener('visibilitychange', syncVisibleData);
       window.removeEventListener('focus', syncVisibleData);
     };
-  }, [gitHubMockScenario, isLoadingSettings, settings.token, settings.username]);
+  }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
 
   const testConnectionStatus = useCallback(async (token: string) => {
     setIsTestingGitHubSettings(true);
@@ -335,10 +345,11 @@ export function useGitHubDashboard({
     await refreshGitHubData({
       username: settings.username,
       token: settings.token,
+      ownerFilter: settings.ownerFilter,
       forceRefresh: true,
       showLoadingIndicator: true
     });
-  }, [applyMockScenarioData, gitHubMockScenario, refreshGitHubData, settings.token, settings.username]);
+  }, [applyMockScenarioData, gitHubMockScenario, refreshGitHubData, settings.ownerFilter, settings.token, settings.username]);
 
   return {
     gitHubData,

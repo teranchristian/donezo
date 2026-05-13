@@ -166,8 +166,12 @@ function normalizeGitHubToken(token) {
   return String(token ?? '').trim();
 }
 
-function createGitHubCacheToken(username, token) {
-  const input = `${username}:${token}`;
+function normalizeGitHubOwnerFilter(ownerFilter) {
+  return String(ownerFilter ?? '').trim();
+}
+
+function createGitHubCacheToken(username, token, ownerFilter = '') {
+  const input = `${username}:${token}:${ownerFilter}`;
   let hash = 5381;
 
   for (let index = 0; index < input.length; index += 1) {
@@ -291,6 +295,7 @@ async function refreshGitHubDashboardFromStoredSettings() {
   const settings = await getStoredDashboardSettings();
   const username = normalizeGitHubUsername(settings?.integrations?.github?.username);
   const token = normalizeGitHubToken(settings?.integrations?.github?.token);
+  const ownerFilter = normalizeGitHubOwnerFilter(settings?.integrations?.github?.ownerFilter);
 
   if (!token) {
     return;
@@ -299,6 +304,7 @@ async function refreshGitHubDashboardFromStoredSettings() {
   await loadGitHubDashboardData({
     username,
     token,
+    ownerFilter,
     forceRefresh: true
   });
 }
@@ -675,12 +681,42 @@ async function getGitHubNotificationAuthorLogins(notifications, token) {
   return authorLoginsByNotificationId;
 }
 
-async function getDashboardPullRequests(username, token) {
+function buildOwnerScopedQuery(query, ownerFilter) {
+  const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
+
+  if (!normalizedOwnerFilter || normalizedOwnerFilter === 'all') {
+    return query;
+  }
+
+  return `${query} user:${normalizedOwnerFilter}`;
+}
+
+function filterNotificationsByOwner(notifications, ownerFilter) {
+  const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
+
+  if (!normalizedOwnerFilter || normalizedOwnerFilter === 'all') {
+    return notifications;
+  }
+
+  return notifications.filter(
+    (notification) =>
+      String(notification?.repository?.full_name ?? '').split('/')[0] ===
+      normalizedOwnerFilter,
+  );
+}
+
+async function getDashboardPullRequests(username, token, ownerFilter) {
   const data = await fetchGitHubGraphQL(
     GITHUB_PULL_REQUESTS_QUERY,
     {
-      authoredQuery: `is:pr is:open author:${username}`,
-      reviewRequestedQuery: `is:pr is:open review-requested:${username}`,
+      authoredQuery: buildOwnerScopedQuery(
+        `is:pr is:open author:${username}`,
+        ownerFilter,
+      ),
+      reviewRequestedQuery: buildOwnerScopedQuery(
+        `is:pr is:open review-requested:${username}`,
+        ownerFilter,
+      ),
       first: GITHUB_PULL_REQUEST_PAGE_SIZE
     },
     token
@@ -704,7 +740,10 @@ async function getDashboardPullRequests(username, token) {
 }
 
 async function buildGitHubDashboardDataFromFetchResults(options) {
-  const notifications = Array.isArray(options.notifications) ? options.notifications : [];
+  const notifications = filterNotificationsByOwner(
+    Array.isArray(options.notifications) ? options.notifications : [],
+    options.ownerFilter,
+  );
   const pullRequestResult = options.pullRequestResult ?? {
     authored: { items: [], total_count: 0 },
     reviewRequested: { items: [], total_count: 0 }
@@ -921,12 +960,13 @@ function mapGitHubDashboardError(error) {
 async function loadGitHubDashboardData(payload) {
   const username = normalizeGitHubUsername(payload.username);
   const token = normalizeGitHubToken(payload.token);
+  const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
 
   if (!token) {
     return getEmptyGitHubDashboardData('not-connected');
   }
 
-  const cacheToken = createGitHubCacheToken(username, token);
+  const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
   if (!payload.forceRefresh) {
     const cached = await getCachedGitHubDashboardData(cacheToken);
     if (cached) {
@@ -949,16 +989,18 @@ async function loadGitHubDashboardData(payload) {
   try {
     console.log('[GitHub] loadGitHubDashboardData: fetching notifications and pull requests', {
       username,
+      ownerFilter,
       forceRefresh: Boolean(payload.forceRefresh)
     });
     const [notifications, pullRequestResult] = await Promise.all([
       getGitHubNotifications(token),
-      getDashboardPullRequests(username, token)
+      getDashboardPullRequests(username, token, ownerFilter)
     ]);
     const data = await buildGitHubDashboardDataFromFetchResults({
       notifications,
       pullRequestResult,
-      token
+      token,
+      ownerFilter
     });
 
     await Promise.all([
@@ -975,6 +1017,7 @@ async function loadGitHubDashboardData(payload) {
 async function pollGitHubNotificationActivity(payload) {
   const username = normalizeGitHubUsername(payload.username);
   const token = normalizeGitHubToken(payload.token);
+  const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
 
   if (!token) {
     return {
@@ -983,17 +1026,18 @@ async function pollGitHubNotificationActivity(payload) {
     };
   }
 
-  const cacheToken = createGitHubCacheToken(username, token);
+  const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
   const [previousNotificationSignals, previousPullRequestSignals] = await Promise.all([
     getCachedGitHubNotificationSignals(cacheToken),
     getCachedGitHubPullRequestSignals(cacheToken)
   ]);
   console.log('[GitHub] pollGitHubNotificationActivity: fetching notifications and pull requests', {
-    username
+    username,
+    ownerFilter
   });
   const [notifications, pullRequestResult] = await Promise.all([
     getGitHubNotifications(token),
-    username ? getDashboardPullRequests(username, token) : null
+    username ? getDashboardPullRequests(username, token, ownerFilter) : null
   ]);
   const pullRequests = pullRequestResult
     ? mergePullRequestSeeds(pullRequestResult.authored.items, pullRequestResult.reviewRequested.items)
@@ -1035,7 +1079,8 @@ async function pollGitHubNotificationActivity(payload) {
         authored: { items: [], total_count: 0 },
         reviewRequested: { items: [], total_count: 0 }
       },
-      token
+      token,
+      ownerFilter
     });
   }
 
@@ -1476,10 +1521,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'FETCH_GITHUB_DASHBOARD') {
       const username = normalizeGitHubUsername(payload.username);
       const token = normalizeGitHubToken(payload.token);
+      const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
       const requestKey = JSON.stringify({
         type: message.type,
         username,
         token,
+        ownerFilter,
         forceRefresh: Boolean(payload.forceRefresh)
       });
 
@@ -1516,10 +1563,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'POLL_GITHUB_ACTIVITY') {
       const username = normalizeGitHubUsername(payload.username);
       const token = normalizeGitHubToken(payload.token);
+      const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
       const requestKey = JSON.stringify({
         type: message.type,
         username,
-        token
+        token,
+        ownerFilter
       });
 
       try {

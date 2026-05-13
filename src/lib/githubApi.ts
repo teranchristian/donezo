@@ -175,24 +175,28 @@ export async function fetchGitHubOwnerOptions(token: string): Promise<string[]> 
 export async function getLatestGitHubDashboardData(options: {
   username: string;
   token: string;
+  ownerFilter?: string;
 }) {
   const username = options.username.trim();
   const token = options.token.trim();
+  const ownerFilter = options.ownerFilter?.trim() ?? '';
 
   if (!token) {
     return null;
   }
 
-  return getCachedGitHubDashboardData(createCacheToken(username, token), { ignoreExpiration: true });
+  return getCachedGitHubDashboardData(createCacheToken(username, token, ownerFilter), { ignoreExpiration: true });
 }
 
 export async function loadGitHubDashboardData(options: {
   username: string;
   token: string;
+  ownerFilter?: string;
   forceRefresh?: boolean;
 }): Promise<GitHubDashboardData> {
   const username = options.username.trim();
   const token = options.token.trim();
+  const ownerFilter = options.ownerFilter?.trim() ?? '';
 
   if (!token) {
     return getEmptyGitHubDashboardData('not-connected');
@@ -211,6 +215,7 @@ export async function loadGitHubDashboardData(options: {
       payload: {
         username,
         token,
+        ownerFilter,
         forceRefresh: Boolean(options.forceRefresh)
       }
     });
@@ -234,9 +239,11 @@ export async function loadGitHubDashboardData(options: {
 export async function pollGitHubNotificationActivity(options: {
   username: string;
   token: string;
+  ownerFilter?: string;
 }) {
   const username = options.username.trim();
   const token = options.token.trim();
+  const ownerFilter = options.ownerFilter?.trim() ?? '';
 
   if (!token) {
     return {
@@ -259,7 +266,8 @@ export async function pollGitHubNotificationActivity(options: {
       type: 'POLL_GITHUB_ACTIVITY',
       payload: {
         username,
-        token
+        token,
+        ownerFilter
       }
     });
 
@@ -360,8 +368,8 @@ async function getCachedGitHubDashboardData(
   return cached.data;
 }
 
-function createCacheToken(username: string, token: string) {
-  const input = `${username}:${token}`;
+function createCacheToken(username: string, token: string, ownerFilter = '') {
+  const input = `${username}:${token}:${ownerFilter}`;
   let hash = 5381;
 
   for (let index = 0; index < input.length; index += 1) {
