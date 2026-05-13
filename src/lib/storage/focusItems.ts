@@ -1,0 +1,112 @@
+import {
+  getChromeStorageValue,
+  getLocalStorageJsonValue,
+  hasChromeStorage,
+  setChromeStorageValues,
+  setLocalStorageJsonValue
+} from './backend';
+import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from './keys';
+import type { FocusItem, FocusJiraItem, FocusPullRequestItem } from './types';
+
+type LegacyFocusItem = {
+  id: string;
+  source: 'jira' | 'github';
+  sourceLabel: string;
+  reference: string;
+  url?: string;
+  title: string;
+  statusLabel: string;
+  statusTone: 'violet' | 'emerald' | 'amber';
+};
+
+export async function getStoredTodayFocusItems() {
+  if (hasChromeStorage()) {
+    return mergeFocusItems(await getChromeStorageValue<FocusItem[]>(TODAY_FOCUS_ITEMS_STORAGE_KEY));
+  }
+
+  const raw = localStorage.getItem(TODAY_FOCUS_ITEMS_STORAGE_KEY);
+  if (raw === null) {
+    return null;
+  }
+
+  return mergeFocusItems(getLocalStorageJsonValue<FocusItem[]>(TODAY_FOCUS_ITEMS_STORAGE_KEY)) ?? [];
+}
+
+export async function saveStoredTodayFocusItems(items: FocusItem[]) {
+  const normalizedItems = mergeFocusItems(items) ?? [];
+
+  if (hasChromeStorage()) {
+    await setChromeStorageValues({ [TODAY_FOCUS_ITEMS_STORAGE_KEY]: normalizedItems });
+    return;
+  }
+
+  setLocalStorageJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedItems);
+}
+
+function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
+  if (!Array.isArray(items)) {
+    return null;
+  }
+
+  return items.map((item) => normalizeFocusItem(item)).filter((item): item is FocusItem => item !== null);
+}
+
+function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined): FocusItem | null {
+  if (
+    !item ||
+    typeof item.id !== 'string' ||
+    (item.source !== 'jira' && item.source !== 'github') ||
+    typeof item.sourceLabel !== 'string' ||
+    typeof item.reference !== 'string' ||
+    typeof item.title !== 'string' ||
+    typeof item.statusLabel !== 'string' ||
+    (item.statusTone !== 'violet' && item.statusTone !== 'emerald' && item.statusTone !== 'amber')
+  ) {
+    return null;
+  }
+
+  const normalizedBase = {
+    id: item.id,
+    sourceLabel: item.sourceLabel.trim(),
+    reference: item.reference.trim(),
+    url: typeof item.url === 'string' && item.url.trim() ? item.url.trim() : undefined,
+    title: item.title.trim(),
+    statusLabel: item.statusLabel.trim(),
+    statusTone: item.statusTone
+  };
+
+  if (item.source === 'github') {
+    return {
+      ...normalizedBase,
+      source: 'github',
+      jiraKey: normalizeJiraKey('jiraKey' in item ? item.jiraKey : null)
+    };
+  }
+
+  const rawChildren = 'children' in item && Array.isArray(item.children) ? item.children : [];
+  const children = rawChildren
+    .map((child) => normalizeFocusItem(child))
+    .filter((child): child is FocusPullRequestItem => child?.source === 'github');
+  const normalizedJiraKey =
+    normalizeJiraKey('jiraKey' in item ? item.jiraKey : item.reference) ?? item.reference.trim();
+
+  return {
+    ...normalizedBase,
+    source: 'jira',
+    jiraKey: normalizedJiraKey,
+    jiraStatusCategoryKey:
+      typeof item === 'object' && item !== null && 'jiraStatusCategoryKey' in item
+        ? normalizeJiraStatusCategoryKey(item.jiraStatusCategoryKey)
+        : undefined,
+    children,
+    isPlaceholder: 'isPlaceholder' in item ? Boolean(item.isPlaceholder) : false
+  } satisfies FocusJiraItem;
+}
+
+function normalizeJiraKey(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim().toUpperCase() : null;
+}
+
+function normalizeJiraStatusCategoryKey(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
+}

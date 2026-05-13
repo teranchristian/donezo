@@ -1,0 +1,17 @@
+export const NOTES_STORAGE_KEY = 'dashboard-notes';
+export const TODAY_FOCUS_ITEMS_STORAGE_KEY = 'today-focus-items';
+export const SETTINGS_STORAGE_KEY = 'dashboard-settings';
+export const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
+export const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
+export const GITHUB_PR_STATUS_FILTER_STORAGE_KEY = 'githubPrStatusFilter';
+export const JIRA_BASE_URL_STORAGE_KEY = 'jiraBaseUrl';
+export const JIRA_EMAIL_STORAGE_KEY = 'jiraEmail';
+export const JIRA_API_TOKEN_STORAGE_KEY = 'jiraApiToken';
+export const ACTIVE_INTEGRATION_STORAGE_KEY = 'activeIntegration';
+export const ACTIVE_GITHUB_VIEW_STORAGE_KEY = 'activeGitHubView';
+export const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
+export const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
+export const GITHUB_PR_READY_STATE_STORAGE_KEY = 'github-pr-ready-state';
+export const GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY = 'github-pr-notification-seen-at';
+export const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
+export const GITHUB_DEV_MODE_STORAGE_KEY = 'github-dev-mode';

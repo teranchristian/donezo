@@ -1,0 +1,76 @@
+export type Note = {
+  id: string;
+  text: string;
+  createdAt: number;
+};
+
+export type FocusStatusTone = 'violet' | 'emerald' | 'amber';
+
+type FocusItemBase = {
+  id: string;
+  sourceLabel: string;
+  reference: string;
+  url?: string;
+  title: string;
+  statusLabel: string;
+  statusTone: FocusStatusTone;
+};
+
+export type FocusPullRequestItem = FocusItemBase & {
+  source: 'github';
+  jiraKey: string | null;
+};
+
+export type FocusJiraItem = FocusItemBase & {
+  source: 'jira';
+  jiraKey: string;
+  jiraStatusCategoryKey?: string;
+  children: FocusPullRequestItem[];
+  isPlaceholder?: boolean;
+};
+
+export type FocusItem = FocusJiraItem | FocusPullRequestItem;
+
+export type DashboardSettings = {
+  name: string;
+  integrations: {
+    github: {
+      username: string;
+      token: string;
+      ownerFilter: string;
+    };
+    jira: {
+      baseUrl: string;
+      email: string;
+      apiToken: string;
+    };
+  };
+};
+
+export type GitHubListOrganizationFilter = 'all' | string;
+export type GitHubListSort =
+  | 'recently-updated'
+  | 'oldest-updated'
+  | 'repository-asc'
+  | 'title-asc';
+export type GitHubPrStatusFilter = 'all' | 'approved' | 'ready-to-merge' | 'waiting-review';
+export type ActiveIntegration = 'github' | 'jira';
+export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
+export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-priority';
+
+export type GitHubPrWarningStateEntry = {
+  activeCaseKeys: string[];
+  highlighted: boolean;
+  updatedAt: number;
+};
+
+export type GitHubPrWarningState = Record<string, GitHubPrWarningStateEntry>;
+
+export type GitHubPrReadyStateEntry = {
+  isReady: boolean;
+  highlighted: boolean;
+  updatedAt: number;
+};
+
+export type GitHubPrReadyState = Record<string, GitHubPrReadyStateEntry>;
+export type GitHubPrNotificationSeenAtState = Record<string, number>;
