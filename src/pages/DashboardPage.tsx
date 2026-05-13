@@ -71,6 +71,7 @@ export function DashboardPage({
       readyToMergeCount: 0,
       failedBuildCount: 0,
       failedBuildBadgeCount: 0,
+      highlightedCommentCount: 0,
       highlightedReadyCount: 0,
       highlightedWarningCount: 0,
       reviewRequestedCount: 0,

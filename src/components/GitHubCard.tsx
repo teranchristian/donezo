@@ -68,6 +68,7 @@ export type GitHubSummaryMetrics = {
   readyToMergeCount: number;
   failedBuildCount: number;
   failedBuildBadgeCount: number;
+  highlightedCommentCount: number;
   highlightedReadyCount: number;
   highlightedWarningCount: number;
   reviewRequestedCount: number;
@@ -149,6 +150,10 @@ export function GitHubCard({
     notifications,
     gitHubPrNotificationSeenAtState
   );
+  const pullRequestNewCommentCountByKey = getPullRequestNewCommentCountByKey(
+    notifications,
+    gitHubPrNotificationSeenAtState
+  );
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
   const notificationItems = notifications.map((notification) => ({
     kind: 'notification' as const,
@@ -180,6 +185,10 @@ export function GitHubCard({
       pullRequest.ciStatus === 'failing' &&
       Boolean(gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted)
   ).length;
+  const highlightedCommentCount = myOpenPRs.filter((pullRequest) => {
+    const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
+    return (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0) > 0;
+  }).length;
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
     const warningEntry = gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
     if (!warningEntry?.highlighted) {
@@ -390,6 +399,7 @@ export function GitHubCard({
       readyToMergeCount,
       failedBuildCount,
       failedBuildBadgeCount,
+      highlightedCommentCount,
       highlightedReadyCount,
       highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
@@ -402,6 +412,7 @@ export function GitHubCard({
     readyToMergeCount,
     failedBuildCount,
     failedBuildBadgeCount,
+    highlightedCommentCount,
     highlightedReadyCount,
     highlightedWarningCount,
     summaryApprovedPrCount,
@@ -793,12 +804,20 @@ function PullRequestCommentBadge({
       <svg
         viewBox="0 0 16 16"
         aria-hidden="true"
-        className="h-3.5 w-3.5 shrink-0 text-white/42"
+        className={`h-3.5 w-3.5 shrink-0 ${newCount > 0 ? 'text-white' : 'text-white/42'}`}
         fill="currentColor"
       >
         <path d="M2.25 3.75A2.25 2.25 0 0 1 4.5 1.5h7a2.25 2.25 0 0 1 2.25 2.25v4.5A2.25 2.25 0 0 1 11.5 10.5H8.78l-2.5 2.1a.75.75 0 0 1-1.23-.57V10.5H4.5a2.25 2.25 0 0 1-2.25-2.25v-4.5Z" />
       </svg>
-      <span>{label}</span>
+      {newCount > 0 ? (
+        <span>
+          <span className="font-bold text-white">{newCount} new</span>
+          <span className="text-white/38"> {'·'} </span>
+          <span>{totalCount} total</span>
+        </span>
+      ) : (
+        <span>{totalCount} total</span>
+      )}
     </span>
   );
 }
@@ -1357,6 +1376,16 @@ function getPullRequestNewNotificationCountByKey(
 
     return counts;
   }, {});
+}
+
+function getPullRequestNewCommentCountByKey(
+  notifications: GitHubNotification[],
+  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState
+) {
+  return getPullRequestNewNotificationCountByKey(
+    notifications.filter((notification) => notification.reason === 'comment'),
+    gitHubPrNotificationSeenAtState
+  );
 }
 
 function getNotificationIconKind(subjectType: string): 'pull-request' | 'issue' | 'commit' | 'discussion' {
