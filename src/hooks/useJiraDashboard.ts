@@ -24,6 +24,7 @@ export function useJiraDashboard({ settings, isLoadingSettings }: UseJiraDashboa
   const [jiraProfile, setJiraProfile] = useState<JiraProfile | null>(null);
   const [jiraErrorMessage, setJiraErrorMessage] = useState('');
   const [jiraData, setJiraData] = useState<JiraDashboardData>(getEmptyJiraDashboardData());
+  const [isJiraInitialized, setIsJiraInitialized] = useState(false);
   const [jiraRefreshSignal, setJiraRefreshSignal] = useState<TodayFocusRefreshSignal>({
     lastCompletedAt: null,
     lastManualAt: null
@@ -69,6 +70,7 @@ export function useJiraDashboard({ settings, isLoadingSettings }: UseJiraDashboa
         }
 
         setJiraData(data);
+        setIsJiraInitialized(true);
         const completedAt = Date.now();
         setJiraRefreshSignal((current) => ({
           lastCompletedAt: completedAt,
@@ -90,6 +92,7 @@ export function useJiraDashboard({ settings, isLoadingSettings }: UseJiraDashboa
       return;
     }
 
+    setIsJiraInitialized(false);
     void refreshJiraData({
       baseUrl: settings.baseUrl,
       email: settings.email,
@@ -266,6 +269,7 @@ export function useJiraDashboard({ settings, isLoadingSettings }: UseJiraDashboa
     jiraProfile,
     jiraErrorMessage,
     jiraData,
+    isJiraInitialized,
     jiraRefreshSignal,
     isJiraLoading,
     testConnectionStatus,

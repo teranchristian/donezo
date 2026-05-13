@@ -31,6 +31,7 @@ export function useGitHubDashboard({
   gitHubMockScenario
 }: UseGitHubDashboardOptions) {
   const [gitHubData, setGitHubData] = useState<GitHubDashboardData>(getEmptyGitHubDashboardData());
+  const [isGitHubInitialized, setIsGitHubInitialized] = useState(false);
   const [isGitHubMockReady, setIsGitHubMockReady] = useState(false);
   const [isGitHubLoading, setIsGitHubLoading] = useState(false);
   const [isCheckingGitHubActivity, setIsCheckingGitHubActivity] = useState(false);
@@ -60,6 +61,7 @@ export function useGitHubDashboard({
 
     setGitHubData(scenario.dashboardData);
     setGitHubSettingsTestStatus(scenario.dashboardData.connectionStatus);
+    setIsGitHubInitialized(true);
     setIsGitHubMockReady(true);
   }, []);
 
@@ -92,6 +94,7 @@ export function useGitHubDashboard({
 
         setGitHubData(data);
         setGitHubSettingsTestStatus(data.connectionStatus);
+        setIsGitHubInitialized(true);
       } finally {
         isGitHubRefreshInFlightRef.current = false;
 
@@ -115,6 +118,7 @@ export function useGitHubDashboard({
 
     let isCancelled = false;
     setIsGitHubMockReady(true);
+    setIsGitHubInitialized(false);
 
     void (async () => {
       const cachedData = await getLatestGitHubDashboardData({
@@ -129,6 +133,7 @@ export function useGitHubDashboard({
       if (cachedData) {
         setGitHubData(cachedData);
         setGitHubSettingsTestStatus(cachedData.connectionStatus);
+        setIsGitHubInitialized(true);
       }
 
       await refreshGitHubData({
@@ -337,6 +342,7 @@ export function useGitHubDashboard({
 
   return {
     gitHubData,
+    isGitHubInitialized,
     isGitHubMockReady,
     isGitHubLoading,
     isCheckingGitHubActivity,

@@ -135,6 +135,10 @@ export function DashboardPage({
     commitTodayFocusItems,
   });
 
+  if (!hasLoadedTodayFocusItems) {
+    return null;
+  }
+
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
   const dashboardAlerts = getDashboardAlerts({
     gitHubMetrics: gitHubSummaryMetrics,

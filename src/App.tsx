@@ -94,6 +94,8 @@ export default function App() {
 
   if (
     isLoadingSettings ||
+    !gitHubDashboard.isGitHubInitialized ||
+    !jiraDashboard.isJiraInitialized ||
     gitHubMockMode.isLoading ||
     (gitHubMockMode.isGitHubMockMode && !gitHubDashboard.isGitHubMockReady)
   ) {
