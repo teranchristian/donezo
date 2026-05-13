@@ -9,6 +9,10 @@ const GITHUB_PULL_REQUEST_SIGNALS_CACHE_KEY = 'github-pull-request-signals';
 const GITHUB_CACHE_TTL_MS = 5 * 60 * 1000;
 const GITHUB_NOTIFICATIONS_WINDOW_DAYS = 7;
 const GITHUB_NOTIFICATIONS_PAGE_SIZE = 50;
+const SETTINGS_STORAGE_KEY = 'dashboard-settings';
+const GITHUB_POLL_ALARM_NAME = 'github-dashboard-poll';
+const JIRA_POLL_ALARM_NAME = 'jira-dashboard-poll';
+const BACKGROUND_POLL_PERIOD_MINUTES = 1;
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
 const GITHUB_PULL_REQUESTS_QUERY = `
   query DashboardPullRequests(
@@ -247,6 +251,102 @@ function getPullRequestNotificationSignals(notifications) {
       unread: Boolean(notification.unread)
     }));
 }
+
+async function getStoredDashboardSettings() {
+  const result = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+  const settings = result[SETTINGS_STORAGE_KEY];
+
+  if (!settings || typeof settings !== 'object') {
+    return null;
+  }
+
+  return settings;
+}
+
+async function syncBackgroundPollingAlarms() {
+  const settings = await getStoredDashboardSettings();
+  const gitHubToken = normalizeGitHubToken(settings?.integrations?.github?.token);
+  const jiraBaseUrl = normalizeJiraBaseUrl(settings?.integrations?.jira?.baseUrl);
+  const jiraEmail = String(settings?.integrations?.jira?.email ?? '').trim();
+  const jiraApiToken = String(settings?.integrations?.jira?.apiToken ?? '').trim();
+
+  if (gitHubToken) {
+    await chrome.alarms.create(GITHUB_POLL_ALARM_NAME, {
+      periodInMinutes: BACKGROUND_POLL_PERIOD_MINUTES
+    });
+  } else {
+    await chrome.alarms.clear(GITHUB_POLL_ALARM_NAME);
+  }
+
+  if (jiraBaseUrl && jiraEmail && jiraApiToken) {
+    await chrome.alarms.create(JIRA_POLL_ALARM_NAME, {
+      periodInMinutes: BACKGROUND_POLL_PERIOD_MINUTES
+    });
+  } else {
+    await chrome.alarms.clear(JIRA_POLL_ALARM_NAME);
+  }
+}
+
+async function refreshGitHubDashboardFromStoredSettings() {
+  const settings = await getStoredDashboardSettings();
+  const username = normalizeGitHubUsername(settings?.integrations?.github?.username);
+  const token = normalizeGitHubToken(settings?.integrations?.github?.token);
+
+  if (!token) {
+    return;
+  }
+
+  await loadGitHubDashboardData({
+    username,
+    token,
+    forceRefresh: true
+  });
+}
+
+async function refreshJiraDashboardFromStoredSettings() {
+  const settings = await getStoredDashboardSettings();
+  const jiraBaseUrl = normalizeJiraBaseUrl(settings?.integrations?.jira?.baseUrl);
+  const jiraEmail = String(settings?.integrations?.jira?.email ?? '').trim();
+  const jiraApiToken = String(settings?.integrations?.jira?.apiToken ?? '').trim();
+
+  if (!jiraBaseUrl || !jiraEmail || !jiraApiToken) {
+    return;
+  }
+
+  const auth = encodeBasicAuth(jiraEmail, jiraApiToken);
+  const credentialsKey = createJiraCredentialsKey(jiraBaseUrl, jiraEmail, jiraApiToken);
+  const issues = await fetchJiraIssuesByJql(jiraBaseUrl, auth, JIRA_ACTIVE_ISSUES_JQL, 50);
+  await saveCachedJiraIssues(credentialsKey, issues);
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  void syncBackgroundPollingAlarms();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  void syncBackgroundPollingAlarms();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local' || !changes[SETTINGS_STORAGE_KEY]) {
+    return;
+  }
+
+  void syncBackgroundPollingAlarms();
+  void refreshGitHubDashboardFromStoredSettings();
+  void refreshJiraDashboardFromStoredSettings();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === GITHUB_POLL_ALARM_NAME) {
+    void refreshGitHubDashboardFromStoredSettings();
+    return;
+  }
+
+  if (alarm.name === JIRA_POLL_ALARM_NAME) {
+    void refreshJiraDashboardFromStoredSettings();
+  }
+});
 
 function getDashboardPullRequestSignals(pullRequests) {
   return pullRequests.map((pullRequest) => ({

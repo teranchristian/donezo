@@ -85,6 +85,9 @@ const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
   relevantPrCount: 0
 };
 
+const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
+const JIRA_ISSUES_CACHE_KEY = 'jira-issues-cache-v4';
+
 // Order matters: the first matching variant wins.
 const FAVICON_VARIANTS: FaviconVariant[] = [
   {
@@ -411,6 +414,121 @@ export default function App() {
       window.clearInterval(intervalId);
     };
   }, [gitHubMockScenario, isLoadingSettings, settings.integrations.github.username, settings.integrations.github.token]);
+
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const handleStorageChanged = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string
+    ) => {
+      if (areaName !== 'local' || isCancelled || !isMountedRef.current || isLoadingSettings) {
+        return;
+      }
+
+      if (changes[GITHUB_DASHBOARD_CACHE_KEY] && !gitHubMockScenario) {
+        void (async () => {
+          const cachedData = await getLatestGitHubDashboardData({
+            username: settings.integrations.github.username,
+            token: settings.integrations.github.token
+          });
+
+          if (!cachedData || isCancelled || !isMountedRef.current) {
+            return;
+          }
+
+          setGitHubData(cachedData);
+          setGitHubSettingsTestStatus(cachedData.connectionStatus);
+        })();
+      }
+
+      if (changes[JIRA_ISSUES_CACHE_KEY]) {
+        void refreshJiraData({
+          baseUrl: settings.integrations.jira.baseUrl,
+          email: settings.integrations.jira.email,
+          apiToken: settings.integrations.jira.apiToken,
+          forceRefresh: false,
+          reason: 'poll',
+          showLoadingIndicator: false
+        });
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChanged);
+
+    return () => {
+      isCancelled = true;
+      chrome.storage.onChanged.removeListener(handleStorageChanged);
+    };
+  }, [
+    gitHubMockScenario,
+    isLoadingSettings,
+    settings.integrations.github.token,
+    settings.integrations.github.username,
+    settings.integrations.jira.apiToken,
+    settings.integrations.jira.baseUrl,
+    settings.integrations.jira.email
+  ]);
+
+  useEffect(() => {
+    if (isLoadingSettings) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const syncVisibleData = () => {
+      if (isCancelled || document.visibilityState !== 'visible') {
+        return;
+      }
+
+      if (!gitHubMockScenario) {
+        void (async () => {
+          const cachedData = await getLatestGitHubDashboardData({
+            username: settings.integrations.github.username,
+            token: settings.integrations.github.token
+          });
+
+          if (!cachedData || isCancelled || !isMountedRef.current) {
+            return;
+          }
+
+          setGitHubData(cachedData);
+          setGitHubSettingsTestStatus(cachedData.connectionStatus);
+        })();
+      }
+
+      void refreshJiraData({
+        baseUrl: settings.integrations.jira.baseUrl,
+        email: settings.integrations.jira.email,
+        apiToken: settings.integrations.jira.apiToken,
+        forceRefresh: false,
+        reason: 'poll',
+        showLoadingIndicator: false
+      });
+    };
+
+    document.addEventListener('visibilitychange', syncVisibleData);
+    window.addEventListener('focus', syncVisibleData);
+
+    return () => {
+      isCancelled = true;
+      document.removeEventListener('visibilitychange', syncVisibleData);
+      window.removeEventListener('focus', syncVisibleData);
+    };
+  }, [
+    gitHubMockScenario,
+    isLoadingSettings,
+    settings.integrations.github.token,
+    settings.integrations.github.username,
+    settings.integrations.jira.apiToken,
+    settings.integrations.jira.baseUrl,
+    settings.integrations.jira.email
+  ]);
 
   async function handleSaveSettings(nextSettings: DashboardSettings) {
     await saveStoredSettings(nextSettings);
