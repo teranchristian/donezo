@@ -12,45 +12,23 @@ import { SummaryCard, TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
 import {
   GitHubConnectionStatus,
   GitHubDashboardData,
-  GitHubPullRequestItem,
-  getGitHubPullRequestStates,
 } from '../lib/githubApi';
 import {
   getJiraIssueCounts,
   JiraConnectionStatus,
   JiraDashboardData,
-  loadJiraIssuesByKeys,
 } from '../lib/jiraApi';
-import {
-  buildDashboardHashNavigation,
-  parseDashboardHashNavigation,
-} from '../lib/dashboardRouting';
 import {
   DashboardSettings,
   FocusItem,
-  FocusPullRequestItem,
-  getStoredActiveGitHubView,
-  getStoredActiveIntegration,
-  getStoredActiveJiraView,
-  getStoredGitHubPrStatusFilter,
-  getStoredTodayFocusItems,
-  saveStoredActiveIntegration,
-  saveStoredActiveGitHubView,
-  saveStoredActiveJiraView,
-  saveStoredGitHubPrStatusFilter,
-  saveStoredTodayFocusItems,
-  type ActiveGitHubView,
-  type ActiveIntegration,
   type ActiveJiraView,
   type GitHubPrStatusFilter,
 } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
-import {
-  applyGitHubPullRequestStatesToTodayFocusItems,
-  reconcileTodayFocusGitHubItems,
-  reconcileTodayFocusJiraItems,
-  type TodayFocusRefreshSignal,
-} from '../lib/todayFocusSync';
+import { type TodayFocusRefreshSignal } from '../lib/todayFocusSync';
+import { useDashboardNavigation } from '../hooks/useDashboardNavigation';
+import { useTodayFocusFallbacks } from '../hooks/useTodayFocusFallbacks';
+import { useTodayFocusState } from '../hooks/useTodayFocusState';
 
 type DashboardPageProps = {
   settings: DashboardSettings;
@@ -89,27 +67,6 @@ export function DashboardPage({
   onRefreshJira,
   onGitHubSummaryMetricsChange,
 }: DashboardPageProps) {
-  const [activeIntegration, setActiveIntegration] =
-    useState<ActiveIntegration>('github');
-  const [activeGitHubView, setActiveGitHubView] =
-    useState<ActiveGitHubView>('prs');
-  const [githubPrStatusFilter, setGitHubPrStatusFilter] =
-    useState<GitHubPrStatusFilter>('all');
-  const [activeJiraView, setActiveJiraView] =
-    useState<ActiveJiraView>('active');
-  const [hasLoadedNavigation, setHasLoadedNavigation] = useState(false);
-  const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
-  const [hasLoadedTodayFocusItems, setHasLoadedTodayFocusItems] =
-    useState(false);
-  const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(
-    null,
-  );
-  const hasLoadedTodayFocusItemsRef = useRef(false);
-  const hasRunInitialFocusedJiraFallbackRef = useRef(false);
-  const isFocusedJiraFallbackInFlightRef = useRef(false);
-  const lastFocusedJiraFallbackAtRef = useRef<number | null>(null);
-  const isFocusedGitHubFallbackInFlightRef = useRef(false);
-  const todayFocusItemsRef = useRef<FocusItem[]>([]);
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
     useState<GitHubSummaryMetrics>({
       connectionStatus: gitHubData.connectionStatus,
@@ -123,126 +80,38 @@ export function DashboardPage({
       approvedPrCount: null,
       relevantPrCount: gitHubData.openPrsCount,
     });
-  const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
-
-  useEffect(() => {
-    todayFocusItemsRef.current = todayFocusItems;
-  }, [todayFocusItems]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    const applyNavigationState = (nextState: {
-      activeIntegration: ActiveIntegration;
-      activeGitHubView: ActiveGitHubView;
-      githubPrStatusFilter: GitHubPrStatusFilter;
-      activeJiraView: ActiveJiraView;
-    }) => {
-      if (!isActive) {
-        return;
-      }
-
-      setActiveIntegration(nextState.activeIntegration);
-      setActiveGitHubView(nextState.activeGitHubView);
-      setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
-      setActiveJiraView(nextState.activeJiraView);
-      setHasLoadedNavigation(true);
-    };
-
-    const syncFromHashOrStorage = async (options?: {
-      replaceUrl?: boolean;
-    }) => {
-      const hashState = parseDashboardHashNavigation(window.location.hash);
-      if (hashState) {
-        applyNavigationState(hashState);
-        return;
-      }
-
-      const [
-        storedActiveIntegration,
-        storedActiveGitHubView,
-        storedGitHubPrStatusFilter,
-        storedActiveJiraView,
-      ] = await Promise.all([
-        getStoredActiveIntegration(),
-        getStoredActiveGitHubView(),
-        getStoredGitHubPrStatusFilter(),
-        getStoredActiveJiraView(),
-      ]);
-
-      if (!isActive) {
-        return;
-      }
-
-      const nextState = {
-        activeIntegration: storedActiveIntegration,
-        activeGitHubView: storedActiveGitHubView,
-        githubPrStatusFilter: storedGitHubPrStatusFilter,
-        activeJiraView: storedActiveJiraView,
-      };
-
-      applyNavigationState(nextState);
-
-      if (options?.replaceUrl) {
-        replaceDashboardHash(nextState);
-      }
-    };
-
-    void syncFromHashOrStorage({ replaceUrl: true });
-
-    const handleHashChange = () => {
-      void syncFromHashOrStorage({ replaceUrl: true });
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-
-    return () => {
-      isActive = false;
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, [gitHubMockScenarioKey]);
-
-  useEffect(() => {
-    if (!hasLoadedNavigation) {
-      return;
-    }
-
-    void Promise.all([
-      saveStoredActiveIntegration(activeIntegration),
-      saveStoredActiveGitHubView(activeGitHubView),
-      saveStoredGitHubPrStatusFilter(githubPrStatusFilter),
-      saveStoredActiveJiraView(activeJiraView),
-    ]);
-  }, [
-    activeGitHubView,
+  const {
     activeIntegration,
-    activeJiraView,
+    activeGitHubView,
     githubPrStatusFilter,
-    hasLoadedNavigation,
-  ]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getStoredTodayFocusItems().then((storedItems) => {
-      if (!isMounted) {
-        return;
-      }
-
-      const nextItems = storedItems ?? getDefaultTodayFocusItems();
-      todayFocusItemsRef.current = nextItems;
-      setTodayFocusItems(nextItems);
-      hasLoadedTodayFocusItemsRef.current = true;
-      setHasLoadedTodayFocusItems(true);
-      if (storedItems === null) {
-        void saveStoredTodayFocusItems(nextItems);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    activeJiraView,
+    navigateToGitHubPrs,
+    navigateToJiraView,
+    handleIntegrationChange,
+    handleGitHubViewChange,
+    handleGitHubPrStatusFilterChange,
+    handleJiraViewChange,
+  } = useDashboardNavigation({
+    syncKey: gitHubMockScenarioKey,
+  });
+  const {
+    todayFocusItems,
+    todayFocusItemsRef,
+    todayFocusItemIds,
+    todayFocusWarning,
+    hasLoadedTodayFocusItems,
+    commitTodayFocusItems,
+    handleAddTodayFocusItem,
+    handleRemoveTodayFocusItem,
+    handleNestNewTodayFocusPullRequest,
+    handleNestExistingTodayFocusPullRequest,
+    handleReorderTopLevelTodayFocusItem,
+    handleMoveTopLevelTodayFocusItemToEnd,
+    handleReorderNestedTodayFocusPullRequest,
+  } = useTodayFocusState({
+    jiraIssues: jiraData.issues,
+    gitHubPullRequests: gitHubData.pullRequests,
+  });
 
   useEffect(() => {
     setGitHubSummaryMetrics((current) => ({
@@ -256,96 +125,15 @@ export function DashboardPage({
     onGitHubSummaryMetricsChange(gitHubSummaryMetrics);
   }, [gitHubSummaryMetrics, onGitHubSummaryMetricsChange]);
 
-  useEffect(() => {
-    if (!hasLoadedTodayFocusItemsRef.current) {
-      return;
-    }
-
-    const syncResult = reconcileTodayFocusJiraItems(
-      todayFocusItemsRef.current,
-      jiraData.issues,
-    );
-    if (syncResult.items === todayFocusItemsRef.current) {
-      return;
-    }
-
-    commitTodayFocusItems(syncResult.items);
-  }, [hasLoadedTodayFocusItems, jiraData.issues]);
-
-  useEffect(() => {
-    if (!hasLoadedTodayFocusItemsRef.current) {
-      return;
-    }
-
-    const groupedItems = syncTodayFocusJiraLinkedPullRequests(
-      todayFocusItemsRef.current,
-      gitHubData.pullRequests,
-    );
-    const syncResult = reconcileTodayFocusGitHubItems(
-      groupedItems,
-      gitHubData.pullRequests,
-    );
-    if (syncResult.items !== todayFocusItemsRef.current) {
-      commitTodayFocusItems(syncResult.items);
-      return;
-    }
-
-    void runFocusedGitHubFallback();
-  }, [
+  useTodayFocusFallbacks({
+    settings,
+    gitHubData,
+    jiraData,
+    jiraRefreshSignal,
     hasLoadedTodayFocusItems,
-    gitHubData.lastUpdatedAt,
-    gitHubData.pullRequests,
-    settings.integrations.github.token,
-  ]);
-
-  useEffect(() => {
-    if (
-      !hasLoadedTodayFocusItemsRef.current ||
-      jiraRefreshSignal.lastCompletedAt === null
-    ) {
-      return;
-    }
-
-    if (!hasRunInitialFocusedJiraFallbackRef.current) {
-      hasRunInitialFocusedJiraFallbackRef.current = true;
-      void runFocusedJiraFallback();
-      return;
-    }
-
-    if (
-      lastFocusedJiraFallbackAtRef.current !== null &&
-      jiraRefreshSignal.lastCompletedAt - lastFocusedJiraFallbackAtRef.current <
-        5 * 60 * 1000
-    ) {
-      return;
-    }
-
-    void runFocusedJiraFallback();
-  }, [
-    hasLoadedTodayFocusItems,
-    jiraRefreshSignal.lastCompletedAt,
-    jiraData.issues,
-    settings.integrations.jira.apiToken,
-    settings.integrations.jira.baseUrl,
-    settings.integrations.jira.email,
-  ]);
-
-  useEffect(() => {
-    if (
-      !hasLoadedTodayFocusItemsRef.current ||
-      jiraRefreshSignal.lastManualAt === null
-    ) {
-      return;
-    }
-
-    void runFocusedJiraFallback();
-  }, [
-    hasLoadedTodayFocusItems,
-    jiraRefreshSignal.lastManualAt,
-    settings.integrations.jira.apiToken,
-    settings.integrations.jira.baseUrl,
-    settings.integrations.jira.email,
-  ]);
+    todayFocusItemsRef,
+    commitTodayFocusItems,
+  });
 
   const jiraCounts = getJiraIssueCounts(jiraData.issues);
   const dashboardAlerts = getDashboardAlerts({
@@ -366,249 +154,6 @@ export function DashboardPage({
       navigateToGitHubPrs('approved');
     },
   });
-
-  function updateDashboardNavigation(nextState: {
-    activeIntegration: ActiveIntegration;
-    activeGitHubView: ActiveGitHubView;
-    githubPrStatusFilter: GitHubPrStatusFilter;
-    activeJiraView: ActiveJiraView;
-  }) {
-    setActiveIntegration(nextState.activeIntegration);
-    setActiveGitHubView(nextState.activeGitHubView);
-    setGitHubPrStatusFilter(nextState.githubPrStatusFilter);
-    setActiveJiraView(nextState.activeJiraView);
-    setHasLoadedNavigation(true);
-    window.location.hash = buildDashboardHashNavigation(nextState);
-  }
-
-  function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
-    updateDashboardNavigation({
-      activeIntegration: 'github',
-      activeGitHubView: 'prs',
-      githubPrStatusFilter: prStatusFilter,
-      activeJiraView,
-    });
-  }
-
-  function navigateToJiraView(view: ActiveJiraView) {
-    updateDashboardNavigation({
-      activeIntegration: 'jira',
-      activeGitHubView,
-      githubPrStatusFilter,
-      activeJiraView: view,
-    });
-  }
-
-  function handleIntegrationChange(nextIntegration: ActiveIntegration) {
-    updateDashboardNavigation({
-      activeIntegration: nextIntegration,
-      activeGitHubView,
-      githubPrStatusFilter,
-      activeJiraView,
-    });
-  }
-
-  function handleGitHubViewChange(view: ActiveGitHubView) {
-    updateDashboardNavigation({
-      activeIntegration: 'github',
-      activeGitHubView: view,
-      githubPrStatusFilter,
-      activeJiraView,
-    });
-  }
-
-  function handleGitHubPrStatusFilterChange(
-    prStatusFilter: GitHubPrStatusFilter,
-  ) {
-    updateDashboardNavigation({
-      activeIntegration: 'github',
-      activeGitHubView: 'prs',
-      githubPrStatusFilter: prStatusFilter,
-      activeJiraView,
-    });
-  }
-
-  function handleJiraViewChange(view: ActiveJiraView) {
-    updateDashboardNavigation({
-      activeIntegration: 'jira',
-      activeGitHubView,
-      githubPrStatusFilter,
-      activeJiraView: view,
-    });
-  }
-
-  function handleAddTodayFocusItem(item: FocusItem) {
-    setTodayFocusWarning(null);
-
-    const addResult = addTodayFocusItem(todayFocusItems, item, gitHubData.pullRequests);
-    if (addResult.warning) {
-      setTodayFocusWarning(addResult.warning);
-      return;
-    }
-
-    commitTodayFocusItems(addResult.items);
-  }
-
-  function handleRemoveTodayFocusItem(itemId: string) {
-    setTodayFocusWarning(null);
-    const nextItems = removeTodayFocusItem(todayFocusItems, itemId);
-    commitTodayFocusItems(nextItems);
-  }
-
-  function handleNestNewTodayFocusPullRequest(
-    parentId: string,
-    item: FocusPullRequestItem,
-  ) {
-    setTodayFocusWarning(null);
-
-    const nextState = nestNewPullRequestUnderJira(
-      todayFocusItems,
-      parentId,
-      item,
-    );
-    if (nextState.warning) {
-      setTodayFocusWarning(nextState.warning);
-      return;
-    }
-
-    commitTodayFocusItems(nextState.items);
-  }
-
-  function handleNestExistingTodayFocusPullRequest(
-    parentId: string,
-    itemId: string,
-  ) {
-    setTodayFocusWarning(null);
-    const nextItems = moveStandalonePullRequestUnderJira(
-      todayFocusItems,
-      parentId,
-      itemId,
-    );
-    commitTodayFocusItems(nextItems);
-  }
-
-  function handleReorderTopLevelTodayFocusItem(
-    itemId: string,
-    targetId: string,
-  ) {
-    setTodayFocusWarning(null);
-    const nextItems = reorderTopLevelTodayFocusItems(
-      todayFocusItems,
-      itemId,
-      targetId,
-    );
-    commitTodayFocusItems(nextItems);
-  }
-
-  function handleMoveTopLevelTodayFocusItemToEnd(itemId: string) {
-    setTodayFocusWarning(null);
-    const nextItems = moveTopLevelTodayFocusItemToEnd(todayFocusItems, itemId);
-    commitTodayFocusItems(nextItems);
-  }
-
-  function handleReorderNestedTodayFocusPullRequest(
-    parentId: string,
-    itemId: string,
-    targetId: string,
-  ) {
-    setTodayFocusWarning(null);
-    const nextItems = reorderNestedPullRequests(
-      todayFocusItems,
-      parentId,
-      itemId,
-      targetId,
-    );
-    commitTodayFocusItems(nextItems);
-  }
-
-  function commitTodayFocusItems(nextItems: FocusItem[]) {
-    todayFocusItemsRef.current = nextItems;
-    setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
-  }
-
-  async function runFocusedJiraFallback() {
-    const { baseUrl, email, apiToken } = settings.integrations.jira;
-    if (
-      !baseUrl.trim() ||
-      !email.trim() ||
-      !apiToken.trim() ||
-      isFocusedJiraFallbackInFlightRef.current
-    ) {
-      return;
-    }
-
-    const syncResult = reconcileTodayFocusJiraItems(
-      todayFocusItemsRef.current,
-      jiraData.issues,
-    );
-    if (syncResult.missingKeys.length === 0) {
-      return;
-    }
-
-    isFocusedJiraFallbackInFlightRef.current = true;
-    lastFocusedJiraFallbackAtRef.current = Date.now();
-
-    try {
-      const fallbackIssues = await loadJiraIssuesByKeys({
-        baseUrl,
-        email,
-        apiToken,
-        issueKeys: syncResult.missingKeys,
-      });
-
-      if (fallbackIssues.length === 0) {
-        return;
-      }
-
-      const fallbackSyncResult = reconcileTodayFocusJiraItems(
-        todayFocusItemsRef.current,
-        fallbackIssues,
-      );
-      if (fallbackSyncResult.items !== todayFocusItemsRef.current) {
-        commitTodayFocusItems(fallbackSyncResult.items);
-      }
-    } finally {
-      isFocusedJiraFallbackInFlightRef.current = false;
-    }
-  }
-
-  async function runFocusedGitHubFallback() {
-    const token = settings.integrations.github.token.trim();
-    if (!token || isFocusedGitHubFallbackInFlightRef.current) {
-      return;
-    }
-
-    const syncResult = reconcileTodayFocusGitHubItems(
-      todayFocusItemsRef.current,
-      gitHubData.pullRequests,
-    );
-    if (syncResult.missingPullRequests.length === 0) {
-      return;
-    }
-
-    isFocusedGitHubFallbackInFlightRef.current = true;
-
-    try {
-      const pullRequestStates = await getGitHubPullRequestStates({
-        token,
-        pullRequests: syncResult.missingPullRequests,
-      });
-      if (Object.keys(pullRequestStates).length === 0) {
-        return;
-      }
-
-      const nextItems = applyGitHubPullRequestStatesToTodayFocusItems(
-        todayFocusItemsRef.current,
-        pullRequestStates,
-      );
-      if (nextItems !== todayFocusItemsRef.current) {
-        commitTodayFocusItems(nextItems);
-      }
-    } finally {
-      isFocusedGitHubFallbackInFlightRef.current = false;
-    }
-  }
 
   const integrationSwitcher = (
     <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-white/[0.035] bg-white/[0.025] p-1">
@@ -776,67 +321,6 @@ export function DashboardPage({
   );
 }
 
-function collectTodayFocusItemIds(items: FocusItem[]) {
-  const itemIds = new Set<string>();
-
-  for (const item of items) {
-    itemIds.add(item.id);
-
-    if (item.source === 'jira') {
-      for (const child of item.children) {
-        itemIds.add(child.id);
-      }
-    }
-  }
-
-  return itemIds;
-}
-
-function replaceDashboardHash(nextState: {
-  activeIntegration: ActiveIntegration;
-  activeGitHubView: ActiveGitHubView;
-  githubPrStatusFilter: GitHubPrStatusFilter;
-  activeJiraView: ActiveJiraView;
-}) {
-  const nextHash = buildDashboardHashNavigation(nextState);
-  if (window.location.hash === nextHash) {
-    return;
-  }
-
-  window.history.replaceState(
-    null,
-    '',
-    `${window.location.pathname}${window.location.search}${nextHash}`,
-  );
-}
-
-function getDefaultTodayFocusItems(): FocusItem[] {
-  return [
-    {
-      id: 'jira:CLK-112',
-      source: 'jira',
-      sourceLabel: 'Jira',
-      reference: 'CLK-112',
-      jiraKey: 'CLK-112',
-      title: 'Fix lead status bug in dashboard',
-      statusLabel: 'In Progress',
-      statusTone: 'violet',
-      children: [
-        {
-          id: 'github:dashboard#142',
-          source: 'github',
-          sourceLabel: 'GitHub',
-          reference: '#142',
-          title: 'CLK-112 Fix venue provision defaults',
-          statusLabel: 'Approved',
-          statusTone: 'emerald',
-          jiraKey: 'CLK-112',
-        },
-      ],
-    },
-  ];
-}
-
 type DashboardAlertItem = {
   value: string;
   title: string;
@@ -845,401 +329,6 @@ type DashboardAlertItem = {
   onClick?: () => void;
 };
 
-function addTodayFocusItem(
-  items: FocusItem[],
-  item: FocusItem,
-  pullRequests: GitHubPullRequestItem[],
-) {
-  if (hasTodayFocusItem(items, item.id)) {
-    return { items, warning: 'That item is already in Today focus.' };
-  }
-
-  if (items.length >= TODAY_FOCUS_MAX_ITEMS) {
-    return { items, warning: 'Today focus already has 3 items.' };
-  }
-
-  if (item.source === 'jira') {
-    const normalizedItem: FocusItem = normalizeTopLevelTodayFocusItem(item);
-    if (normalizedItem.source !== 'jira') {
-      return { items, warning: null };
-    }
-
-    const matchingPullRequests = getMatchingGitHubFocusPullRequests(
-      pullRequests,
-      normalizedItem.jiraKey,
-    );
-    const existingMatchingStandalonePullRequests = items.filter(
-      (focusItem): focusItem is FocusPullRequestItem =>
-        focusItem.source === 'github' &&
-        focusItem.jiraKey === normalizedItem.jiraKey,
-    );
-    const nextChildrenById = new Map<string, FocusPullRequestItem>();
-
-    for (const child of normalizedItem.children) {
-      nextChildrenById.set(child.id, child);
-    }
-
-    for (const pullRequest of matchingPullRequests) {
-      nextChildrenById.set(pullRequest.id, pullRequest);
-    }
-
-    for (const pullRequest of existingMatchingStandalonePullRequests) {
-      nextChildrenById.set(pullRequest.id, pullRequest);
-    }
-
-    return {
-      items: [
-        ...items.filter(
-          (focusItem) =>
-            !(
-              focusItem.source === 'github' &&
-              focusItem.jiraKey === normalizedItem.jiraKey
-            ),
-        ),
-        {
-          ...normalizedItem,
-          children: Array.from(nextChildrenById.values()),
-        },
-      ],
-      warning: null,
-    };
-  }
-
-  return {
-    items: [...items, normalizeTopLevelTodayFocusItem(item)],
-    warning: null,
-  };
-}
-
-function syncTodayFocusJiraLinkedPullRequests(
-  items: FocusItem[],
-  pullRequests: GitHubPullRequestItem[],
-) {
-  const jiraKeys = new Set(
-    items
-      .filter((item): item is Extract<FocusItem, { source: 'jira' }> => item.source === 'jira')
-      .map((item) => item.jiraKey),
-  );
-  if (jiraKeys.size === 0) {
-    return items;
-  }
-
-  const matchingPullRequestsByJiraKey = new Map<string, FocusPullRequestItem[]>();
-  for (const pullRequest of pullRequests) {
-    const jiraKey = extractJiraKeyFromPullRequestTitle(pullRequest.title);
-    if (!jiraKey || !jiraKeys.has(jiraKey)) {
-      continue;
-    }
-
-    const nextItem = mapGitHubPullRequestToFocusItem(pullRequest);
-    const currentItems = matchingPullRequestsByJiraKey.get(jiraKey) ?? [];
-    currentItems.push(nextItem);
-    matchingPullRequestsByJiraKey.set(jiraKey, currentItems);
-  }
-
-  let hasChanges = false;
-  const nextItems: FocusItem[] = [];
-
-  for (const item of items) {
-    if (item.source === 'jira') {
-      const nextChildrenById = new Map<string, FocusPullRequestItem>();
-
-      for (const child of item.children) {
-        nextChildrenById.set(child.id, child);
-      }
-
-      for (const pullRequest of matchingPullRequestsByJiraKey.get(item.jiraKey) ?? []) {
-        const previousChild = nextChildrenById.get(pullRequest.id);
-        if (
-          !previousChild ||
-          previousChild.title !== pullRequest.title ||
-          previousChild.statusLabel !== pullRequest.statusLabel ||
-          previousChild.statusTone !== pullRequest.statusTone ||
-          previousChild.url !== pullRequest.url
-        ) {
-          hasChanges = true;
-        }
-        nextChildrenById.set(pullRequest.id, pullRequest);
-      }
-
-      const nextChildren = Array.from(nextChildrenById.values());
-      if (
-        nextChildren.length !== item.children.length ||
-        nextChildren.some((child, index) => child !== item.children[index])
-      ) {
-        hasChanges = true;
-        nextItems.push({
-          ...item,
-          children: nextChildren,
-        });
-        continue;
-      }
-
-      nextItems.push(item);
-      continue;
-    }
-
-    if (item.jiraKey && jiraKeys.has(item.jiraKey)) {
-      hasChanges = true;
-      continue;
-    }
-
-    nextItems.push(item);
-  }
-
-  return hasChanges ? nextItems : items;
-}
-
-function removeTodayFocusItem(items: FocusItem[], itemId: string) {
-  const nextItems: FocusItem[] = [];
-
-  for (const item of items) {
-    if (item.id === itemId) {
-      continue;
-    }
-
-    if (item.source === 'jira') {
-      const nextChildren = item.children.filter((child) => child.id !== itemId);
-      nextItems.push(
-        nextChildren.length === item.children.length
-          ? item
-          : {
-              ...item,
-              children: nextChildren,
-            },
-      );
-      continue;
-    }
-
-    nextItems.push(item);
-  }
-
-  return nextItems;
-}
-
-function hasTodayFocusItem(items: FocusItem[], itemId: string) {
-  return items.some(
-    (item) =>
-      item.id === itemId ||
-      (item.source === 'jira' &&
-        item.children.some((child) => child.id === itemId)),
-  );
-}
-
-function nestNewPullRequestUnderJira(
-  items: FocusItem[],
-  parentId: string,
-  pullRequest: FocusPullRequestItem,
-) {
-  if (hasTodayFocusItem(items, pullRequest.id)) {
-    return { items, warning: 'That item is already in Today focus.' };
-  }
-
-  if (!items.some((item) => item.id === parentId && item.source === 'jira')) {
-    return { items, warning: null };
-  }
-
-  return {
-    items: items.map((item) =>
-      item.id === parentId && item.source === 'jira'
-        ? {
-            ...item,
-            children: [...item.children, pullRequest],
-          }
-        : item,
-    ),
-    warning: null,
-  };
-}
-
-function moveStandalonePullRequestUnderJira(
-  items: FocusItem[],
-  parentId: string,
-  itemId: string,
-) {
-  const standalonePullRequest = items.find(
-    (item): item is FocusPullRequestItem =>
-      item.id === itemId && item.source === 'github',
-  );
-
-  if (
-    !standalonePullRequest ||
-    !items.some((item) => item.id === parentId && item.source === 'jira')
-  ) {
-    return items;
-  }
-
-  return items.reduce<FocusItem[]>((nextItems, item) => {
-    if (item.id === itemId) {
-      return nextItems;
-    }
-
-    if (item.id === parentId && item.source === 'jira') {
-      nextItems.push({
-        ...item,
-        children: [...item.children, standalonePullRequest],
-      });
-      return nextItems;
-    }
-
-    nextItems.push(item);
-    return nextItems;
-  }, []);
-}
-
-function reorderTopLevelTodayFocusItems(
-  items: FocusItem[],
-  itemId: string,
-  targetId: string,
-) {
-  if (itemId === targetId) {
-    return items;
-  }
-
-  const sourceIndex = items.findIndex((item) => item.id === itemId);
-  const targetIndex = items.findIndex((item) => item.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0) {
-    return items;
-  }
-
-  const nextItems = [...items];
-  const [movedItem] = nextItems.splice(sourceIndex, 1);
-  const insertIndex = nextItems.findIndex((item) => item.id === targetId);
-  nextItems.splice(insertIndex, 0, movedItem);
-  return nextItems;
-}
-
-function moveTopLevelTodayFocusItemToEnd(items: FocusItem[], itemId: string) {
-  const sourceIndex = items.findIndex((item) => item.id === itemId);
-  if (sourceIndex < 0 || sourceIndex === items.length - 1) {
-    return items;
-  }
-
-  const nextItems = [...items];
-  const [movedItem] = nextItems.splice(sourceIndex, 1);
-  nextItems.push(movedItem);
-  return nextItems;
-}
-
-function reorderNestedPullRequests(
-  items: FocusItem[],
-  parentId: string,
-  itemId: string,
-  targetId: string,
-) {
-  if (itemId === targetId) {
-    return items;
-  }
-
-  return items.map((item) => {
-    if (item.id !== parentId || item.source !== 'jira') {
-      return item;
-    }
-
-    const sourceIndex = item.children.findIndex((child) => child.id === itemId);
-    if (sourceIndex < 0) {
-      return item;
-    }
-
-    const nextChildren = [...item.children];
-    const [movedChild] = nextChildren.splice(sourceIndex, 1);
-    const insertIndex =
-      targetId === getNestedPullRequestEndTargetId(parentId)
-        ? nextChildren.length
-        : nextChildren.findIndex((child) => child.id === targetId);
-    if (insertIndex < 0) {
-      return item;
-    }
-    nextChildren.splice(insertIndex, 0, movedChild);
-
-    return {
-      ...item,
-      children: nextChildren,
-    };
-  });
-}
-
-function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
-  return item.source === 'jira'
-    ? {
-        ...item,
-        jiraStatusCategoryKey: item.jiraStatusCategoryKey?.trim().toLowerCase() ?? undefined,
-        children: item.children ?? [],
-      }
-    : item;
-}
-
-function getNestedPullRequestEndTargetId(parentId: string) {
-  return `__end__:${parentId}`;
-}
-
-function getMatchingGitHubFocusPullRequests(
-  pullRequests: GitHubPullRequestItem[],
-  jiraKey: string,
-) {
-  return pullRequests
-    .filter(
-      (pullRequest) => extractJiraKeyFromPullRequestTitle(pullRequest.title) === jiraKey,
-    )
-    .map((pullRequest) => mapGitHubPullRequestToFocusItem(pullRequest));
-}
-
-function mapGitHubPullRequestToFocusItem(
-  pullRequest: GitHubPullRequestItem,
-): FocusPullRequestItem {
-  return {
-    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
-    source: 'github',
-    sourceLabel: 'GitHub',
-    reference: `#${pullRequest.pullNumber}`,
-    url: pullRequest.url,
-    title: pullRequest.title,
-    statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
-    statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKeyFromPullRequestTitle(pullRequest.title),
-  };
-}
-
-function extractJiraKeyFromPullRequestTitle(value: string) {
-  const match = value.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
-  return match ? match[1].toUpperCase() : null;
-}
-
-function getGitHubFocusStatusLabel(
-  reviewStatus: GitHubPullRequestItem['reviewStatus'],
-) {
-  if (reviewStatus === 'approved') {
-    return 'Approved';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'Changes Requested';
-  }
-
-  if (reviewStatus === 'waiting-review') {
-    return 'Waiting Review';
-  }
-
-  if (reviewStatus === 'draft') {
-    return 'Draft';
-  }
-
-  return 'Open';
-}
-
-function getGitHubFocusStatusTone(
-  reviewStatus: GitHubPullRequestItem['reviewStatus'],
-): FocusItem['statusTone'] {
-  if (reviewStatus === 'approved') {
-    return 'emerald';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'amber';
-  }
-
-  return 'violet';
-}
 
 function getDashboardAlerts(options: {
   gitHubMetrics: GitHubSummaryMetrics;
