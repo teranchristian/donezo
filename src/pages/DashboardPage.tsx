@@ -1163,6 +1163,7 @@ function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
   return item.source === 'jira'
     ? {
         ...item,
+        jiraStatusCategoryKey: item.jiraStatusCategoryKey?.trim().toLowerCase() ?? undefined,
         children: item.children ?? [],
       }
     : item;

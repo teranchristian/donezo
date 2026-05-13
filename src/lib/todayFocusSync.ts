@@ -62,11 +62,13 @@ function applyJiraIssueToFocusItem(item: FocusJiraItem, issue: JiraIssue): Focus
   const nextTitle = issue.summary.trim();
   const nextStatusLabel = issue.status.name.trim();
   const nextStatusTone = getJiraIssueFocusTone(issue);
+  const nextJiraStatusCategoryKey = issue.status.statusCategory?.key?.trim().toLowerCase() ?? undefined;
 
   if (
     item.title === nextTitle &&
     item.statusLabel === nextStatusLabel &&
-    item.statusTone === nextStatusTone
+    item.statusTone === nextStatusTone &&
+    item.jiraStatusCategoryKey === nextJiraStatusCategoryKey
   ) {
     return item;
   }
@@ -75,7 +77,8 @@ function applyJiraIssueToFocusItem(item: FocusJiraItem, issue: JiraIssue): Focus
     ...item,
     title: nextTitle,
     statusLabel: nextStatusLabel,
-    statusTone: nextStatusTone
+    statusTone: nextStatusTone,
+    jiraStatusCategoryKey: nextJiraStatusCategoryKey
   };
 }
 

@@ -264,6 +264,7 @@ function FocusJiraCard({
   const [isNestTargetActive, setIsNestTargetActive] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const hasLinkedPrs = item.children.length > 0;
+  const jiraPrWarning = getJiraPrAlignmentWarning(item);
   const shouldExpandList = hasLinkedPrs && (isExpanded || isNestTargetActive);
   const issueUrl = getFocusItemUrl(item, jiraBaseUrl);
 
@@ -397,6 +398,15 @@ function FocusJiraCard({
         </div>
 
         <div className="mt-2">
+          {jiraPrWarning ? (
+            <div className="mb-2 flex items-start gap-1.5 rounded-[12px] border border-amber-300/18 bg-amber-400/[0.08] px-2.5 py-2 text-[0.69rem] leading-4 text-amber-50/88">
+              <span className="mt-0.25 shrink-0 text-amber-300/85" aria-hidden="true">
+                <WarningIcon />
+              </span>
+              <span>{jiraPrWarning}</span>
+            </div>
+          ) : null}
+
           <div className="mb-2 flex items-center gap-3">
             <button
               type="button"
@@ -722,6 +732,39 @@ function NestedPullRequestReorderSlot({
 
 function getNestedEndTargetId(parentId: string) {
   return `__end__:${parentId}`;
+}
+
+function getJiraPrAlignmentWarning(item: FocusJiraItem) {
+  if (item.children.length === 0) {
+    return null;
+  }
+
+  const isDone = isDoneJiraFocusItem(item);
+  const hasOpenPullRequests = item.children.some((child) => !isCompletedPullRequestFocusItem(child));
+
+  if (isDone && hasOpenPullRequests) {
+    return 'Some linked PRs are still open.';
+  }
+
+  if (!isDone && !hasOpenPullRequests) {
+    return 'All linked PRs are finished. You may be able to close this ticket.';
+  }
+
+  return null;
+}
+
+function isDoneJiraFocusItem(item: FocusJiraItem) {
+  if (item.jiraStatusCategoryKey) {
+    return item.jiraStatusCategoryKey === 'done';
+  }
+
+  const normalizedStatusLabel = item.statusLabel.trim().toLowerCase();
+  return normalizedStatusLabel.includes('done') || normalizedStatusLabel.includes('closed');
+}
+
+function isCompletedPullRequestFocusItem(item: FocusPullRequestItem) {
+  const normalizedStatusLabel = item.statusLabel.trim().toLowerCase();
+  return normalizedStatusLabel === 'merged' || normalizedStatusLabel === 'closed';
 }
 
 function isValidRootDrop(dataTransfer: DataTransfer, activeInternalDrag: FocusInternalDragPayload | null) {

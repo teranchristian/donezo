@@ -24,6 +24,7 @@ export type FocusPullRequestItem = FocusItemBase & {
 export type FocusJiraItem = FocusItemBase & {
   source: 'jira';
   jiraKey: string;
+  jiraStatusCategoryKey?: string;
   children: FocusPullRequestItem[];
   isPlaceholder?: boolean;
 };
@@ -777,6 +778,10 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
     ...normalizedBase,
     source: 'jira',
     jiraKey: normalizedJiraKey,
+    jiraStatusCategoryKey:
+      typeof item === 'object' && item !== null && 'jiraStatusCategoryKey' in item
+        ? normalizeJiraStatusCategoryKey(item.jiraStatusCategoryKey)
+        : undefined,
     children,
     isPlaceholder: 'isPlaceholder' in item ? Boolean(item.isPlaceholder) : false
   };
@@ -784,4 +789,8 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
 
 function normalizeJiraKey(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim().toUpperCase() : null;
+}
+
+function normalizeJiraStatusCategoryKey(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
 }
