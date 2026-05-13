@@ -5,7 +5,7 @@ import {
   GitHubNotification,
   GitHubPullRequestItem,
   getGitHubPullRequestStates,
-  type GitHubPullRequestState
+  type GitHubPullRequestState,
 } from '../lib/githubApi';
 import { type FocusItem } from '../lib/storage';
 import { formatRelativeTime } from '../lib/date';
@@ -19,7 +19,7 @@ import {
   isGitHubPrWarningHighlighted,
   isPullRequestOutOfDate,
   isPullRequestQueued,
-  isPullRequestReadyToMerge
+  isPullRequestReadyToMerge,
 } from '../lib/githubDomain';
 import {
   getStoredGitHubPrNotificationSeenAtState,
@@ -35,7 +35,7 @@ import {
   type GitHubPrNotificationSeenAtState,
   type GitHubPrWarningState,
   type GitHubPrStatusFilter,
-  type GitHubListSort
+  type GitHubListSort,
 } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
@@ -76,32 +76,37 @@ export type GitHubSummaryMetrics = {
   relevantPrCount: number;
 };
 
-const STATUS_COPY: Record<GitHubConnectionStatus, { label: string; tone: string; message: string }> = {
+const STATUS_COPY: Record<
+  GitHubConnectionStatus,
+  { label: string; tone: string; message: string }
+> = {
   'not-connected': {
     label: 'Not connected',
     tone: 'bg-white/6 text-stone-300',
-    message: 'Add a personal access token in Settings to enable GitHub integration.'
+    message:
+      'Add a personal access token in Settings to enable GitHub integration.',
   },
   testing: {
     label: 'Testing',
     tone: 'bg-amber-200/10 text-amber-100',
-    message: 'Checking the saved GitHub credentials.'
+    message: 'Checking the saved GitHub credentials.',
   },
   connected: {
     label: 'Connected',
     tone: 'bg-emerald-200/10 text-emerald-100',
-    message: 'GitHub activity is live on the dashboard.'
+    message: 'GitHub activity is live on the dashboard.',
   },
   invalid: {
     label: 'Invalid token',
     tone: 'bg-rose-200/10 text-rose-100',
-    message: 'GitHub returned 401 for the saved token. Update the token and test again.'
+    message:
+      'GitHub returned 401 for the saved token. Update the token and test again.',
   },
   error: {
     label: 'Connection error',
     tone: 'bg-amber-200/10 text-amber-100',
-    message: 'GitHub data could not be loaded right now.'
-  }
+    message: 'GitHub data could not be loaded right now.',
+  },
 };
 
 export function GitHubCard({
@@ -120,40 +125,58 @@ export function GitHubCard({
   activeView,
   prStatusFilter,
   onViewChange,
-  onPrStatusFilterChange
+  onPrStatusFilterChange,
 }: GitHubCardProps) {
   const filterControlClass =
     'flex h-9 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.035] bg-white/[0.025] px-2.5 text-[0.8rem] text-white/40 transition hover:bg-white/[0.04] hover:text-white/54';
   const filterSelectClass =
     'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
-  const [sortOrder, setSortOrder] = useState<GitHubListSort>('recently-updated');
+  const [sortOrder, setSortOrder] =
+    useState<GitHubListSort>('recently-updated');
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
-  const [gitHubPrReadyState, setGitHubPrReadyState] = useState<GitHubPrReadyState>({});
-  const [hasLoadedGitHubPrReadyState, setHasLoadedGitHubPrReadyState] = useState(false);
-  const [gitHubPrWarningState, setGitHubPrWarningState] = useState<GitHubPrWarningState>({});
-  const [hasLoadedGitHubPrWarningState, setHasLoadedGitHubPrWarningState] = useState(false);
+  const [gitHubPrReadyState, setGitHubPrReadyState] =
+    useState<GitHubPrReadyState>({});
+  const [hasLoadedGitHubPrReadyState, setHasLoadedGitHubPrReadyState] =
+    useState(false);
+  const [gitHubPrWarningState, setGitHubPrWarningState] =
+    useState<GitHubPrWarningState>({});
+  const [hasLoadedGitHubPrWarningState, setHasLoadedGitHubPrWarningState] =
+    useState(false);
   const [gitHubPrNotificationSeenAtState, setGitHubPrNotificationSeenAtState] =
     useState<GitHubPrNotificationSeenAtState>({});
-  const [hasLoadedGitHubPrNotificationSeenAtState, setHasLoadedGitHubPrNotificationSeenAtState] = useState(false);
-  const [isResolvingNotificationStates, setIsResolvingNotificationStates] = useState(false);
-  const [notificationPullRequestStates, setNotificationPullRequestStates] = useState<
-    Record<string, GitHubPullRequestState>
-  >({});
+  const [
+    hasLoadedGitHubPrNotificationSeenAtState,
+    setHasLoadedGitHubPrNotificationSeenAtState,
+  ] = useState(false);
+  const [isResolvingNotificationStates, setIsResolvingNotificationStates] =
+    useState(false);
+  const [notificationPullRequestStates, setNotificationPullRequestStates] =
+    useState<Record<string, GitHubPullRequestState>>({});
   const organizationFilter = isMockMode ? 'all' : ownerFilter.trim() || 'all';
   const resolvedPullRequests = data.pullRequests;
-  const myOpenPRs = resolvedPullRequests.filter((pullRequest) => pullRequest.source === 'authored');
+  const myOpenPRs = resolvedPullRequests.filter(
+    (pullRequest) => pullRequest.source === 'authored',
+  );
   const reviewRequestedPRs = resolvedPullRequests.filter(
-    (pullRequest) => pullRequest.source === 'review-requested'
+    (pullRequest) => pullRequest.source === 'review-requested',
   );
-  const notifications = (data.notifications ?? []).filter(shouldDisplayNotification);
-  const pullRequestNewNotificationCountByKey = getPullRequestNewNotificationCountByKey(
-    notifications,
-    gitHubPrNotificationSeenAtState
+  const notifications = (data.notifications ?? []).filter(
+    shouldDisplayNotification,
   );
-  const pullRequestNewCommentCountByKey = getPullRequestNewCommentCountByKey(
-    notifications,
-    gitHubPrNotificationSeenAtState
-  );
+  const pullRequestNewNotificationCountByKey =
+    hasLoadedGitHubPrNotificationSeenAtState
+      ? getPullRequestNewNotificationCountByKey(
+          notifications,
+          gitHubPrNotificationSeenAtState,
+        )
+      : {};
+  const pullRequestNewCommentCountByKey =
+    hasLoadedGitHubPrNotificationSeenAtState
+      ? getPullRequestNewCommentCountByKey(
+          notifications,
+          gitHubPrNotificationSeenAtState,
+        )
+      : {};
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
   const notificationItems = notifications.map((notification) => ({
     kind: 'notification' as const,
@@ -162,87 +185,126 @@ export function GitHubCard({
     repositoryName: notification.repository.full_name,
     title: notification.subject.title,
     updatedAt: notification.updated_at,
-    value: notification
+    value: notification,
   }));
-  const myOpenPrItems = myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
-  const reviewRequestedItems = reviewRequestedPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest));
-  const ownerFilteredMyOpenPRs = filterGitHubPullRequests(myOpenPRs, organizationFilter);
-  const ownerFilteredReviewRequestedPRs = filterGitHubPullRequests(reviewRequestedPRs, organizationFilter);
-  const filteredMyOpenPRs = filterGitHubPullRequests(myOpenPRs, organizationFilter, prStatusFilter);
+  const myOpenPrItems = myOpenPRs.map((pullRequest) =>
+    mapPullRequestViewItem(pullRequest),
+  );
+  const reviewRequestedItems = reviewRequestedPRs.map((pullRequest) =>
+    mapPullRequestViewItem(pullRequest),
+  );
+  const ownerFilteredMyOpenPRs = filterGitHubPullRequests(
+    myOpenPRs,
+    organizationFilter,
+  );
+  const ownerFilteredReviewRequestedPRs = filterGitHubPullRequests(
+    reviewRequestedPRs,
+    organizationFilter,
+  );
+  const filteredMyOpenPRs = filterGitHubPullRequests(
+    myOpenPRs,
+    organizationFilter,
+    prStatusFilter,
+  );
   const filteredReviewRequestedPRs = ownerFilteredReviewRequestedPRs;
-  const filteredNotificationCount = filterGitHubItems(notificationItems, organizationFilter).length;
+  const filteredNotificationCount = filterGitHubItems(
+    notificationItems,
+    organizationFilter,
+  ).length;
   const filteredMyOpenPrCount = filteredMyOpenPRs.length;
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
   const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
   const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
   const highlightedReadyCount = resolvedPullRequests.filter((pullRequest) =>
-    isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)
+    isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest),
   ).length;
-  const readyToMergeCount = resolvedPullRequests.filter((pullRequest) => isPullRequestReadyToMerge(pullRequest)).length;
-  const failedBuildCount = resolvedPullRequests.filter((pullRequest) => pullRequest.ciStatus === 'failing').length;
+  const readyToMergeCount = resolvedPullRequests.filter((pullRequest) =>
+    isPullRequestReadyToMerge(pullRequest),
+  ).length;
+  const failedBuildCount = resolvedPullRequests.filter(
+    (pullRequest) => pullRequest.ciStatus === 'failing',
+  ).length;
   const failedBuildBadgeCount = resolvedPullRequests.filter(
     (pullRequest) =>
       pullRequest.ciStatus === 'failing' &&
-      Boolean(gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted)
+      Boolean(
+        gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)]
+          ?.highlighted,
+      ),
   ).length;
-  const highlightedCommentCount = myOpenPRs.reduce((count, pullRequest) => {
+  const highlightedCommentCount = myOpenPRs.filter((pullRequest) => {
     const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-    return count + (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0);
-  }, 0);
+    return (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0) > 0;
+  }).length;
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
-    const warningEntry = gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
+    const warningEntry =
+      gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
     if (!warningEntry?.highlighted) {
       return false;
     }
 
-    return warningEntry.activeCaseKeys.some((caseKey) => caseKey !== 'failed-checks');
+    return warningEntry.activeCaseKeys.some(
+      (caseKey) => caseKey !== 'failed-checks',
+    );
   }).length;
   const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
-    (pullRequest) => pullRequest.reviewStatus === 'approved' && !isPullRequestOutOfDate(pullRequest)
+    (pullRequest) =>
+      pullRequest.reviewStatus === 'approved' &&
+      !isPullRequestOutOfDate(pullRequest),
   ).length;
   const currentView = getGitHubViewContent(
     activeView,
     data,
     notifications,
     filteredMyOpenPRs,
-    reviewRequestedPRs
+    reviewRequestedPRs,
   );
   const filteredItems = sortGitHubItems(
     filterGitHubItems(currentView.items, organizationFilter),
-    sortOrder
+    sortOrder,
   );
   const visiblePullRequestNotifications = filteredItems
-    .filter((item): item is Extract<GitHubViewItem, { kind: 'notification' }> => item.kind === 'notification')
+    .filter(
+      (item): item is Extract<GitHubViewItem, { kind: 'notification' }> =>
+        item.kind === 'notification',
+    )
     .map((item) => item.value)
     .filter((notification) => notification.subject.type === 'PullRequest')
     .filter((notification) => !notificationPullRequestStates[notification.id]);
   const visibleNotificationPullRequestKey = visiblePullRequestNotifications
     .map((notification) => notification.id)
     .join('|');
-  const isNotificationViewLoading = activeView === 'notifications' && (isLoading || isResolvingNotificationStates);
+  const isNotificationViewLoading =
+    activeView === 'notifications' &&
+    (isLoading || isResolvingNotificationStates);
   const tabItems = [
     {
       key: 'prs',
       label: 'PRs',
       value: formatCount(filteredMyOpenPrCount, isLoading),
       isActive: activeView === 'prs',
-      title: isLoading ? undefined : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`,
-      onClick: () => onViewChange('prs')
+      title: isLoading
+        ? undefined
+        : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`,
+      onClick: () => onViewChange('prs'),
     },
     {
       key: 'notifications',
       label: 'Notifications',
-      value: formatCount(filteredNotificationCount, isLoading || isResolvingNotificationStates),
+      value: formatCount(
+        filteredNotificationCount,
+        isLoading || isResolvingNotificationStates,
+      ),
       isActive: activeView === 'notifications',
-      onClick: () => onViewChange('notifications')
+      onClick: () => onViewChange('notifications'),
     },
     {
       key: 'review',
       label: 'Review',
       value: formatCount(filteredReviewRequestedCount, isLoading),
       isActive: activeView === 'review',
-      onClick: () => onViewChange('review')
-    }
+      onClick: () => onViewChange('review'),
+    },
   ];
 
   useEffect(() => {
@@ -318,8 +380,13 @@ export function GitHubCard({
       return;
     }
 
-    void saveStoredGitHubPrNotificationSeenAtState(gitHubPrNotificationSeenAtState);
-  }, [gitHubPrNotificationSeenAtState, hasLoadedGitHubPrNotificationSeenAtState]);
+    void saveStoredGitHubPrNotificationSeenAtState(
+      gitHubPrNotificationSeenAtState,
+    );
+  }, [
+    gitHubPrNotificationSeenAtState,
+    hasLoadedGitHubPrNotificationSeenAtState,
+  ]);
 
   useEffect(() => {
     if (!hasLoadedGitHubPrReadyState) {
@@ -327,8 +394,13 @@ export function GitHubCard({
     }
 
     setGitHubPrReadyState((currentState) => {
-      const nextState = buildGitHubPrReadyState(currentState, resolvedPullRequests);
-      return areGitHubPrReadyStatesEqual(currentState, nextState) ? currentState : nextState;
+      const nextState = buildGitHubPrReadyState(
+        currentState,
+        resolvedPullRequests,
+      );
+      return areGitHubPrReadyStatesEqual(currentState, nextState)
+        ? currentState
+        : nextState;
     });
   }, [hasLoadedGitHubPrReadyState, resolvedPullRequests]);
 
@@ -338,30 +410,52 @@ export function GitHubCard({
     }
 
     setGitHubPrWarningState((currentState) => {
-      const nextState = buildGitHubPrWarningState(currentState, resolvedPullRequests);
-      return areGitHubPrWarningStatesEqual(currentState, nextState) ? currentState : nextState;
+      const nextState = buildGitHubPrWarningState(
+        currentState,
+        resolvedPullRequests,
+      );
+      return areGitHubPrWarningStatesEqual(currentState, nextState)
+        ? currentState
+        : nextState;
     });
   }, [hasLoadedGitHubPrWarningState, resolvedPullRequests]);
 
   useEffect(() => {
-    if (!hasLoadedGitHubPrNotificationSeenAtState || data.connectionStatus !== 'connected' || isLoading) {
+    if (
+      !hasLoadedGitHubPrNotificationSeenAtState ||
+      data.connectionStatus !== 'connected' ||
+      isLoading
+    ) {
       return;
     }
 
     const activePullRequestKeys = new Set(
-      resolvedPullRequests.map((pullRequest) => getGitHubPullRequestAttentionStateKey(pullRequest))
+      resolvedPullRequests.map((pullRequest) =>
+        getGitHubPullRequestAttentionStateKey(pullRequest),
+      ),
     );
 
     setGitHubPrNotificationSeenAtState((currentState) => {
       const nextState = Object.fromEntries(
-        Object.entries(currentState).filter(([key]) => activePullRequestKeys.has(key))
+        Object.entries(currentState).filter(([key]) =>
+          activePullRequestKeys.has(key),
+        ),
       );
 
-      return Object.keys(nextState).length === Object.keys(currentState).length ? currentState : nextState;
+      return Object.keys(nextState).length === Object.keys(currentState).length
+        ? currentState
+        : nextState;
     });
-  }, [data.connectionStatus, hasLoadedGitHubPrNotificationSeenAtState, isLoading, resolvedPullRequests]);
+  }, [
+    data.connectionStatus,
+    hasLoadedGitHubPrNotificationSeenAtState,
+    isLoading,
+    resolvedPullRequests,
+  ]);
 
-  function handleMarkPullRequestNotificationsSeen(pullRequest: GitHubPullRequestItem) {
+  function handleMarkPullRequestNotificationsSeen(
+    pullRequest: GitHubPullRequestItem,
+  ) {
     const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
     const nextSeenAt = Date.now();
 
@@ -372,21 +466,26 @@ export function GitHubCard({
 
       return {
         ...currentState,
-        [pullRequestKey]: nextSeenAt
+        [pullRequestKey]: nextSeenAt,
       };
     });
   }
 
   useEffect(() => {
-    const activeNotificationIds = new Set((data.notifications ?? []).map((notification) => notification.id));
+    const activeNotificationIds = new Set(
+      (data.notifications ?? []).map((notification) => notification.id),
+    );
 
     setIsResolvingNotificationStates(false);
     setNotificationPullRequestStates((currentEntries) => {
       const nextEntries = Object.fromEntries(
-        Object.entries(currentEntries).filter(([id]) => activeNotificationIds.has(id))
+        Object.entries(currentEntries).filter(([id]) =>
+          activeNotificationIds.has(id),
+        ),
       );
 
-      return Object.keys(nextEntries).length === Object.keys(currentEntries).length
+      return Object.keys(nextEntries).length ===
+        Object.keys(currentEntries).length
         ? currentEntries
         : nextEntries;
     });
@@ -404,7 +503,7 @@ export function GitHubCard({
       highlightedWarningCount,
       reviewRequestedCount: summaryReviewRequestedCount,
       approvedPrCount: summaryApprovedPrCount,
-      relevantPrCount: summaryMyOpenPrCount + summaryReviewRequestedCount
+      relevantPrCount: summaryMyOpenPrCount + summaryReviewRequestedCount,
     });
   }, [
     data.connectionStatus,
@@ -418,7 +517,7 @@ export function GitHubCard({
     summaryApprovedPrCount,
     summaryMyOpenPrCount,
     summaryReviewRequestedCount,
-    onSummaryMetricsChange
+    onSummaryMetricsChange,
   ]);
 
   useEffect(() => {
@@ -432,23 +531,31 @@ export function GitHubCard({
 
     const missingPullRequests = visiblePullRequestNotifications
       .map((notification) => {
-        const pullRequestIdentity = getPullRequestIdentityFromNotification(notification);
+        const pullRequestIdentity =
+          getPullRequestIdentityFromNotification(notification);
         if (!pullRequestIdentity) {
           return null;
         }
 
         return {
           id: notification.id,
-          ...pullRequestIdentity
+          ...pullRequestIdentity,
         };
       })
-      .filter((pullRequest): pullRequest is { id: string; owner: string; repo: string; pullNumber: number } =>
-        Boolean(pullRequest)
+      .filter(
+        (
+          pullRequest,
+        ): pullRequest is {
+          id: string;
+          owner: string;
+          repo: string;
+          pullNumber: number;
+        } => Boolean(pullRequest),
       );
 
     getGitHubPullRequestStates({
       token,
-      pullRequests: missingPullRequests
+      pullRequests: missingPullRequests,
     }).then((statesById) => {
       if (isCancelled) {
         return;
@@ -484,8 +591,8 @@ export function GitHubCard({
         ...currentState,
         [readyStateKey]: {
           ...currentEntry,
-          highlighted: false
-        }
+          highlighted: false,
+        },
       };
     });
 
@@ -499,8 +606,8 @@ export function GitHubCard({
         ...currentState,
         [warningStateKey]: {
           ...currentEntry,
-          highlighted: false
-        }
+          highlighted: false,
+        },
       };
     });
   }
@@ -521,45 +628,77 @@ export function GitHubCard({
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:max-w-[100%] xl:justify-end">
               {activeView === 'prs' ? (
-                <label className={`${filterControlClass} min-w-[160px] flex-1 xl:w-[168px] xl:flex-none`}>
-                  <span className="shrink-0 text-[var(--text-tertiary)]">Status:</span>
+                <label
+                  className={`${filterControlClass} min-w-[160px] flex-1 xl:w-[168px] xl:flex-none`}
+                >
+                  <span className="shrink-0 text-[var(--text-tertiary)]">
+                    Status:
+                  </span>
                   <select
                     aria-label="PR status"
                     value={prStatusFilter}
-                    onChange={(event) => onPrStatusFilterChange(event.target.value as GitHubPrStatusFilter)}
+                    onChange={(event) =>
+                      onPrStatusFilterChange(
+                        event.target.value as GitHubPrStatusFilter,
+                      )
+                    }
                     className={`${filterSelectClass} flex-1`}
                   >
                     <option value="all" className="bg-panel text-stone-100">
                       All
                     </option>
-                    <option value="approved" className="bg-panel text-stone-100">
+                    <option
+                      value="approved"
+                      className="bg-panel text-stone-100"
+                    >
                       Approved
                     </option>
-                    <option value="ready-to-merge" className="bg-panel text-stone-100">
+                    <option
+                      value="ready-to-merge"
+                      className="bg-panel text-stone-100"
+                    >
                       Ready to merge
                     </option>
-                    <option value="waiting-review" className="bg-panel text-stone-100">
+                    <option
+                      value="waiting-review"
+                      className="bg-panel text-stone-100"
+                    >
                       Waiting review
                     </option>
                   </select>
                 </label>
               ) : null}
 
-              <label className={`${filterControlClass} min-w-[200px] flex-1 xl:w-[220px] xl:flex-none`}>
-                <span className="shrink-0 text-[var(--text-tertiary)]">Sort:</span>
+              <label
+                className={`${filterControlClass} min-w-[200px] flex-1 xl:w-[220px] xl:flex-none`}
+              >
+                <span className="shrink-0 text-[var(--text-tertiary)]">
+                  Sort:
+                </span>
                 <select
                   aria-label="Sort"
                   value={sortOrder}
-                  onChange={(event) => setSortOrder(event.target.value as GitHubListSort)}
+                  onChange={(event) =>
+                    setSortOrder(event.target.value as GitHubListSort)
+                  }
                   className={`${filterSelectClass} flex-1`}
                 >
-                  <option value="recently-updated" className="bg-panel text-stone-100">
+                  <option
+                    value="recently-updated"
+                    className="bg-panel text-stone-100"
+                  >
                     Recently updated
                   </option>
-                  <option value="oldest-updated" className="bg-panel text-stone-100">
+                  <option
+                    value="oldest-updated"
+                    className="bg-panel text-stone-100"
+                  >
                     Oldest updated
                   </option>
-                  <option value="repository-asc" className="bg-panel text-stone-100">
+                  <option
+                    value="repository-asc"
+                    className="bg-panel text-stone-100"
+                  >
                     Repository A-Z
                   </option>
                   <option value="title-asc" className="bg-panel text-stone-100">
@@ -579,17 +718,28 @@ export function GitHubCard({
               </div>
             ) : filteredItems.length === 0 ? (
               <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
-                {currentView.items.length === 0 ? currentView.emptyMessage : getNoFilterResultsMessage(currentView.itemLabel)}
+                {currentView.items.length === 0
+                  ? currentView.emptyMessage
+                  : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
             ) : activeView === 'prs' ? (
               <PullRequestList
                 pullRequests={filteredItems
-                  .filter((item): item is Extract<GitHubViewItem, { kind: 'pull-request' }> => item.kind === 'pull-request')
+                  .filter(
+                    (
+                      item,
+                    ): item is Extract<
+                      GitHubViewItem,
+                      { kind: 'pull-request' }
+                    > => item.kind === 'pull-request',
+                  )
                   .map((item) => item.value)}
                 todayFocusItemIds={todayFocusItemIds}
                 gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}
-                pullRequestNewNotificationCountByKey={pullRequestNewNotificationCountByKey}
+                pullRequestNewNotificationCountByKey={
+                  pullRequestNewNotificationCountByKey
+                }
                 onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
                 onClearWarningHighlight={handleClearWarningHighlight}
               />
@@ -600,27 +750,44 @@ export function GitHubCard({
                     <NotificationRow
                       key={item.key}
                       notification={item.value}
-                      pullRequestState={notificationPullRequestStates[item.value.id]}
+                      pullRequestState={
+                        notificationPullRequestStates[item.value.id]
+                      }
                     />
                   ) : (
                     <PullRequestRow
                       key={item.key}
                       pullRequest={item.value}
                       newNotificationCount={
-                        pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(item.value)] ?? 0
+                        pullRequestNewNotificationCountByKey[
+                          getGitHubPullRequestAttentionStateKey(item.value)
+                        ] ?? 0
                       }
-                      isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(item.value).id)}
-                      isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, item.value)}
-                      isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, item.value)}
-                      onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
+                      isInTodayFocus={todayFocusItemIds.has(
+                        mapPullRequestToFocusItem(item.value).id,
+                      )}
+                      isReadyHighlighted={isGitHubPrReadyHighlighted(
+                        gitHubPrReadyState,
+                        item.value,
+                      )}
+                      isWarningHighlighted={isGitHubPrWarningHighlighted(
+                        gitHubPrWarningState,
+                        item.value,
+                      )}
+                      onMarkNotificationsSeen={
+                        handleMarkPullRequestNotificationsSeen
+                      }
                       onClearWarningHighlight={handleClearWarningHighlight}
                     />
-                  )
+                  ),
                 )}
               </div>
             )}
           </div>
-          {!isLoading && activeView === 'prs' && data.openPrsCount > 0 && username.trim() ? (
+          {!isLoading &&
+          activeView === 'prs' &&
+          data.openPrsCount > 0 &&
+          username.trim() ? (
             <div className="mt-3 text-right">
               <a
                 href={viewAllUrl}
@@ -665,7 +832,7 @@ function PullRequestRow({
   isReadyHighlighted = false,
   isWarningHighlighted = false,
   onMarkNotificationsSeen,
-  onClearWarningHighlight
+  onClearWarningHighlight,
 }: {
   pullRequest: GitHubPullRequestItem;
   newNotificationCount: number;
@@ -680,7 +847,8 @@ function PullRequestRow({
   const isQueued = isPullRequestQueued(pullRequest);
   const isReadyToMerge = isPullRequestReadyToMerge(pullRequest);
   const status = getPullRequestDisplayStatus(pullRequest);
-  const shouldShowAuthor = pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
+  const shouldShowAuthor =
+    pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
   const repositoryLabel = getRepositoryLabel(pullRequest.repositoryName);
 
   return (
@@ -691,8 +859,14 @@ function PullRequestRow({
       draggable
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'copy';
-        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapPullRequestToFocusItem(pullRequest)));
-        event.dataTransfer.setData('text/plain', `${pullRequest.repositoryName}#${pullRequest.pullNumber}`);
+        event.dataTransfer.setData(
+          TODAY_FOCUS_DRAG_MIME,
+          JSON.stringify(mapPullRequestToFocusItem(pullRequest)),
+        );
+        event.dataTransfer.setData(
+          'text/plain',
+          `${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
+        );
       }}
       onClick={() => {
         onMarkNotificationsSeen?.(pullRequest);
@@ -703,19 +877,24 @@ function PullRequestRow({
           ? 'bg-amber-400/[0.08] shadow-[inset_0_0_0_1px_rgba(251,191,36,0.22)] hover:bg-amber-400/[0.12]'
           : isReadyHighlighted
             ? 'bg-violet-400/[0.09] shadow-[inset_0_0_0_1px_rgba(196,181,253,0.22)] hover:bg-violet-400/[0.14]'
-          : 'hover:bg-white/[0.03]'
+            : 'hover:bg-white/[0.03]'
       }`}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 gap-x-3">
         <div className="row-span-2 flex min-w-0 items-start gap-1.5">
-          <GitHubItemIcon kind="pull-request" isDraft={pullRequest.reviewStatus === 'draft'} />
+          <GitHubItemIcon
+            kind="pull-request"
+            isDraft={pullRequest.reviewStatus === 'draft'}
+          />
           <div className="min-w-0 flex-1">
             <div className="inline-flex max-w-full items-center gap-1 align-top">
               <p className="truncate text-[0.82rem] font-medium leading-4.25 text-primary transition group-hover:text-white">
                 {pullRequest.title}
               </p>
               <PullRequestTrailingIcon pullRequest={pullRequest} />
-              {isInTodayFocus ? <TodayFocusIndicator className="font-semibold" /> : null}
+              {isInTodayFocus ? (
+                <TodayFocusIndicator className="font-semibold" />
+              ) : null}
             </div>
             <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-secondary">
               <div
@@ -738,8 +917,12 @@ function PullRequestRow({
                     <PullRequestReadyToMergeIcon />
                   </>
                 ) : null}
-                {shouldShowAuthor ? <span className="mx-1.5 text-white/22">•</span> : null}
-                {shouldShowAuthor ? <span>by {pullRequest.authorLogin}</span> : null}
+                {shouldShowAuthor ? (
+                  <span className="mx-1.5 text-white/22">•</span>
+                ) : null}
+                {shouldShowAuthor ? (
+                  <span>by {pullRequest.authorLogin}</span>
+                ) : null}
               </div>
               {hasConflicts ? (
                 <span
@@ -766,9 +949,15 @@ function PullRequestRow({
         </div>
         <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 self-center whitespace-nowrap">
           {pullRequest.totalCommentCount > 0 ? (
-            <PullRequestCommentBadge newCount={newNotificationCount} totalCount={pullRequest.totalCommentCount} />
+            <PullRequestCommentBadge
+              newCount={newNotificationCount}
+              totalCount={pullRequest.totalCommentCount}
+            />
           ) : null}
-          <StatusBadge label={status.label} className="inline-flex min-w-[8.75rem] justify-end whitespace-nowrap" />
+          <StatusBadge
+            label={status.label}
+            className="inline-flex min-w-[8.75rem] justify-end whitespace-nowrap"
+          />
         </div>
         <p className="col-start-2 row-start-2 mt-0.25 self-start whitespace-nowrap text-right text-[0.64rem] leading-4 text-white/38">
           updated {formatRelativeTime(pullRequest.updatedAt)}
@@ -779,7 +968,7 @@ function PullRequestRow({
 }
 
 function PullRequestTrailingIcon({
-  pullRequest
+  pullRequest,
 }: {
   pullRequest: GitHubPullRequestItem;
 }) {
@@ -788,13 +977,15 @@ function PullRequestTrailingIcon({
 
 function PullRequestCommentBadge({
   newCount,
-  totalCount
+  totalCount,
 }: {
   newCount: number;
   totalCount: number;
 }) {
   const label =
-    newCount > 0 ? `${newCount} new · ${totalCount} total` : `${totalCount} total`;
+    newCount > 0
+      ? `${newCount} new · ${totalCount} total`
+      : `${totalCount} total`;
 
   return (
     <span
@@ -822,7 +1013,9 @@ function PullRequestCommentBadge({
   );
 }
 
-function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusItem {
+function mapPullRequestToFocusItem(
+  pullRequest: GitHubPullRequestItem,
+): FocusItem {
   return {
     id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
     source: 'github',
@@ -832,11 +1025,13 @@ function mapPullRequestToFocusItem(pullRequest: GitHubPullRequestItem): FocusIte
     title: pullRequest.title,
     statusLabel: getFocusStatusLabel(pullRequest.reviewStatus),
     statusTone: getFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKey(pullRequest.title)
+    jiraKey: extractJiraKey(pullRequest.title),
   };
 }
 
-function getFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
+function getFocusStatusLabel(
+  reviewStatus: GitHubPullRequestItem['reviewStatus'],
+) {
   if (reviewStatus === 'approved') {
     return 'Approved';
   }
@@ -852,7 +1047,9 @@ function getFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']
   return 'Open';
 }
 
-function getFocusStatusTone(reviewStatus: GitHubPullRequestItem['reviewStatus']): FocusItem['statusTone'] {
+function getFocusStatusTone(
+  reviewStatus: GitHubPullRequestItem['reviewStatus'],
+): FocusItem['statusTone'] {
   if (reviewStatus === 'approved') {
     return 'emerald';
   }
@@ -865,12 +1062,16 @@ function getFocusStatusTone(reviewStatus: GitHubPullRequestItem['reviewStatus'])
 }
 
 function PullRequestCheckStatusIcon({
-  ciStatus
+  ciStatus,
 }: {
   ciStatus: GitHubPullRequestItem['ciStatus'];
 }) {
   if (ciStatus === 'passing') {
-    return <span className="shrink-0 text-base leading-none text-emerald-400">✓</span>;
+    return (
+      <span className="shrink-0 text-base leading-none text-emerald-400">
+        ✓
+      </span>
+    );
   }
 
   if (ciStatus === 'failing') {
@@ -894,7 +1095,14 @@ function PullRequestCheckStatusIcon({
         className="h-[0.8rem] w-[0.8rem] shrink-0 animate-spin text-amber-300/85"
         fill="none"
       >
-        <circle cx="8" cy="8" r="5.25" className="text-amber-100/4" stroke="currentColor" strokeWidth="2.1" />
+        <circle
+          cx="8"
+          cy="8"
+          r="5.25"
+          className="text-amber-100/4"
+          stroke="currentColor"
+          strokeWidth="2.1"
+        />
         <path
           d="M8 2.75a5.25 5.25 0 0 1 5.25 5.25"
           className="text-amber-300"
@@ -929,7 +1137,7 @@ function PullRequestList({
   gitHubPrWarningState,
   pullRequestNewNotificationCountByKey,
   onMarkNotificationsSeen,
-  onClearWarningHighlight
+  onClearWarningHighlight,
 }: {
   pullRequests: GitHubPullRequestItem[];
   todayFocusItemIds: Set<string>;
@@ -939,8 +1147,12 @@ function PullRequestList({
   onMarkNotificationsSeen: (pullRequest: GitHubPullRequestItem) => void;
   onClearWarningHighlight: (pullRequest: GitHubPullRequestItem) => void;
 }) {
-  const readyToClose = pullRequests.filter((pullRequest) => isPullRequestReadyToMerge(pullRequest));
-  const remainingPullRequests = pullRequests.filter((pullRequest) => !isPullRequestReadyToMerge(pullRequest));
+  const readyToClose = pullRequests.filter((pullRequest) =>
+    isPullRequestReadyToMerge(pullRequest),
+  );
+  const remainingPullRequests = pullRequests.filter(
+    (pullRequest) => !isPullRequestReadyToMerge(pullRequest),
+  );
 
   if (readyToClose.length === 0) {
     return (
@@ -950,11 +1162,21 @@ function PullRequestList({
             key={pullRequest.url}
             pullRequest={pullRequest}
             newNotificationCount={
-              pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(pullRequest)] ?? 0
+              pullRequestNewNotificationCountByKey[
+                getGitHubPullRequestAttentionStateKey(pullRequest)
+              ] ?? 0
             }
-            isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
-            isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
-            isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+            isInTodayFocus={todayFocusItemIds.has(
+              mapPullRequestToFocusItem(pullRequest).id,
+            )}
+            isReadyHighlighted={isGitHubPrReadyHighlighted(
+              gitHubPrReadyState,
+              pullRequest,
+            )}
+            isWarningHighlighted={isGitHubPrWarningHighlighted(
+              gitHubPrWarningState,
+              pullRequest,
+            )}
             onMarkNotificationsSeen={onMarkNotificationsSeen}
             onClearWarningHighlight={onClearWarningHighlight}
           />
@@ -970,38 +1192,58 @@ function PullRequestList({
           key={pullRequest.url}
           pullRequest={pullRequest}
           newNotificationCount={
-            pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(pullRequest)] ?? 0
+            pullRequestNewNotificationCountByKey[
+              getGitHubPullRequestAttentionStateKey(pullRequest)
+            ] ?? 0
           }
-          isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
-          isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
-          isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
+          isInTodayFocus={todayFocusItemIds.has(
+            mapPullRequestToFocusItem(pullRequest).id,
+          )}
+          isReadyHighlighted={isGitHubPrReadyHighlighted(
+            gitHubPrReadyState,
+            pullRequest,
+          )}
+          isWarningHighlighted={isGitHubPrWarningHighlighted(
+            gitHubPrWarningState,
+            pullRequest,
+          )}
           onMarkNotificationsSeen={onMarkNotificationsSeen}
           onClearWarningHighlight={onClearWarningHighlight}
         />
       ))}
-      {remainingPullRequests.length > 0 ? (
-        remainingPullRequests.map((pullRequest) => (
-          <PullRequestRow
-            key={pullRequest.url}
-            pullRequest={pullRequest}
-            newNotificationCount={
-              pullRequestNewNotificationCountByKey[getGitHubPullRequestAttentionStateKey(pullRequest)] ?? 0
-            }
-            isInTodayFocus={todayFocusItemIds.has(mapPullRequestToFocusItem(pullRequest).id)}
-            isReadyHighlighted={isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest)}
-            isWarningHighlighted={isGitHubPrWarningHighlighted(gitHubPrWarningState, pullRequest)}
-            onMarkNotificationsSeen={onMarkNotificationsSeen}
-            onClearWarningHighlight={onClearWarningHighlight}
-          />
-        ))
-      ) : null}
+      {remainingPullRequests.length > 0
+        ? remainingPullRequests.map((pullRequest) => (
+            <PullRequestRow
+              key={pullRequest.url}
+              pullRequest={pullRequest}
+              newNotificationCount={
+                pullRequestNewNotificationCountByKey[
+                  getGitHubPullRequestAttentionStateKey(pullRequest)
+                ] ?? 0
+              }
+              isInTodayFocus={todayFocusItemIds.has(
+                mapPullRequestToFocusItem(pullRequest).id,
+              )}
+              isReadyHighlighted={isGitHubPrReadyHighlighted(
+                gitHubPrReadyState,
+                pullRequest,
+              )}
+              isWarningHighlighted={isGitHubPrWarningHighlighted(
+                gitHubPrWarningState,
+                pullRequest,
+              )}
+              onMarkNotificationsSeen={onMarkNotificationsSeen}
+              onClearWarningHighlight={onClearWarningHighlight}
+            />
+          ))
+        : null}
     </div>
   );
 }
 
 function NotificationRow({
   notification,
-  pullRequestState
+  pullRequestState,
 }: {
   notification: GitHubNotification;
   pullRequestState?: GitHubPullRequestState;
@@ -1011,9 +1253,15 @@ function NotificationRow({
   const authorLogin = notification.authorLogin?.trim() ?? '';
   const repositoryLabel = getRepositoryLabel(notification.repository.full_name);
   const rowTextClass = notification.unread ? 'text-primary' : 'text-secondary';
-  const rowMetaClass = notification.unread ? 'text-white/42' : 'text-[var(--text-tertiary)]';
-  const rowMutedClass = notification.unread ? 'text-white/36' : 'text-[var(--text-tertiary)]';
-  const rowTimestampClass = notification.unread ? 'text-white/38' : 'text-[var(--text-tertiary)]';
+  const rowMetaClass = notification.unread
+    ? 'text-white/42'
+    : 'text-[var(--text-tertiary)]';
+  const rowMutedClass = notification.unread
+    ? 'text-white/36'
+    : 'text-[var(--text-tertiary)]';
+  const rowTimestampClass = notification.unread
+    ? 'text-white/38'
+    : 'text-[var(--text-tertiary)]';
 
   return (
     <a
@@ -1036,26 +1284,36 @@ function NotificationRow({
                 {notification.subject.title}
               </p>
             </div>
-            <div className={`mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] ${rowMetaClass}`}>
+            <div
+              className={`mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] ${rowMetaClass}`}
+            >
               <p
                 className="truncate"
                 title={`${notification.repository.full_name}${authorLogin ? ` • by ${authorLogin}` : ''}${notification.unread ? ' • unread' : ''}`}
               >
                 <span>{repositoryLabel}</span>
-                {authorLogin ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {authorLogin ? (
+                  <span className="mx-1.5 text-white/22">•</span>
+                ) : null}
                 {authorLogin ? <span>by {authorLogin}</span> : null}
-                {notification.unread ? <span className="mx-1.5 text-white/22">•</span> : null}
+                {notification.unread ? (
+                  <span className="mx-1.5 text-white/22">•</span>
+                ) : null}
                 {notification.unread ? <span>Unread</span> : null}
               </p>
             </div>
           </div>
         </div>
         <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
-          <p className={`text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] ${rowMutedClass}`}>
+          <p
+            className={`text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] ${rowMutedClass}`}
+          >
             {notificationTypeLabel}
           </p>
         </div>
-        <p className={`col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 ${rowTimestampClass}`}>
+        <p
+          className={`col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 ${rowTimestampClass}`}
+        >
           updated {formatRelativeTime(notification.updated_at)}
         </p>
       </div>
@@ -1066,11 +1324,11 @@ function NotificationRow({
 function GitHubItemIcon({
   kind,
   state,
-  isDraft = false
+  isDraft = false,
 }: {
-  kind: 'pull-request' | 'issue' | 'commit' | 'discussion'
-  state?: GitHubPullRequestState
-  isDraft?: boolean
+  kind: 'pull-request' | 'issue' | 'commit' | 'discussion';
+  state?: GitHubPullRequestState;
+  isDraft?: boolean;
 }) {
   if (kind === 'issue') {
     return (
@@ -1164,7 +1422,7 @@ function GitHubItemIcon({
 
 function Badge({
   label,
-  tone
+  tone,
 }: {
   label: string;
   tone: 'default' | 'green' | 'red' | 'yellow' | 'gray';
@@ -1174,7 +1432,7 @@ function Badge({
     green: 'bg-emerald-400/16 text-emerald-100',
     red: 'bg-rose-400/16 text-rose-100',
     yellow: 'bg-amber-400/16 text-amber-100',
-    gray: 'bg-white/[0.045] text-white/42'
+    gray: 'bg-white/[0.045] text-white/42',
   }[tone];
 
   return (
@@ -1206,7 +1464,7 @@ function getGitHubViewContent(
   data: GitHubDashboardData,
   notifications: GitHubNotification[],
   myOpenPRs: GitHubPullRequestItem[],
-  reviewRequestedPRs: GitHubPullRequestItem[]
+  reviewRequestedPRs: GitHubPullRequestItem[],
 ) {
   if (activeGitHubView === 'notifications') {
     return {
@@ -1224,8 +1482,8 @@ function getGitHubViewContent(
         repositoryName: notification.repository.full_name,
         title: notification.subject.title,
         updatedAt: notification.updated_at,
-        value: notification
-      }))
+        value: notification,
+      })),
     };
   }
 
@@ -1234,8 +1492,13 @@ function getGitHubViewContent(
       count: data.reviewRequestedCount,
       countLabel: `${data.reviewRequestedCount} review requests`,
       itemLabel: 'PRs',
-      emptyMessage: data.connectionStatus === 'connected' ? 'No pull requests need your review.' : getEmptyListMessage(data),
-      items: reviewRequestedPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest))
+      emptyMessage:
+        data.connectionStatus === 'connected'
+          ? 'No pull requests need your review.'
+          : getEmptyListMessage(data),
+      items: reviewRequestedPRs.map((pullRequest) =>
+        mapPullRequestViewItem(pullRequest),
+      ),
     };
   }
 
@@ -1244,11 +1507,13 @@ function getGitHubViewContent(
     countLabel: `${data.openPrsCount} open PRs`,
     itemLabel: 'PRs',
     emptyMessage: getEmptyListMessage(data),
-    items: myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest))
+    items: myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest)),
   };
 }
 
-function mapPullRequestViewItem(pullRequest: GitHubPullRequestItem): GitHubViewItem {
+function mapPullRequestViewItem(
+  pullRequest: GitHubPullRequestItem,
+): GitHubViewItem {
   return {
     kind: 'pull-request',
     key: pullRequest.url,
@@ -1256,7 +1521,7 @@ function mapPullRequestViewItem(pullRequest: GitHubPullRequestItem): GitHubViewI
     repositoryName: pullRequest.repositoryName,
     title: pullRequest.title,
     updatedAt: pullRequest.updatedAt,
-    value: pullRequest
+    value: pullRequest,
   };
 }
 
@@ -1269,7 +1534,10 @@ function getRepositoryLabel(repositoryName: string) {
   return segments[segments.length - 1] ?? repositoryName;
 }
 
-function filterGitHubItems(items: GitHubViewItem[], organizationFilter: string) {
+function filterGitHubItems(
+  items: GitHubViewItem[],
+  organizationFilter: string,
+) {
   if (organizationFilter === 'all') {
     return items;
   }
@@ -1280,25 +1548,32 @@ function filterGitHubItems(items: GitHubViewItem[], organizationFilter: string) 
 function filterGitHubPullRequests(
   pullRequests: GitHubPullRequestItem[],
   organizationFilter: string,
-  prStatusFilter: GitHubPrStatusFilter = 'all'
+  prStatusFilter: GitHubPrStatusFilter = 'all',
 ) {
   const organizationFilteredPullRequests =
     organizationFilter === 'all'
       ? pullRequests
-      : pullRequests.filter((pullRequest) => pullRequest.owner === organizationFilter);
+      : pullRequests.filter(
+          (pullRequest) => pullRequest.owner === organizationFilter,
+        );
 
   if (prStatusFilter === 'approved') {
-    return organizationFilteredPullRequests.filter((pullRequest) => pullRequest.reviewStatus === 'approved');
+    return organizationFilteredPullRequests.filter(
+      (pullRequest) => pullRequest.reviewStatus === 'approved',
+    );
   }
 
   if (prStatusFilter === 'ready-to-merge') {
-    return organizationFilteredPullRequests.filter((pullRequest) => isPullRequestReadyToMerge(pullRequest));
+    return organizationFilteredPullRequests.filter((pullRequest) =>
+      isPullRequestReadyToMerge(pullRequest),
+    );
   }
 
   if (prStatusFilter === 'waiting-review') {
     return organizationFilteredPullRequests.filter(
       (pullRequest) =>
-        pullRequest.reviewStatus === 'waiting-review' || pullRequest.reviewStatus === 'changes-requested'
+        pullRequest.reviewStatus === 'waiting-review' ||
+        pullRequest.reviewStatus === 'changes-requested',
     );
   }
 
@@ -1310,7 +1585,9 @@ function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
 
   sortedItems.sort((left, right) => {
     if (sortOrder === 'oldest-updated') {
-      return new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime();
+      return (
+        new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
+      );
     }
 
     if (sortOrder === 'repository-asc') {
@@ -1321,7 +1598,9 @@ function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
       return left.title.localeCompare(right.title);
     }
 
-    return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+    return (
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+    );
   });
 
   return sortedItems;
@@ -1357,38 +1636,45 @@ function getNotificationTypeLabel(notification: GitHubNotification) {
 
 function getPullRequestNewNotificationCountByKey(
   notifications: GitHubNotification[],
-  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState
+  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState,
 ) {
-  return notifications.reduce<Record<string, number>>((counts, notification) => {
-    const identity = getPullRequestIdentityFromNotification(notification);
-    if (!identity) {
+  return notifications.reduce<Record<string, number>>(
+    (counts, notification) => {
+      const identity = getPullRequestIdentityFromNotification(notification);
+      if (!identity) {
+        return counts;
+      }
+
+      const key = getPullRequestIdentityKey(identity);
+      const seenAt = gitHubPrNotificationSeenAtState[key];
+      const updatedAt = Date.parse(notification.updated_at);
+      const isNew =
+        typeof seenAt !== 'number' ||
+        (Number.isFinite(updatedAt) && updatedAt > seenAt);
+
+      if (isNew) {
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+
       return counts;
-    }
-
-    const key = getPullRequestIdentityKey(identity);
-    const seenAt = gitHubPrNotificationSeenAtState[key];
-    const updatedAt = Date.parse(notification.updated_at);
-    const isNew = typeof seenAt !== 'number' || (Number.isFinite(updatedAt) && updatedAt > seenAt);
-
-    if (isNew) {
-      counts[key] = (counts[key] ?? 0) + 1;
-    }
-
-    return counts;
-  }, {});
+    },
+    {},
+  );
 }
 
 function getPullRequestNewCommentCountByKey(
   notifications: GitHubNotification[],
-  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState
+  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState,
 ) {
   return getPullRequestNewNotificationCountByKey(
     notifications.filter((notification) => notification.reason === 'comment'),
-    gitHubPrNotificationSeenAtState
+    gitHubPrNotificationSeenAtState,
   );
 }
 
-function getNotificationIconKind(subjectType: string): 'pull-request' | 'issue' | 'commit' | 'discussion' {
+function getNotificationIconKind(
+  subjectType: string,
+): 'pull-request' | 'issue' | 'commit' | 'discussion' {
   if (subjectType === 'Issue') {
     return 'issue';
   }
@@ -1404,12 +1690,17 @@ function getNotificationIconKind(subjectType: string): 'pull-request' | 'issue' 
   return 'pull-request';
 }
 
-function getPullRequestIdentityFromNotification(notification: GitHubNotification) {
+function getPullRequestIdentityFromNotification(
+  notification: GitHubNotification,
+) {
   if (!notification.subject.url) {
     return null;
   }
 
-  const apiPath = notification.subject.url.replace('https://api.github.com/repos/', '');
+  const apiPath = notification.subject.url.replace(
+    'https://api.github.com/repos/',
+    '',
+  );
   const [owner, repo, resource, pullNumber] = apiPath.split('/');
 
   if (resource !== 'pulls' || !owner || !repo || !pullNumber) {
@@ -1419,7 +1710,7 @@ function getPullRequestIdentityFromNotification(notification: GitHubNotification
   return {
     owner,
     repo,
-    pullNumber: Number(pullNumber)
+    pullNumber: Number(pullNumber),
   };
 }
 
@@ -1433,7 +1724,10 @@ function getPullRequestIdentityKey(pullRequestIdentity: {
 
 function getNotificationUrl(notification: GitHubNotification) {
   if (notification.subject.url) {
-    const apiPath = notification.subject.url.replace('https://api.github.com/repos/', '');
+    const apiPath = notification.subject.url.replace(
+      'https://api.github.com/repos/',
+      '',
+    );
     const [owner, repo, resource, id] = apiPath.split('/');
 
     if (resource === 'pulls') {
@@ -1448,11 +1742,16 @@ function getNotificationUrl(notification: GitHubNotification) {
   return `https://github.com/${notification.repository.full_name}`;
 }
 
-function getGitHubPullRequestAttentionStateKey(pullRequest: GitHubPullRequestItem) {
+function getGitHubPullRequestAttentionStateKey(
+  pullRequest: GitHubPullRequestItem,
+) {
   return `${pullRequest.repositoryName}#${pullRequest.pullNumber}`;
 }
 
-function areGitHubPrReadyStatesEqual(left: GitHubPrReadyState, right: GitHubPrReadyState) {
+function areGitHubPrReadyStatesEqual(
+  left: GitHubPrReadyState,
+  right: GitHubPrReadyState,
+) {
   const leftKeys = Object.keys(left);
   const rightKeys = Object.keys(right);
 
@@ -1476,7 +1775,10 @@ function areGitHubPrReadyStatesEqual(left: GitHubPrReadyState, right: GitHubPrRe
   return true;
 }
 
-function areGitHubPrWarningStatesEqual(left: GitHubPrWarningState, right: GitHubPrWarningState) {
+function areGitHubPrWarningStatesEqual(
+  left: GitHubPrWarningState,
+  right: GitHubPrWarningState,
+) {
   const leftKeys = Object.keys(left);
   const rightKeys = Object.keys(right);
 
@@ -1497,7 +1799,9 @@ function areGitHubPrWarningStatesEqual(left: GitHubPrWarningState, right: GitHub
     }
 
     for (let index = 0; index < leftEntry.activeCaseKeys.length; index += 1) {
-      if (leftEntry.activeCaseKeys[index] !== rightEntry.activeCaseKeys[index]) {
+      if (
+        leftEntry.activeCaseKeys[index] !== rightEntry.activeCaseKeys[index]
+      ) {
         return false;
       }
     }
