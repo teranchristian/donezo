@@ -1,4 +1,8 @@
-import { type FocusStatusTone } from './storage';
+import {
+  getJiraIssueFocusTone,
+  isJiraIssueHighPriority,
+  isJiraIssueInProgress,
+} from './jiraDomain';
 
 export type JiraConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
 
@@ -293,9 +297,9 @@ export async function loadJiraIssuesByKeys(options: {
 export function getJiraIssueCounts(issues: JiraIssue[]) {
   return {
     active: issues.length,
-    inProgress: issues.filter(isInProgressIssue).length,
+    inProgress: issues.filter(isJiraIssueInProgress).length,
     blocking: issues.filter(isBlockingIssue).length,
-    highPriority: issues.filter(isHighPriorityIssue).length
+    highPriority: issues.filter(isJiraIssueHighPriority).length
   };
 }
 
@@ -303,20 +307,7 @@ export function getJiraBrowseUrl(baseUrl: string, issueKey: string) {
   return `${normalizeJiraBaseUrl(baseUrl)}/browse/${issueKey}`;
 }
 
-export function getJiraIssueFocusTone(issue: JiraIssue): FocusStatusTone {
-  const statusCategoryKey = issue.status.statusCategory?.key;
-  const normalizedStatus = issue.status.name.toLowerCase();
-
-  if (statusCategoryKey === 'done' || normalizedStatus.includes('done') || normalizedStatus.includes('closed')) {
-    return 'emerald';
-  }
-
-  if (statusCategoryKey === 'new' || normalizedStatus.includes('to do') || normalizedStatus.includes('todo')) {
-    return 'amber';
-  }
-
-  return 'violet';
-}
+export { getJiraIssueFocusTone };
 
 export function getJiraSearchUrl(baseUrl: string) {
   return `${normalizeJiraBaseUrl(baseUrl)}/issues/?jql=${encodeURIComponent(JIRA_ACTIVE_ISSUES_JQL)}`;
@@ -341,23 +332,6 @@ type BackgroundJiraConnectionResponse =
 type BackgroundJiraIssuesResponse =
   | { success: true; issues: JiraIssue[] }
   | { success: false; status?: number; error?: string };
-
-function isInProgressIssue(issue: JiraIssue) {
-  const statusName = issue.status.name.toLowerCase();
-  const statusCategoryName = issue.status.statusCategory?.name?.toLowerCase() ?? '';
-  const statusCategoryKey = issue.status.statusCategory?.key?.toLowerCase() ?? '';
-
-  return (
-    statusName.includes('in progress') ||
-    statusCategoryName === 'indeterminate' ||
-    statusCategoryKey === 'indeterminate'
-  );
-}
-
-function isHighPriorityIssue(issue: JiraIssue) {
-  const priorityName = issue.priority?.name?.toLowerCase() ?? '';
-  return priorityName === 'highest' || priorityName === 'high';
-}
 
 function getBlockingCount(issue: JiraIssueLike) {
   return getBlockingIssues(issue).length;

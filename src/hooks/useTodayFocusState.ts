@@ -3,6 +3,11 @@ import { TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
 import type { JiraIssue } from '../lib/jiraApi';
 import type { GitHubPullRequestItem } from '../lib/githubApi';
 import {
+  extractJiraKey,
+  getGitHubFocusStatusLabel,
+  getGitHubFocusStatusTone,
+} from '../lib/githubDomain';
+import {
   getStoredTodayFocusItems,
   saveStoredTodayFocusItems,
   type FocusItem,
@@ -329,7 +334,7 @@ function syncTodayFocusJiraLinkedPullRequests(
 
   const matchingPullRequestsByJiraKey = new Map<string, FocusPullRequestItem[]>();
   for (const pullRequest of pullRequests) {
-    const jiraKey = extractJiraKeyFromPullRequestTitle(pullRequest.title);
+    const jiraKey = extractJiraKey(pullRequest.title);
     if (!jiraKey || !jiraKeys.has(jiraKey)) {
       continue;
     }
@@ -584,7 +589,7 @@ function getMatchingGitHubFocusPullRequests(
   return pullRequests
     .filter(
       (pullRequest) =>
-        extractJiraKeyFromPullRequestTitle(pullRequest.title) === jiraKey,
+        extractJiraKey(pullRequest.title) === jiraKey,
     )
     .map((pullRequest) => mapGitHubPullRequestToFocusItem(pullRequest));
 }
@@ -601,47 +606,6 @@ function mapGitHubPullRequestToFocusItem(
     title: pullRequest.title,
     statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
     statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKeyFromPullRequestTitle(pullRequest.title),
+    jiraKey: extractJiraKey(pullRequest.title),
   };
-}
-
-function extractJiraKeyFromPullRequestTitle(value: string) {
-  const match = value.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
-  return match ? match[1].toUpperCase() : null;
-}
-
-function getGitHubFocusStatusLabel(
-  reviewStatus: GitHubPullRequestItem['reviewStatus'],
-) {
-  if (reviewStatus === 'approved') {
-    return 'Approved';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'Changes Requested';
-  }
-
-  if (reviewStatus === 'waiting-review') {
-    return 'Waiting Review';
-  }
-
-  if (reviewStatus === 'draft') {
-    return 'Draft';
-  }
-
-  return 'Open';
-}
-
-function getGitHubFocusStatusTone(
-  reviewStatus: GitHubPullRequestItem['reviewStatus'],
-): FocusItem['statusTone'] {
-  if (reviewStatus === 'approved') {
-    return 'emerald';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'amber';
-  }
-
-  return 'violet';
 }

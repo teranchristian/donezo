@@ -1,6 +1,11 @@
 import { ReactNode, useMemo } from 'react';
 import { formatRelativeTime } from '../lib/date';
 import {
+  getJiraRelatedIssueTooltip,
+  isJiraIssueHighPriority,
+  isJiraIssueInProgress,
+} from '../lib/jiraDomain';
+import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
   getJiraIssueFocusTone,
@@ -71,7 +76,7 @@ export function JiraCard({
   const viewAllUrl = baseUrl ? getJiraSearchUrl(baseUrl) : '';
   const filteredIssues = useMemo(() => {
     if (activeView === 'in-progress') {
-      return data.issues.filter(isInProgressIssue);
+      return data.issues.filter(isJiraIssueInProgress);
     }
 
     if (activeView === 'blocking') {
@@ -79,7 +84,7 @@ export function JiraCard({
     }
 
     if (activeView === 'high-priority') {
-      return data.issues.filter(isHighPriorityIssue);
+      return data.issues.filter(isJiraIssueHighPriority);
     }
 
     return data.issues;
@@ -287,17 +292,12 @@ function RelatedIssueLink({
       href={getJiraBrowseUrl(baseUrl, issue.key)}
       target="_blank"
       rel="noreferrer"
-      title={getRelatedIssueTooltip(issue)}
+      title={getJiraRelatedIssueTooltip(issue)}
       className={`font-medium uppercase tracking-[0.14em] underline underline-offset-4 transition ${toneClass}`}
     >
       {issue.key}
     </a>
   );
-}
-
-function getRelatedIssueTooltip(issue: JiraIssue['blockingIssues'][number]) {
-  const parts = [issue.summary, issue.status, issue.assignee ? `Owner: ${issue.assignee}` : undefined].filter(Boolean);
-  return parts.join(' • ');
 }
 
 function PriorityIcon({ priorityName }: { priorityName?: string }) {
@@ -421,23 +421,6 @@ function ListItemSkeleton() {
 
 function formatCount(value: number, isLoading: boolean) {
   return isLoading ? '...' : value.toString();
-}
-
-function isInProgressIssue(issue: JiraIssue) {
-  const statusName = issue.status.name.toLowerCase();
-  const statusCategoryName = issue.status.statusCategory?.name?.toLowerCase() ?? '';
-  const statusCategoryKey = issue.status.statusCategory?.key?.toLowerCase() ?? '';
-
-  return (
-    statusName.includes('in progress') ||
-    statusCategoryName === 'indeterminate' ||
-    statusCategoryKey === 'indeterminate'
-  );
-}
-
-function isHighPriorityIssue(issue: JiraIssue) {
-  const priorityName = issue.priority?.name?.toLowerCase() ?? '';
-  return priorityName === 'highest' || priorityName === 'high';
 }
 
 function getEmptyFilterMessage(activeFilter: 'active' | 'in-progress' | 'blocking' | 'high-priority') {

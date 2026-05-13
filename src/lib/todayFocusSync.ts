@@ -2,7 +2,12 @@ import {
   type GitHubPullRequestItem,
   type GitHubPullRequestState,
 } from './githubApi';
-import { JiraIssue, getJiraIssueFocusTone } from './jiraApi';
+import {
+  getGitHubFocusStatusLabel,
+  getGitHubFocusStatusTone,
+} from './githubDomain';
+import { getJiraIssueFocusTone } from './jiraDomain';
+import { JiraIssue } from './jiraApi';
 import { FocusItem, FocusJiraItem, FocusPullRequestItem } from './storage';
 
 export type TodayFocusRefreshSignal = {
@@ -269,36 +274,6 @@ function parseGitHubFocusPullRequestIdentity(value: string) {
 
 function getFocusPullRequestId(pullRequest: GitHubPullRequestItem) {
   return `github:${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
-}
-
-function getGitHubFocusStatusLabel(reviewStatus: GitHubPullRequestItem['reviewStatus']) {
-  if (reviewStatus === 'approved') {
-    return 'Approved';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'Changes Requested';
-  }
-
-  if (reviewStatus === 'waiting-review') {
-    return 'Waiting Review';
-  }
-
-  if (reviewStatus === 'draft') {
-    return 'Draft';
-  }
-
-  return 'Open';
-}
-
-function getGitHubFocusStatusTone(
-  reviewStatus: GitHubPullRequestItem['reviewStatus']
-): FocusPullRequestItem['statusTone'] {
-  if (reviewStatus === 'approved') {
-    return 'emerald';
-  }
-
-  return reviewStatus === 'changes-requested' ? 'amber' : 'violet';
 }
 
 function isTerminalGitHubFocusStatus(statusLabel: string) {
