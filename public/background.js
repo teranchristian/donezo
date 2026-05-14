@@ -473,24 +473,6 @@ function getChangedSignalIds(previousSignals, nextSignals, options) {
   return changedIds;
 }
 
-function getSignalById(signals, id) {
-  return signals.find((signal) => signal.id === id) ?? null;
-}
-
-function logSignalChanges(kind, previousSignals, nextSignals, changedIds) {
-  if (changedIds.length === 0) {
-    return;
-  }
-
-  const firstChangedId = changedIds[0];
-  console.log(`[GitHub] ${kind} signals changed`, {
-    changedCount: changedIds.length,
-    firstChangedId,
-    previous: getSignalById(previousSignals, firstChangedId),
-    next: getSignalById(nextSignals, firstChangedId)
-  });
-}
-
 async function fetchGitHub(url, token) {
   let response;
 
@@ -1163,11 +1145,6 @@ async function loadGitHubDashboardData(payload) {
   }
 
   try {
-    console.log('[GitHub] loadGitHubDashboardData: fetching notifications and pull requests', {
-      username,
-      ownerFilter,
-      forceRefresh: Boolean(payload.forceRefresh)
-    });
     const [notifications, pullRequestResult] = await Promise.all([
       getGitHubNotifications(token),
       getDashboardPullRequests(username, token, ownerFilter)
@@ -1207,10 +1184,6 @@ async function pollGitHubNotificationActivity(payload) {
     getCachedGitHubNotificationSignals(cacheToken),
     getCachedGitHubPullRequestSignals(cacheToken)
   ]);
-  console.log('[GitHub] pollGitHubNotificationActivity: fetching notifications and pull requests', {
-    username,
-    ownerFilter
-  });
   const [notifications, pullRequestResult] = await Promise.all([
     getGitHubNotifications(token),
     username ? getDashboardPullRequests(username, token, ownerFilter) : null
@@ -1232,19 +1205,6 @@ async function pollGitHubNotificationActivity(payload) {
     expectedKeys: GITHUB_PULL_REQUEST_SIGNAL_KEYS,
     kind: 'pull request'
   });
-  logSignalChanges(
-    'notification',
-    previousNotificationSignals,
-    nextNotificationSignals,
-    changedNotificationIds
-  );
-  logSignalChanges(
-    'pull request',
-    previousPullRequestSignals,
-    nextPullRequestSignals,
-    changedPullRequestIds
-  );
-
   const hasChanges = changedNotificationIds.length > 0 || changedPullRequestIds.length > 0;
   let data;
 
@@ -1374,13 +1334,6 @@ function normalizeJiraIssue(issue) {
   const issueLinks = Array.isArray(issue?.fields?.issuelinks) ? issue.fields.issuelinks : [];
   const blockingIssues = getBlockingIssues(issue);
   const blockedByIssues = getBlockedByIssues(issue);
-
-  console.log('Normalized Jira issue:', {
-    key: issue?.key,
-    issueLinks,
-    blockingIssues,
-    blockedByIssues
-  });
 
   return {
     id: String(issue?.id ?? ''),
