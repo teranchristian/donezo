@@ -72,6 +72,7 @@ export type GitHubRepository = {
   url: string;
   isPrivate: boolean;
   updatedAt: string;
+  description: string;
 };
 
 type CachedGitHubDashboardData = {

@@ -87,6 +87,33 @@ const GITHUB_PULL_REQUESTS_QUERY = `
   }
 `;
 const GITHUB_PULL_REQUEST_PAGE_SIZE = 50;
+const GITHUB_REPOSITORY_SEARCH_QUERY = `
+  query RepositorySearch(
+    $query: String!
+    $first: Int!
+    $after: String
+  ) {
+    search(query: $query, type: REPOSITORY, first: $first, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ... on Repository {
+          databaseId
+          name
+          url
+          isPrivate
+          updatedAt
+          description
+          owner {
+            login
+          }
+        }
+      }
+    }
+  }
+`;
 
 const gitHubDashboardRequests = new Map();
 const gitHubActivityPollRequests = new Map();
@@ -621,11 +648,11 @@ async function getGitHubNotifications(token) {
 }
 
 function getGitHubRepoIdentity(repo) {
-  const id = Number(repo?.id);
+  const id = Number(repo?.databaseId ?? repo?.id);
   const name = String(repo?.name ?? '').trim();
-  const fullName = String(repo?.full_name ?? '').trim();
   const owner = String(repo?.owner?.login ?? '').trim();
-  const url = String(repo?.html_url ?? '').trim();
+  const url = String(repo?.url ?? repo?.html_url ?? '').trim();
+  const fullName = owner && name ? `${owner}/${name}` : '';
 
   if (!Number.isFinite(id) || !name || !fullName || !owner || !url) {
     return null;
@@ -637,27 +664,39 @@ function getGitHubRepoIdentity(repo) {
     fullName,
     owner,
     url,
-    isPrivate: Boolean(repo?.private),
-    updatedAt: String(repo?.pushed_at ?? repo?.updated_at ?? '').trim()
+    isPrivate: Boolean(repo?.isPrivate ?? repo?.private),
+    updatedAt: String(repo?.updatedAt ?? repo?.pushed_at ?? repo?.updated_at ?? '').trim(),
+    description: String(repo?.description ?? '').trim()
   };
 }
 
-async function getAccessibleGitHubRepos(token) {
+function buildRepositorySearchQuery(ownerFilter) {
+  const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
+  const qualifiers = ['archived:false', 'sort:updated-desc'];
+
+  if (normalizedOwnerFilter && normalizedOwnerFilter !== 'all') {
+    qualifiers.push(`user:${normalizedOwnerFilter}`);
+  }
+
+  return qualifiers.join(' ');
+}
+
+async function getAccessibleGitHubRepos(token, ownerFilter) {
   const repos = [];
-  let page = 1;
+  let cursor = null;
 
   while (true) {
-    const searchParams = new URLSearchParams({
-      affiliation: 'owner,collaborator,organization_member',
-      per_page: String(GITHUB_REPO_PAGE_SIZE),
-      sort: 'updated',
-      page: String(page)
-    });
-    const response = await fetchGitHub(
-      `https://api.github.com/user/repos?${searchParams.toString()}`,
+    const data = await fetchGitHubGraphQL(
+      GITHUB_REPOSITORY_SEARCH_QUERY,
+      {
+        query: buildRepositorySearchQuery(ownerFilter),
+        first: GITHUB_REPO_PAGE_SIZE,
+        after: cursor
+      },
       token
     );
-    const pageRepos = await response.json();
+    const searchResult = data?.search;
+    const pageRepos = Array.isArray(searchResult?.nodes) ? searchResult.nodes : [];
 
     if (!Array.isArray(pageRepos) || pageRepos.length === 0) {
       break;
@@ -665,11 +704,11 @@ async function getAccessibleGitHubRepos(token) {
 
     repos.push(...pageRepos);
 
-    if (pageRepos.length < GITHUB_REPO_PAGE_SIZE) {
+    if (!searchResult?.pageInfo?.hasNextPage || !searchResult?.pageInfo?.endCursor) {
       break;
     }
 
-    page += 1;
+    cursor = searchResult.pageInfo.endCursor;
   }
 
   return repos;
@@ -678,11 +717,13 @@ async function getAccessibleGitHubRepos(token) {
 function filterReposByOwner(repos, ownerFilter) {
   const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
 
-  if (!normalizedOwnerFilter || normalizedOwnerFilter === 'all') {
-    return repos;
-  }
+  return repos.filter((repo) => {
+    if (!normalizedOwnerFilter || normalizedOwnerFilter === 'all') {
+      return true;
+    }
 
-  return repos.filter((repo) => String(repo?.owner?.login ?? '').trim() === normalizedOwnerFilter);
+    return String(repo?.owner?.login ?? '').trim() === normalizedOwnerFilter;
+  });
 }
 
 function sortGitHubRepoIndex(left, right) {
@@ -712,7 +753,7 @@ async function loadGitHubRepoIndex(payload) {
     }
   }
 
-  const repos = await getAccessibleGitHubRepos(token);
+  const repos = await getAccessibleGitHubRepos(token, ownerFilter);
   const data = filterReposByOwner(repos, ownerFilter)
     .map(getGitHubRepoIdentity)
     .filter(Boolean)
