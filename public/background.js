@@ -381,8 +381,17 @@ async function refreshJiraDashboardFromStoredSettings() {
 
   const auth = encodeBasicAuth(jiraEmail, jiraApiToken);
   const credentialsKey = createJiraCredentialsKey(jiraBaseUrl, jiraEmail, jiraApiToken);
-  const issues = await fetchJiraIssuesByJql(jiraBaseUrl, auth, JIRA_ACTIVE_ISSUES_JQL, 50);
-  await saveCachedJiraIssues(credentialsKey, issues);
+
+  try {
+    const issues = await fetchJiraIssuesByJql(jiraBaseUrl, auth, JIRA_ACTIVE_ISSUES_JQL, 50);
+    await saveCachedJiraIssues(credentialsKey, issues);
+  } catch (error) {
+    console.error('Failed to refresh Jira dashboard in background polling', {
+      jiraBaseUrl,
+      stage: 'background-poll',
+      error: serializeError(error)
+    });
+  }
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -1546,18 +1555,11 @@ async function fetchBlockingIssueDetails(jiraBaseUrl, auth, issueKeys) {
     return {};
   }
 
-  const result = await fetchJira(`${jiraBaseUrl}/rest/api/3/search/jql`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      jql: `issuekey in (${issueKeys.map((issueKey) => `"${escapeJqlValue(issueKey)}"`).join(', ')})`,
-      fields: ['summary', 'status', 'assignee'],
-      maxResults: issueKeys.length
-    })
+  const result = await fetchJiraSearch(jiraBaseUrl, auth, {
+    requestName: 'fetchBlockingIssueDetails',
+    jql: `issuekey in (${issueKeys.map((issueKey) => `"${escapeJqlValue(issueKey)}"`).join(', ')})`,
+    fields: ['summary', 'status', 'assignee'],
+    maxResults: issueKeys.length
   });
 
   if (!result.success) {
@@ -1592,18 +1594,11 @@ async function fetchBlockingIssueDetails(jiraBaseUrl, auth, issueKeys) {
 }
 
 async function fetchJiraIssuesByJql(jiraBaseUrl, auth, jql, maxResults) {
-  const result = await fetchJira(`${jiraBaseUrl}/rest/api/3/search/jql`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      jql,
-      fields: ['summary', 'status', 'priority', 'updated', 'issuelinks', 'project'],
-      maxResults
-    })
+  const result = await fetchJiraSearch(jiraBaseUrl, auth, {
+    requestName: 'fetchJiraIssuesByJql',
+    jql,
+    fields: ['summary', 'status', 'priority', 'updated', 'issuelinks', 'project'],
+    maxResults
   });
 
   if (!result.success) {
@@ -1632,8 +1627,74 @@ async function fetchJiraIssuesByKeys(jiraBaseUrl, auth, issueKeys) {
   return fetchJiraIssuesByJql(jiraBaseUrl, auth, jql, uniqueIssueKeys.length);
 }
 
-async function fetchJira(endpoint, options) {
-  const response = await fetch(endpoint, options);
+async function fetchJiraSearch(jiraBaseUrl, auth, request) {
+  const searchEndpoints = ['/rest/api/3/search/jql', '/rest/api/3/search'];
+  const { requestName = 'unknown-jira-search', ...payload } = request ?? {};
+  let lastResult = null;
+
+  for (const path of searchEndpoints) {
+    const endpoint = `${jiraBaseUrl}${path}`;
+
+    try {
+      const result = await fetchJira(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }, {
+        requestName,
+        method: 'POST'
+      });
+
+      if (result.success || !shouldFallbackJiraSearch(result.status)) {
+        return result;
+      }
+
+      console.warn('Jira search endpoint unavailable, retrying fallback endpoint', {
+        jiraBaseUrl,
+        requestName,
+        endpoint,
+        status: result.status
+      });
+      lastResult = result;
+    } catch (error) {
+      lastResult = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to reach Jira'
+      };
+
+      console.error('Jira search request failed', {
+        jiraBaseUrl,
+        requestName,
+        endpoint,
+        error: serializeError(error)
+      });
+
+      if (!isLikelyJiraSearchCompatibilityError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  return (
+    lastResult ?? {
+      success: false,
+      error: 'Failed to load Jira issues'
+    }
+  );
+}
+
+async function fetchJira(endpoint, options, context = {}) {
+  let response;
+
+  try {
+    response = await fetch(endpoint, options);
+  } catch (error) {
+    throw new Error(getJiraFetchErrorMessage(endpoint, error, context));
+  }
 
   if (response.status === 401) {
     return { success: false, status: 401, error: 'Invalid credentials' };
@@ -1648,6 +1709,55 @@ async function fetchJira(endpoint, options) {
   }
 
   return { success: true, response };
+}
+
+function shouldFallbackJiraSearch(status) {
+  return status === 404 || status === 410;
+}
+
+function isLikelyJiraSearchCompatibilityError(error) {
+  return error instanceof Error && /Failed to fetch/i.test(error.message);
+}
+
+function getJiraFetchErrorMessage(endpoint, error, context = {}) {
+  const message = error instanceof Error ? error.message : 'Failed to fetch';
+
+  if (!/Failed to fetch/i.test(message)) {
+    return message;
+  }
+
+  const hostname = getHostnameFromUrl(endpoint);
+  const customDomainHint =
+    hostname && !hostname.endsWith('.atlassian.net')
+      ? ` Host permissions currently only allow Jira sites on *.atlassian.net, but this request targeted ${hostname}.`
+      : '';
+
+  const requestName = context?.requestName ? ` Request: ${context.requestName}.` : '';
+  const method = context?.method ? ` Method: ${context.method}.` : '';
+
+  return `Failed to reach Jira at ${endpoint}.${requestName}${method}${customDomainHint} Verify the Jira base URL, network access, and extension host permissions.`;
+}
+
+function getHostnameFromUrl(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+function serializeError(error) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+
+  return {
+    message: String(error)
+  };
 }
 
 class GitHubApiError extends Error {
