@@ -70,20 +70,18 @@ export function DashboardHeaderControls({
           onRefresh={onRefreshJira}
         />
       )}
-      {activeIntegration === 'github' ? (
-        <GitHubHeaderShortcuts
-          connectionStatus={gitHubSummaryMetrics.connectionStatus}
-          warningCount={gitHubSummaryMetrics.highlightedWarningCount}
-          readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
-          readyToMergeBadgeCount={gitHubSummaryMetrics.highlightedReadyCount}
-          failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
-          failedBuildBadgeCount={gitHubSummaryMetrics.failedBuildBadgeCount}
-          jiraBlockingCount={jiraBlockingCount}
-          onOpenWarnings={onOpenWarnings}
-          onOpenReadyToMerge={onOpenReadyToMerge}
-          onOpenJira={onOpenJira}
-        />
-      ) : null}
+      <GitHubHeaderShortcuts
+        connectionStatus={gitHubSummaryMetrics.connectionStatus}
+        warningCount={gitHubSummaryMetrics.highlightedWarningCount}
+        readyToMergeCount={gitHubSummaryMetrics.readyToMergeCount}
+        readyToMergeBadgeCount={gitHubSummaryMetrics.highlightedReadyCount}
+        failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
+        failedBuildBadgeCount={gitHubSummaryMetrics.failedBuildBadgeCount}
+        jiraBlockingCount={jiraBlockingCount}
+        onOpenWarnings={onOpenWarnings}
+        onOpenReadyToMerge={onOpenReadyToMerge}
+        onOpenJira={onOpenJira}
+      />
       <HeaderMenu
         isMockMode={isGitHubMockMode}
         mockScenarioKey={gitHubMockScenarioKey}
