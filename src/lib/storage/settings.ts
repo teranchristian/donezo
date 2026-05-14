@@ -73,6 +73,11 @@ function mergeSettings(
   const jiraApiToken =
     overrides?.apiToken ?? settings?.integrations?.jira?.apiToken ?? defaultSettings.integrations.jira.apiToken;
   const gitHubOwnerFilter = mergeGitHubOwnerFilter(settings?.integrations?.github?.ownerFilter ?? overrides?.ownerFilter);
+  const hiddenRepositories = Array.isArray(settings?.integrations?.github?.hiddenRepositories)
+    ? settings.integrations.github.hiddenRepositories
+        .map((repository) => normalizeHiddenRepository(repository))
+        .filter((repository): repository is NonNullable<typeof repository> => Boolean(repository))
+    : defaultSettings.integrations.github.hiddenRepositories;
 
   return {
     name: settings?.name?.trim() ?? getDefaultSettings().name,
@@ -80,7 +85,8 @@ function mergeSettings(
       github: {
         username: settings?.integrations?.github?.username ?? defaultSettings.integrations.github.username,
         token: settings?.integrations?.github?.token ?? defaultSettings.integrations.github.token,
-        ownerFilter: gitHubOwnerFilter === 'all' ? '' : gitHubOwnerFilter
+        ownerFilter: gitHubOwnerFilter === 'all' ? '' : gitHubOwnerFilter,
+        hiddenRepositories
       },
       jira: {
         baseUrl: normalizeBaseUrl(jiraBaseUrl),
@@ -97,4 +103,24 @@ function normalizeBaseUrl(value: string) {
 
 function mergeGitHubOwnerFilter(filter?: string): GitHubListOrganizationFilter {
   return typeof filter === 'string' && filter.trim() ? filter : DEFAULT_GITHUB_OWNER_FILTER;
+}
+
+function normalizeHiddenRepository(repository: unknown) {
+  const id = Number((repository as { id?: unknown })?.id);
+  const name = String((repository as { name?: unknown })?.name ?? '').trim();
+  const fullName = String((repository as { fullName?: unknown })?.fullName ?? '').trim();
+  const owner = String((repository as { owner?: unknown })?.owner ?? '').trim();
+  const url = String((repository as { url?: unknown })?.url ?? '').trim();
+
+  if (!Number.isFinite(id) || !name || !fullName || !owner || !url) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    fullName,
+    owner,
+    url
+  };
 }

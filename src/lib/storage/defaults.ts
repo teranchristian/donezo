@@ -14,7 +14,8 @@ const DEFAULT_SETTINGS: DashboardSettings = {
     github: {
       username: '',
       token: '',
-      ownerFilter: ''
+      ownerFilter: '',
+      hiddenRepositories: []
     },
     jira: {
       baseUrl: '',

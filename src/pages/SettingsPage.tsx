@@ -84,7 +84,8 @@ export function SettingsPage({
           github: {
             username: draft.integrations.github.username.trim(),
             token: draft.integrations.github.token.trim(),
-            ownerFilter: draft.integrations.github.ownerFilter.trim()
+            ownerFilter: draft.integrations.github.ownerFilter.trim(),
+            hiddenRepositories: draft.integrations.github.hiddenRepositories
           },
           jira: {
             baseUrl: draft.integrations.jira.baseUrl.trim(),
@@ -113,10 +114,31 @@ export function SettingsPage({
     );
   }
 
+  async function handleShowRepositoryAgain(fullName: string) {
+    const nextSettings: DashboardSettings = {
+      ...draft,
+      integrations: {
+        ...draft.integrations,
+        github: {
+          ...draft.integrations.github,
+          hiddenRepositories: draft.integrations.github.hiddenRepositories.filter(
+            (entry) => entry.fullName !== fullName
+          )
+        }
+      }
+    };
+
+    setDraft(nextSettings);
+    setSaveMessage('');
+    await onSave(nextSettings);
+    setSaveMessage('Hidden repositories updated.');
+  }
+
   const ownerOptions = getGitHubOwnerOptions(gitHubOwnerOptions, draft.integrations.github.ownerFilter);
   const hasValidatedCurrentGitHubToken =
     gitHubTestStatus === 'connected' && draft.integrations.github.token.trim() === lastSuccessfulGitHubTestToken;
   const shouldShowOwnerFilter = hasValidatedCurrentGitHubToken && ownerOptions.length > 0;
+  const hiddenRepositories = draft.integrations.github.hiddenRepositories;
 
   return (
     <main className="min-h-screen px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
@@ -310,6 +332,52 @@ export function SettingsPage({
               <div className="rounded-2xl border border-white/5 bg-panelAlt/70 px-4 py-3 text-sm text-stone-300">
                 <p>{TEST_STATUS_COPY[gitHubTestStatus]}</p>
                 {saveMessage ? <p className="mt-2 text-stone-400">{saveMessage}</p> : null}
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-stone-100">Hidden repositories</h3>
+                    <p className="mt-1 text-sm leading-6 text-stone-400">
+                      Hidden repos stay out of the Spotlight search until you restore them here.
+                    </p>
+                  </div>
+                  <span className="text-[0.7rem] uppercase tracking-[0.2em] text-stone-500">
+                    {hiddenRepositories.length} hidden
+                  </span>
+                </div>
+
+                {hiddenRepositories.length === 0 ? (
+                  <p className="mt-4 text-sm text-stone-400">No repositories are hidden.</p>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    {hiddenRepositories
+                      .slice()
+                      .sort((left, right) => left.fullName.localeCompare(right.fullName))
+                      .map((repository) => (
+                        <div
+                          key={repository.fullName}
+                          className="flex flex-col gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-stone-100">
+                              {repository.name}
+                            </p>
+                            <p className="truncate text-sm text-stone-400">
+                              {repository.fullName}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleShowRepositoryAgain(repository.fullName)}
+                            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-stone-100 transition hover:border-white/20 hover:bg-white/10"
+                          >
+                            Show again
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             </div>
           </CardShell>

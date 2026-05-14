@@ -39,6 +39,7 @@ export type DashboardSettings = {
       username: string;
       token: string;
       ownerFilter: string;
+      hiddenRepositories: GitHubHiddenRepository[];
     };
     jira: {
       baseUrl: string;
@@ -46,6 +47,14 @@ export type DashboardSettings = {
       apiToken: string;
     };
   };
+};
+
+export type GitHubHiddenRepository = {
+  id: number;
+  name: string;
+  fullName: string;
+  owner: string;
+  url: string;
 };
 
 export type GitHubListOrganizationFilter = 'all' | string;

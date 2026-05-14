@@ -6,9 +6,12 @@ const JIRA_ACTIVE_ISSUES_JQL =
 const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
 const GITHUB_NOTIFICATION_SIGNALS_CACHE_KEY = 'github-notification-signals';
 const GITHUB_PULL_REQUEST_SIGNALS_CACHE_KEY = 'github-pull-request-signals';
+const GITHUB_REPO_INDEX_CACHE_KEY = 'github-repo-index-cache';
 const GITHUB_CACHE_TTL_MS = 5 * 60 * 1000;
+const GITHUB_REPO_INDEX_CACHE_TTL_MS = 30 * 60 * 1000;
 const GITHUB_NOTIFICATIONS_WINDOW_DAYS = 7;
 const GITHUB_NOTIFICATIONS_PAGE_SIZE = 50;
+const GITHUB_REPO_PAGE_SIZE = 100;
 const SETTINGS_STORAGE_KEY = 'dashboard-settings';
 const GITHUB_POLL_ALARM_NAME = 'github-dashboard-poll';
 const JIRA_POLL_ALARM_NAME = 'jira-dashboard-poll';
@@ -89,6 +92,7 @@ const gitHubDashboardRequests = new Map();
 const gitHubActivityPollRequests = new Map();
 const gitHubPullRequestStateRequests = new Map();
 const gitHubPullRequestStatesRequests = new Map();
+const gitHubRepoIndexRequests = new Map();
 const GITHUB_NOTIFICATION_SIGNAL_KEYS = ['id', 'updatedAt', 'unread'];
 const GITHUB_PULL_REQUEST_SIGNAL_KEYS = [
   'id',
@@ -244,6 +248,31 @@ async function saveCachedGitHubPullRequestSignals(cacheToken, pullRequests) {
   });
 }
 
+async function getCachedGitHubRepoIndex(cacheToken, options = {}) {
+  const result = await chrome.storage.local.get(GITHUB_REPO_INDEX_CACHE_KEY);
+  const cached = result[GITHUB_REPO_INDEX_CACHE_KEY];
+  if (!cached) {
+    return null;
+  }
+
+  const isExpired = Date.now() - cached.fetchedAt > GITHUB_REPO_INDEX_CACHE_TTL_MS;
+  if (cached.cacheToken !== cacheToken || (!options.ignoreExpiration && isExpired)) {
+    return null;
+  }
+
+  return cached.data;
+}
+
+async function saveCachedGitHubRepoIndex(cacheToken, data) {
+  await chrome.storage.local.set({
+    [GITHUB_REPO_INDEX_CACHE_KEY]: {
+      cacheToken,
+      fetchedAt: Date.now(),
+      data
+    }
+  });
+}
+
 function getPullRequestNotificationSignals(notifications) {
   return notifications
     .filter((notification) => notification.subject?.type === 'PullRequest')
@@ -300,6 +329,12 @@ async function refreshGitHubDashboardFromStoredSettings() {
   }
 
   await loadGitHubDashboardData({
+    username,
+    token,
+    ownerFilter,
+    forceRefresh: true
+  });
+  await loadGitHubRepoIndex({
     username,
     token,
     ownerFilter,
@@ -583,6 +618,108 @@ async function getGitHubNotifications(token) {
   }
 
   return notifications;
+}
+
+function getGitHubRepoIdentity(repo) {
+  const id = Number(repo?.id);
+  const name = String(repo?.name ?? '').trim();
+  const fullName = String(repo?.full_name ?? '').trim();
+  const owner = String(repo?.owner?.login ?? '').trim();
+  const url = String(repo?.html_url ?? '').trim();
+
+  if (!Number.isFinite(id) || !name || !fullName || !owner || !url) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    fullName,
+    owner,
+    url,
+    isPrivate: Boolean(repo?.private),
+    updatedAt: String(repo?.pushed_at ?? repo?.updated_at ?? '').trim()
+  };
+}
+
+async function getAccessibleGitHubRepos(token) {
+  const repos = [];
+  let page = 1;
+
+  while (true) {
+    const searchParams = new URLSearchParams({
+      affiliation: 'owner,collaborator,organization_member',
+      per_page: String(GITHUB_REPO_PAGE_SIZE),
+      sort: 'updated',
+      page: String(page)
+    });
+    const response = await fetchGitHub(
+      `https://api.github.com/user/repos?${searchParams.toString()}`,
+      token
+    );
+    const pageRepos = await response.json();
+
+    if (!Array.isArray(pageRepos) || pageRepos.length === 0) {
+      break;
+    }
+
+    repos.push(...pageRepos);
+
+    if (pageRepos.length < GITHUB_REPO_PAGE_SIZE) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return repos;
+}
+
+function filterReposByOwner(repos, ownerFilter) {
+  const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
+
+  if (!normalizedOwnerFilter || normalizedOwnerFilter === 'all') {
+    return repos;
+  }
+
+  return repos.filter((repo) => String(repo?.owner?.login ?? '').trim() === normalizedOwnerFilter);
+}
+
+function sortGitHubRepoIndex(left, right) {
+  const updatedDifference =
+    new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  if (updatedDifference !== 0) {
+    return updatedDifference;
+  }
+
+  return left.fullName.localeCompare(right.fullName);
+}
+
+async function loadGitHubRepoIndex(payload) {
+  const username = normalizeGitHubUsername(payload.username);
+  const token = normalizeGitHubToken(payload.token);
+  const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
+
+  if (!token) {
+    return [];
+  }
+
+  const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
+  if (!payload.forceRefresh) {
+    const cached = await getCachedGitHubRepoIndex(cacheToken);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const repos = await getAccessibleGitHubRepos(token);
+  const data = filterReposByOwner(repos, ownerFilter)
+    .map(getGitHubRepoIdentity)
+    .filter(Boolean)
+    .sort(sortGitHubRepoIndex);
+
+  await saveCachedGitHubRepoIndex(cacheToken, data);
+  return data;
 }
 
 function getPullRequestIdentityFromNotification(notification) {
@@ -1487,6 +1624,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       'TEST_GITHUB_CONNECTION',
       'FETCH_GITHUB_OWNER_OPTIONS',
       'FETCH_GITHUB_DASHBOARD',
+      'FETCH_GITHUB_REPO_INDEX',
       'POLL_GITHUB_ACTIVITY',
       'FETCH_GITHUB_PULL_REQUEST_STATE',
       'FETCH_GITHUB_PULL_REQUEST_STATES',
@@ -1552,6 +1690,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           success: false,
           owners: [],
           error: error instanceof Error ? error.message : 'Failed to load GitHub owner options'
+        });
+      }
+
+      return;
+    }
+
+    if (message.type === 'FETCH_GITHUB_REPO_INDEX') {
+      const username = normalizeGitHubUsername(payload.username);
+      const token = normalizeGitHubToken(payload.token);
+      const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
+      const requestKey = JSON.stringify({
+        type: message.type,
+        username,
+        token,
+        ownerFilter,
+        forceRefresh: Boolean(payload.forceRefresh)
+      });
+
+      try {
+        const repos = await withSharedPromise(gitHubRepoIndexRequests, requestKey, () =>
+          loadGitHubRepoIndex(payload)
+        );
+        sendResponse({ success: true, repos });
+      } catch (error) {
+        sendResponse({
+          success: false,
+          repos: [],
+          error: error instanceof Error ? error.message : 'Failed to load GitHub repositories'
         });
       }
 

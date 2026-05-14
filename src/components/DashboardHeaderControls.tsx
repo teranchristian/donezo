@@ -9,6 +9,7 @@ import { HeaderMenu } from './HeaderMenu';
 
 type DashboardHeaderControlsProps = {
   activeIntegration: ActiveIntegration;
+  repoLauncherControl?: ReactNode;
   gitHubSummaryMetrics: GitHubSummaryMetrics;
   jiraBlockingCount: number;
   gitHubConnectionStatus: GitHubConnectionStatus;
@@ -32,6 +33,7 @@ type DashboardHeaderControlsProps = {
 
 export function DashboardHeaderControls({
   activeIntegration,
+  repoLauncherControl,
   gitHubSummaryMetrics,
   jiraBlockingCount,
   gitHubConnectionStatus,
@@ -82,6 +84,7 @@ export function DashboardHeaderControls({
         onOpenReadyToMerge={onOpenReadyToMerge}
         onOpenJira={onOpenJira}
       />
+      {repoLauncherControl}
       <HeaderMenu
         isMockMode={isGitHubMockMode}
         mockScenarioKey={gitHubMockScenarioKey}

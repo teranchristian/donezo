@@ -5,6 +5,7 @@ import {
   DashboardHeaderControls,
   DashboardIntegrationSwitcher,
 } from '../components/DashboardHeaderControls';
+import { GitHubRepoLauncher } from '../components/GitHubRepoLauncher';
 import {
   GitHubCard,
   type GitHubSummaryMetrics,
@@ -12,6 +13,7 @@ import {
 import { JiraCard } from '../components/JiraCard';
 import { SummaryCard } from '../components/SummaryCard';
 import { useDashboardNavigation } from '../hooks/useDashboardNavigation';
+import { useGitHubRepoLauncher } from '../hooks/useGitHubRepoLauncher';
 import { useTodayFocusFallbacks } from '../hooks/useTodayFocusFallbacks';
 import { useTodayFocusState } from '../hooks/useTodayFocusState';
 import { type GitHubDashboardData } from '../lib/githubApi';
@@ -22,6 +24,7 @@ import type {
   ActiveIntegration,
   ActiveJiraView,
   DashboardSettings,
+  GitHubHiddenRepository,
   GitHubPrStatusFilter,
 } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
@@ -44,6 +47,7 @@ type DashboardPageProps = {
   isJiraLoading: boolean;
   onRefreshJira: () => void;
   onGitHubSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
+  onUpdateSettings: (settings: DashboardSettings) => Promise<void>;
 };
 
 const EMPTY_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
@@ -77,6 +81,7 @@ export function DashboardPage({
   isJiraLoading,
   onRefreshJira,
   onGitHubSummaryMetricsChange,
+  onUpdateSettings,
 }: DashboardPageProps) {
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
     useState<GitHubSummaryMetrics>({
@@ -87,6 +92,14 @@ export function DashboardPage({
     });
   const navigation = useDashboardNavigation({
     syncKey: gitHubMockScenarioKey,
+  });
+  const repoLauncher = useGitHubRepoLauncher({
+    username: settings.integrations.github.username,
+    token: settings.integrations.github.token,
+    ownerFilter: settings.integrations.github.ownerFilter,
+    hiddenRepositories: settings.integrations.github.hiddenRepositories,
+    connectionStatus: gitHubData.connectionStatus,
+    isLoadingSettings: false,
   });
   const todayFocus = useTodayFocusState({
     jiraIssues: jiraData.issues,
@@ -138,6 +151,26 @@ export function DashboardPage({
     />
   );
 
+  async function handleHideRepository(repository: GitHubHiddenRepository) {
+    const hiddenRepositories = settings.integrations.github.hiddenRepositories;
+    if (hiddenRepositories.some((entry) => entry.fullName === repository.fullName)) {
+      return;
+    }
+
+    await onUpdateSettings({
+      ...settings,
+      integrations: {
+        ...settings.integrations,
+        github: {
+          ...settings.integrations.github,
+          hiddenRepositories: [...hiddenRepositories, repository].sort((left, right) =>
+            left.fullName.localeCompare(right.fullName)
+          )
+        }
+      }
+    });
+  }
+
   return (
     <main className="min-h-screen py-6 text-stone-100 sm:py-7">
       <div className="dashboard-container flex flex-col gap-5">
@@ -145,6 +178,27 @@ export function DashboardPage({
           <DashboardHeader name={settings.name} />
           <DashboardHeaderControls
             activeIntegration={navigation.activeIntegration}
+            repoLauncherControl={
+              <GitHubRepoLauncher
+                isOpen={repoLauncher.isOpen}
+                isLoading={repoLauncher.isLoading}
+                ownerFilter={settings.integrations.github.ownerFilter}
+                query={repoLauncher.query}
+                results={repoLauncher.results}
+                selectedIndex={repoLauncher.selectedIndex}
+                totalRepositoryCount={repoLauncher.repositories.length}
+                totalVisibleRepositoryCount={repoLauncher.visibleRepositories.length}
+                onOpen={repoLauncher.openLauncher}
+                onClose={repoLauncher.closeLauncher}
+                onQueryChange={repoLauncher.updateQuery}
+                onSelectIndex={repoLauncher.setSelectedIndex}
+                onSelectNext={repoLauncher.selectNextResult}
+                onSelectPrevious={repoLauncher.selectPreviousResult}
+                onOpenSelected={repoLauncher.openSelectedRepository}
+                onOpenResult={repoLauncher.openRepositoryAtIndex}
+                onHideRepository={(repository) => void handleHideRepository(repository)}
+              />
+            }
             gitHubSummaryMetrics={gitHubSummaryMetrics}
             jiraBlockingCount={jiraCounts.blocking}
             gitHubConnectionStatus={gitHubData.connectionStatus}

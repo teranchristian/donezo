@@ -114,6 +114,7 @@ export default function App() {
         isJiraLoading={jiraDashboard.isJiraLoading}
         onRefreshJira={() => void jiraDashboard.refresh()}
         onGitHubSummaryMetricsChange={setGitHubSummaryMetrics}
+        onUpdateSettings={handleSaveSettings}
       />
     ) : (
       shouldShowDelayedDashboardLoader ? (

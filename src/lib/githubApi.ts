@@ -64,10 +64,26 @@ export type GitHubDashboardData = {
   lastUpdatedAt: number | null;
 };
 
+export type GitHubRepository = {
+  id: number;
+  name: string;
+  fullName: string;
+  owner: string;
+  url: string;
+  isPrivate: boolean;
+  updatedAt: string;
+};
+
 type CachedGitHubDashboardData = {
   cacheToken: string;
   fetchedAt: number;
   data: GitHubDashboardData;
+};
+
+type CachedGitHubRepoIndex = {
+  cacheToken: string;
+  fetchedAt: number;
+  data: GitHubRepository[];
 };
 
 type GitHubDashboardResponse = {
@@ -108,7 +124,14 @@ type GitHubPullRequestStatesResponse = {
   error?: string;
 };
 
+type GitHubRepoIndexResponse = {
+  success: boolean;
+  repos?: GitHubRepository[];
+  error?: string;
+};
+
 const CACHE_KEY = 'github-dashboard-cache';
+const REPO_INDEX_CACHE_KEY = 'github-repo-index-cache';
 
 export function getEmptyGitHubDashboardData(
   connectionStatus: GitHubConnectionStatus = 'not-connected'
@@ -190,6 +213,24 @@ export async function getLatestGitHubDashboardData(options: {
   return getCachedGitHubDashboardData(createCacheToken(username, token, ownerFilter), { ignoreExpiration: true });
 }
 
+export async function getLatestGitHubRepoIndex(options: {
+  username: string;
+  token: string;
+  ownerFilter?: string;
+}) {
+  const username = options.username.trim();
+  const token = options.token.trim();
+  const ownerFilter = options.ownerFilter?.trim() ?? '';
+
+  if (!token) {
+    return [];
+  }
+
+  return (await getCachedGitHubRepoIndex(createCacheToken(username, token, ownerFilter), {
+    ignoreExpiration: true
+  })) ?? [];
+}
+
 export async function loadGitHubDashboardData(options: {
   username: string;
   token: string;
@@ -235,6 +276,41 @@ export async function loadGitHubDashboardData(options: {
       ...getEmptyGitHubDashboardData('error'),
       errorMessage: error instanceof Error ? error.message : 'Unknown GitHub message bridge failure'
     };
+  }
+}
+
+export async function loadGitHubRepoIndex(options: {
+  username: string;
+  token: string;
+  ownerFilter?: string;
+  forceRefresh?: boolean;
+}): Promise<GitHubRepository[]> {
+  const username = options.username.trim();
+  const token = options.token.trim();
+  const ownerFilter = options.ownerFilter?.trim() ?? '';
+
+  if (!token) {
+    return [];
+  }
+
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return [];
+  }
+
+  try {
+    const response = await sendMessage<GitHubRepoIndexResponse>({
+      type: 'FETCH_GITHUB_REPO_INDEX',
+      payload: {
+        username,
+        token,
+        ownerFilter,
+        forceRefresh: Boolean(options.forceRefresh)
+      }
+    });
+
+    return Array.isArray(response?.repos) ? response.repos : [];
+  } catch {
+    return [];
   }
 }
 
@@ -364,6 +440,23 @@ async function getCachedGitHubDashboardData(
 
   const cacheTtlMs = 5 * 60 * 1000;
   const isExpired = Date.now() - cached.fetchedAt > cacheTtlMs;
+  if (cached.cacheToken !== cacheToken || (!options.ignoreExpiration && isExpired)) {
+    return null;
+  }
+
+  return cached.data;
+}
+
+async function getCachedGitHubRepoIndex(
+  cacheToken: string,
+  options: { ignoreExpiration?: boolean } = {}
+) {
+  const cached = await getStoredJsonValue<CachedGitHubRepoIndex>(REPO_INDEX_CACHE_KEY);
+  if (!cached) {
+    return null;
+  }
+
+  const isExpired = Date.now() - cached.fetchedAt > 30 * 60 * 1000;
   if (cached.cacheToken !== cacheToken || (!options.ignoreExpiration && isExpired)) {
     return null;
   }
