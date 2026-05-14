@@ -492,14 +492,16 @@ input {
 }
 
 .repo-launcher-hide {
+  position: relative;
   border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-secondary);
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   transition:
     background 0.16s ease,
     color 0.16s ease;
@@ -508,6 +510,11 @@ input {
 .repo-launcher-hide:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
+}
+
+.repo-launcher-hide__icon {
+  width: 18px;
+  height: 18px;
 }
 
 ::selection {
