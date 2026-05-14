@@ -232,10 +232,10 @@ export function GitHubCard({
           ?.highlighted,
       ),
   ).length;
-  const highlightedCommentCount = myOpenPRs.filter((pullRequest) => {
+  const highlightedCommentCount = myOpenPRs.reduce((count, pullRequest) => {
     const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-    return (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0) > 0;
-  }).length;
+    return count + (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0);
+  }, 0);
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
     const warningEntry =
       gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
@@ -723,10 +723,10 @@ export function GitHubCard({
                   : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
             ) : activeView === 'prs' ? (
-              <PullRequestList
-                pullRequests={filteredItems
-                  .filter(
-                    (
+                <PullRequestList
+                  pullRequests={filteredItems
+                    .filter(
+                      (
                       item,
                     ): item is Extract<
                       GitHubViewItem,
@@ -734,15 +734,15 @@ export function GitHubCard({
                     > => item.kind === 'pull-request',
                   )
                   .map((item) => item.value)}
-                todayFocusItemIds={todayFocusItemIds}
-                gitHubPrReadyState={gitHubPrReadyState}
-                gitHubPrWarningState={gitHubPrWarningState}
-                pullRequestNewNotificationCountByKey={
-                  pullRequestNewNotificationCountByKey
-                }
-                onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
-                onClearWarningHighlight={handleClearWarningHighlight}
-              />
+                  todayFocusItemIds={todayFocusItemIds}
+                  gitHubPrReadyState={gitHubPrReadyState}
+                  gitHubPrWarningState={gitHubPrWarningState}
+                  pullRequestNewCommentCountByKey={
+                    pullRequestNewCommentCountByKey
+                  }
+                  onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
+                  onClearWarningHighlight={handleClearWarningHighlight}
+                />
             ) : (
               <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
                 {filteredItems.map((item) =>
@@ -759,7 +759,7 @@ export function GitHubCard({
                       key={item.key}
                       pullRequest={item.value}
                       newNotificationCount={
-                        pullRequestNewNotificationCountByKey[
+                        pullRequestNewCommentCountByKey[
                           getGitHubPullRequestAttentionStateKey(item.value)
                         ] ?? 0
                       }
@@ -1135,7 +1135,7 @@ function PullRequestList({
   todayFocusItemIds,
   gitHubPrReadyState,
   gitHubPrWarningState,
-  pullRequestNewNotificationCountByKey,
+  pullRequestNewCommentCountByKey,
   onMarkNotificationsSeen,
   onClearWarningHighlight,
 }: {
@@ -1143,7 +1143,7 @@ function PullRequestList({
   todayFocusItemIds: Set<string>;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
-  pullRequestNewNotificationCountByKey: Record<string, number>;
+  pullRequestNewCommentCountByKey: Record<string, number>;
   onMarkNotificationsSeen: (pullRequest: GitHubPullRequestItem) => void;
   onClearWarningHighlight: (pullRequest: GitHubPullRequestItem) => void;
 }) {
@@ -1162,7 +1162,7 @@ function PullRequestList({
             key={pullRequest.url}
             pullRequest={pullRequest}
             newNotificationCount={
-              pullRequestNewNotificationCountByKey[
+              pullRequestNewCommentCountByKey[
                 getGitHubPullRequestAttentionStateKey(pullRequest)
               ] ?? 0
             }
@@ -1192,7 +1192,7 @@ function PullRequestList({
           key={pullRequest.url}
           pullRequest={pullRequest}
           newNotificationCount={
-            pullRequestNewNotificationCountByKey[
+            pullRequestNewCommentCountByKey[
               getGitHubPullRequestAttentionStateKey(pullRequest)
             ] ?? 0
           }
@@ -1217,7 +1217,7 @@ function PullRequestList({
               key={pullRequest.url}
               pullRequest={pullRequest}
               newNotificationCount={
-                pullRequestNewNotificationCountByKey[
+                pullRequestNewCommentCountByKey[
                   getGitHubPullRequestAttentionStateKey(pullRequest)
                 ] ?? 0
               }
