@@ -164,7 +164,6 @@ export function DashboardPage({
               navigation.navigateToGitHubPrs('ready-to-merge')
             }
             onOpenJira={() => navigation.navigateToJiraView('blocking')}
-            onSetActiveIntegration={navigation.handleIntegrationChange}
             onApplyGitHubMockScenario={onApplyGitHubMockScenario}
             onClearGitHubMockScenario={onClearGitHubMockScenario}
           />

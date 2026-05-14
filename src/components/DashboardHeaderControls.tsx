@@ -26,7 +26,6 @@ type DashboardHeaderControlsProps = {
   onOpenWarnings: () => void;
   onOpenReadyToMerge: () => void;
   onOpenJira: () => void;
-  onSetActiveIntegration: (integration: ActiveIntegration) => void;
   onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onClearGitHubMockScenario: () => void;
 };
@@ -50,7 +49,6 @@ export function DashboardHeaderControls({
   onOpenWarnings,
   onOpenReadyToMerge,
   onOpenJira,
-  onSetActiveIntegration,
   onApplyGitHubMockScenario,
   onClearGitHubMockScenario,
 }: DashboardHeaderControlsProps) {
@@ -92,10 +90,6 @@ export function DashboardHeaderControls({
         mockScenarioOptions={gitHubMockScenarioOptions}
         onApplyMockScenario={onApplyGitHubMockScenario}
         onClearMockScenario={onClearGitHubMockScenario}
-      />
-      <DashboardIntegrationSwitcher
-        activeIntegration={activeIntegration}
-        onSetActiveIntegration={onSetActiveIntegration}
       />
     </div>
   );
