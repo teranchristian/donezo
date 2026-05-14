@@ -1,19 +1,43 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { GitHubConnectionStatus } from '../lib/githubApi';
+import type { JiraConnectionStatus } from '../lib/jiraApi';
+import { formatDashboardTime } from '../lib/dashboardPageDomain';
+import type { ActiveIntegration } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 
 type HeaderMenuProps = {
+  activeIntegration: ActiveIntegration;
+  gitHubConnectionStatus: GitHubConnectionStatus;
+  jiraConnectionStatus: JiraConnectionStatus;
+  isGitHubLoading?: boolean;
+  isJiraLoading?: boolean;
+  isCheckingGitHubActivity?: boolean;
+  lastGitHubUpdatedAt?: number | null;
+  lastJiraUpdatedAt?: number | null;
   isMockMode?: boolean;
   mockScenarioKey?: string | null;
   mockScenarioOptions?: GitHubMockScenarioOption[];
+  onRefreshGitHub?: () => void;
+  onRefreshJira?: () => void;
   onApplyMockScenario?: (mockScenarioKey: string) => void;
   onClearMockScenario?: () => void;
 };
 
 export function HeaderMenu({
+  activeIntegration,
+  gitHubConnectionStatus,
+  jiraConnectionStatus,
+  isGitHubLoading = false,
+  isJiraLoading = false,
+  isCheckingGitHubActivity = false,
+  lastGitHubUpdatedAt = null,
+  lastJiraUpdatedAt = null,
   isMockMode = false,
   mockScenarioKey = null,
   mockScenarioOptions = [],
+  onRefreshGitHub,
+  onRefreshJira,
   onApplyMockScenario,
   onClearMockScenario
 }: HeaderMenuProps) {
@@ -47,6 +71,37 @@ export function HeaderMenu({
     };
   }, []);
 
+  const isRefreshDisabled =
+    activeIntegration === 'github'
+      ? isGitHubLoading || gitHubConnectionStatus !== 'connected'
+      : isJiraLoading || jiraConnectionStatus !== 'connected';
+  const refreshLabel =
+    activeIntegration === 'github' && isGitHubLoading
+      ? 'Refreshing...'
+      : activeIntegration === 'jira' && isJiraLoading
+        ? 'Refreshing...'
+        : 'Refresh';
+  const statusText =
+    activeIntegration === 'github'
+      ? gitHubConnectionStatus === 'connected'
+        ? `Updated ${formatDashboardTime(lastGitHubUpdatedAt)}`
+        : gitHubConnectionStatus === 'invalid'
+          ? 'Invalid token'
+          : gitHubConnectionStatus === 'testing'
+            ? 'Testing'
+            : gitHubConnectionStatus === 'error'
+              ? 'Connection error'
+              : 'Not connected'
+      : jiraConnectionStatus === 'connected'
+        ? `Updated ${formatDashboardTime(lastJiraUpdatedAt)}`
+        : jiraConnectionStatus === 'invalid'
+          ? 'Invalid credentials'
+          : jiraConnectionStatus === 'testing'
+            ? 'Testing'
+            : jiraConnectionStatus === 'error'
+              ? 'API error'
+              : 'Not connected';
+
   return (
     <div className="relative" ref={menuRef}>
       <button
@@ -65,9 +120,41 @@ export function HeaderMenu({
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-14 z-20 min-w-[180px] rounded-2xl bg-panel p-2 shadow-glow">
+        <div className="header-menu-panel absolute right-0 top-14 z-20 min-w-[280px] rounded-[26px] bg-panel p-4 shadow-glow">
+          <div className="header-menu-refresh">
+            <div className="header-menu-refresh__meta">
+              <p className="header-menu-refresh__label">Last updated</p>
+              <p className="header-menu-refresh__value">{statusText.replace('Updated ', '')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (activeIntegration === 'github') {
+                  onRefreshGitHub?.();
+                } else {
+                  onRefreshJira?.();
+                }
+                setIsOpen(false);
+              }}
+              disabled={isRefreshDisabled}
+              className="header-menu-refresh__button"
+            >
+              <span className="header-menu-refresh__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                  <path d="M20 6v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M20 11a8 8 0 1 1-2.34-5.66L20 7.66"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span>{refreshLabel}</span>
+            </button>
+          </div>
+          <div className="header-menu-divider" />
           {isMockMode ? (
-            <div className="mb-1 rounded-xl bg-white/[0.03] px-4 py-3">
+            <div className="mb-3 rounded-xl bg-white/[0.03] px-4 py-3">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.66rem] font-medium uppercase tracking-[0.14em] text-white/38">
@@ -127,9 +214,26 @@ export function HeaderMenu({
           <Link
             to="/settings"
             onClick={() => setIsOpen(false)}
-            className="block rounded-xl px-4 py-3 text-sm text-primary transition hover:bg-white/5"
+            className="header-menu-settings"
           >
-            Settings
+            <span className="header-menu-settings__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path
+                  d="M12 8.75A3.25 3.25 0 1 1 8.75 12 3.25 3.25 0 0 1 12 8.75Z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M19 12a7 7 0 0 0-.08-1l2.02-1.57-1.92-3.32-2.4.83a7.02 7.02 0 0 0-1.74-1l-.37-2.5h-3.84l-.37 2.5a7.02 7.02 0 0 0-1.74 1l-2.4-.83-1.92 3.32L5.08 11a7 7 0 0 0 0 2l-2.02 1.57 1.92 3.32 2.4-.83a7.02 7.02 0 0 0 1.74 1l.37 2.5h3.84l.37-2.5a7.02 7.02 0 0 0 1.74-1l2.4.83 1.92-3.32L18.92 13c.05-.33.08-.66.08-1Z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span className="header-menu-settings__body">
+              <span className="header-menu-settings__title">Settings</span>
+              <span className="header-menu-settings__detail">Preferences and account</span>
+            </span>
           </Link>
         </div>
       ) : null}

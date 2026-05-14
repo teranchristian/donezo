@@ -4,7 +4,6 @@ import type { GitHubConnectionStatus } from '../lib/githubApi';
 import type { JiraConnectionStatus } from '../lib/jiraApi';
 import type { ActiveIntegration } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
-import { formatDashboardTime } from '../lib/dashboardPageDomain';
 import { HeaderMenu } from './HeaderMenu';
 
 type DashboardHeaderControlsProps = {
@@ -56,22 +55,6 @@ export function DashboardHeaderControls({
 }: DashboardHeaderControlsProps) {
   return (
     <div className="dashboard-header-status gap-3">
-      {activeIntegration === 'github' ? (
-        <GitHubIntegrationStatusBar
-          connectionStatus={gitHubConnectionStatus}
-          isLoading={isGitHubLoading}
-          isCheckingActivity={isCheckingGitHubActivity}
-          lastUpdatedAt={lastGitHubUpdatedAt}
-          onRefresh={onRefreshGitHub}
-        />
-      ) : (
-        <JiraIntegrationStatusBar
-          connectionStatus={jiraConnectionStatus}
-          isLoading={isJiraLoading}
-          lastUpdatedAt={lastJiraUpdatedAt}
-          onRefresh={onRefreshJira}
-        />
-      )}
       <GitHubHeaderShortcuts
         connectionStatus={gitHubSummaryMetrics.connectionStatus}
         warningCount={gitHubSummaryMetrics.highlightedWarningCount}
@@ -86,9 +69,19 @@ export function DashboardHeaderControls({
       />
       {repoLauncherControl}
       <HeaderMenu
+        activeIntegration={activeIntegration}
+        gitHubConnectionStatus={gitHubConnectionStatus}
+        jiraConnectionStatus={jiraConnectionStatus}
+        isGitHubLoading={isGitHubLoading}
+        isJiraLoading={isJiraLoading}
+        isCheckingGitHubActivity={isCheckingGitHubActivity}
+        lastGitHubUpdatedAt={lastGitHubUpdatedAt}
+        lastJiraUpdatedAt={lastJiraUpdatedAt}
         isMockMode={isGitHubMockMode}
         mockScenarioKey={gitHubMockScenarioKey}
         mockScenarioOptions={gitHubMockScenarioOptions}
+        onRefreshGitHub={onRefreshGitHub}
+        onRefreshJira={onRefreshJira}
         onApplyMockScenario={onApplyGitHubMockScenario}
         onClearMockScenario={onClearGitHubMockScenario}
       />
@@ -139,131 +132,6 @@ function IntegrationTabButton({
       }`}
     >
       {label}
-    </button>
-  );
-}
-
-function GitHubIntegrationStatusBar({
-  connectionStatus,
-  isLoading,
-  isCheckingActivity,
-  lastUpdatedAt,
-  onRefresh,
-}: {
-  connectionStatus: GitHubConnectionStatus;
-  isLoading: boolean;
-  isCheckingActivity: boolean;
-  lastUpdatedAt: number | null;
-  onRefresh: () => void;
-}) {
-  const buttonLabel =
-    connectionStatus === 'connected'
-      ? isLoading
-        ? 'Refreshing...'
-        : 'Refresh'
-      : connectionStatus === 'invalid'
-        ? 'Invalid token'
-        : connectionStatus === 'testing'
-          ? 'Testing'
-          : connectionStatus === 'error'
-            ? 'Connection error'
-            : 'Not connected';
-  const statusText =
-    connectionStatus === 'connected'
-      ? `Updated ${formatDashboardTime(lastUpdatedAt)}`
-      : connectionStatus === 'invalid'
-        ? 'Invalid token'
-        : connectionStatus === 'testing'
-          ? 'Testing'
-          : connectionStatus === 'error'
-            ? 'Connection error'
-            : 'Not connected';
-
-  return (
-    <div className="ml-auto flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end">
-        <TopBarButton
-          onClick={onRefresh}
-          disabled={isLoading || connectionStatus !== 'connected'}
-        >
-          {buttonLabel}
-        </TopBarButton>
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-y-1 text-[0.68rem] text-white/32">
-        <span>{statusText}</span>
-      </div>
-    </div>
-  );
-}
-
-function JiraIntegrationStatusBar({
-  connectionStatus,
-  isLoading,
-  lastUpdatedAt,
-  onRefresh,
-}: {
-  connectionStatus: JiraConnectionStatus;
-  isLoading: boolean;
-  lastUpdatedAt: number | null;
-  onRefresh: () => void;
-}) {
-  const buttonLabel =
-    connectionStatus === 'connected'
-      ? isLoading
-        ? 'Refreshing...'
-        : 'Refresh'
-      : connectionStatus === 'invalid'
-        ? 'Invalid credentials'
-        : connectionStatus === 'testing'
-          ? 'Testing'
-          : connectionStatus === 'error'
-            ? 'API error'
-            : 'Not connected';
-  const statusText =
-    connectionStatus === 'connected'
-      ? `Updated ${formatDashboardTime(lastUpdatedAt)}`
-      : connectionStatus === 'invalid'
-        ? 'Invalid credentials'
-        : connectionStatus === 'testing'
-          ? 'Testing'
-          : connectionStatus === 'error'
-            ? 'API error'
-            : 'Not connected';
-
-  return (
-    <div className="ml-auto flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end">
-        <TopBarButton
-          onClick={onRefresh}
-          disabled={isLoading || connectionStatus !== 'connected'}
-        >
-          {buttonLabel}
-        </TopBarButton>
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-y-1 text-[0.68rem] text-white/32">
-        <span>{statusText}</span>
-      </div>
-    </div>
-  );
-}
-
-function TopBarButton({
-  children,
-  disabled,
-  onClick,
-}: {
-  children: ReactNode;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center rounded-full bg-white/[0.045] px-2.5 py-0.5 text-[0.62rem] uppercase tracking-[0.16em] text-white/48 transition hover:bg-white/[0.08] hover:text-white/72 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {children}
     </button>
   );
 }
