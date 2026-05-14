@@ -7,12 +7,30 @@ import {
   getGitHubPullRequestStates,
   type GitHubPullRequestState,
 } from '../lib/githubApi';
-import { type FocusItem } from '../lib/storage';
+import {
+  calculateGitHubSummaryCounts,
+  filterGitHubItems,
+  filterGitHubPullRequests,
+  getGitHubViewContent,
+  getNoFilterResultsMessage,
+  getNotificationIconKind,
+  getNotificationTypeLabel,
+  getNotificationUrl,
+  getPullRequestIdentityFromNotification,
+  getPullRequestNewCommentCountByKey,
+  getPullRequestNewNotificationCountByKey,
+  getRepositoryLabel,
+  mapNotificationViewItem,
+  mapPullRequestToFocusItem,
+  sortGitHubItems,
+  shouldDisplayNotification,
+  type GitHubViewItem,
+} from '../lib/githubCardDomain';
 import { formatRelativeTime } from '../lib/date';
 import {
   buildGitHubPrReadyState,
   buildGitHubPrWarningState,
-  extractJiraKey,
+  getGitHubPullRequestAttentionStateKey,
   getGitHubPullRequestWarningStateKey,
   getPullRequestDisplayStatus,
   isGitHubPrReadyHighlighted,
@@ -74,39 +92,6 @@ export type GitHubSummaryMetrics = {
   reviewRequestedCount: number;
   approvedPrCount: number | null;
   relevantPrCount: number;
-};
-
-const STATUS_COPY: Record<
-  GitHubConnectionStatus,
-  { label: string; tone: string; message: string }
-> = {
-  'not-connected': {
-    label: 'Not connected',
-    tone: 'bg-white/6 text-stone-300',
-    message:
-      'Add a personal access token in Settings to enable GitHub integration.',
-  },
-  testing: {
-    label: 'Testing',
-    tone: 'bg-amber-200/10 text-amber-100',
-    message: 'Checking the saved GitHub credentials.',
-  },
-  connected: {
-    label: 'Connected',
-    tone: 'bg-emerald-200/10 text-emerald-100',
-    message: 'GitHub activity is live on the dashboard.',
-  },
-  invalid: {
-    label: 'Invalid token',
-    tone: 'bg-rose-200/10 text-rose-100',
-    message:
-      'GitHub returned 401 for the saved token. Update the token and test again.',
-  },
-  error: {
-    label: 'Connection error',
-    tone: 'bg-amber-200/10 text-amber-100',
-    message: 'GitHub data could not be loaded right now.',
-  },
 };
 
 export function GitHubCard({
@@ -178,21 +163,7 @@ export function GitHubCard({
         )
       : {};
   const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
-  const notificationItems = notifications.map((notification) => ({
-    kind: 'notification' as const,
-    key: notification.id,
-    owner: getOwnerFromRepositoryName(notification.repository.full_name),
-    repositoryName: notification.repository.full_name,
-    title: notification.subject.title,
-    updatedAt: notification.updated_at,
-    value: notification,
-  }));
-  const myOpenPrItems = myOpenPRs.map((pullRequest) =>
-    mapPullRequestViewItem(pullRequest),
-  );
-  const reviewRequestedItems = reviewRequestedPRs.map((pullRequest) =>
-    mapPullRequestViewItem(pullRequest),
-  );
+  const notificationItems = notifications.map(mapNotificationViewItem);
   const ownerFilteredMyOpenPRs = filterGitHubPullRequests(
     myOpenPRs,
     organizationFilter,
@@ -213,52 +184,23 @@ export function GitHubCard({
   ).length;
   const filteredMyOpenPrCount = filteredMyOpenPRs.length;
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
-  const summaryMyOpenPrCount = ownerFilteredMyOpenPRs.length;
-  const summaryReviewRequestedCount = ownerFilteredReviewRequestedPRs.length;
-  const highlightedReadyCount = resolvedPullRequests.filter((pullRequest) =>
-    isGitHubPrReadyHighlighted(gitHubPrReadyState, pullRequest),
-  ).length;
-  const readyToMergeCount = resolvedPullRequests.filter((pullRequest) =>
-    isPullRequestReadyToMerge(pullRequest),
-  ).length;
-  const failedBuildCount = resolvedPullRequests.filter(
-    (pullRequest) => pullRequest.ciStatus === 'failing',
-  ).length;
-  const failedBuildBadgeCount = resolvedPullRequests.filter(
-    (pullRequest) =>
-      pullRequest.ciStatus === 'failing' &&
-      Boolean(
-        gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)]
-          ?.highlighted,
-      ),
-  ).length;
-  const highlightedCommentCount = myOpenPRs.reduce((count, pullRequest) => {
-    const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-    return count + (pullRequestNewCommentCountByKey[pullRequestKey] ?? 0);
-  }, 0);
-  const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
-    const warningEntry =
-      gitHubPrWarningState[getGitHubPullRequestWarningStateKey(pullRequest)];
-    if (!warningEntry?.highlighted) {
-      return false;
-    }
-
-    return warningEntry.activeCaseKeys.some(
-      (caseKey) => caseKey !== 'failed-checks',
-    );
-  }).length;
-  const summaryApprovedPrCount = ownerFilteredMyOpenPRs.filter(
-    (pullRequest) =>
-      pullRequest.reviewStatus === 'approved' &&
-      !isPullRequestOutOfDate(pullRequest),
-  ).length;
-  const currentView = getGitHubViewContent(
-    activeView,
+  const summaryCounts = calculateGitHubSummaryCounts({
+    resolvedPullRequests,
+    myOpenPullRequests: myOpenPRs,
+    ownerFilteredMyOpenPullRequests: ownerFilteredMyOpenPRs,
+    ownerFilteredReviewRequestedPullRequests: ownerFilteredReviewRequestedPRs,
+    notifications: hasLoadedGitHubPrNotificationSeenAtState ? notifications : [],
+    notificationSeenAtState: gitHubPrNotificationSeenAtState,
+    readyState: gitHubPrReadyState,
+    warningState: gitHubPrWarningState,
+  });
+  const currentView = getGitHubViewContent({
+    activeGitHubView: activeView,
     data,
     notifications,
-    filteredMyOpenPRs,
-    reviewRequestedPRs,
-  );
+    myOpenPullRequests: filteredMyOpenPRs,
+    reviewRequestedPullRequests: reviewRequestedPRs,
+  });
   const filteredItems = sortGitHubItems(
     filterGitHubItems(currentView.items, organizationFilter),
     sortOrder,
@@ -285,7 +227,7 @@ export function GitHubCard({
       isActive: activeView === 'prs',
       title: isLoading
         ? undefined
-        : `${filteredMyOpenPrCount} of ${myOpenPrItems.length} PRs`,
+        : `${filteredMyOpenPrCount} of ${myOpenPRs.length} PRs`,
       onClick: () => onViewChange('prs'),
     },
     {
@@ -495,28 +437,28 @@ export function GitHubCard({
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
-      readyToMergeCount,
-      failedBuildCount,
-      failedBuildBadgeCount,
-      highlightedCommentCount,
-      highlightedReadyCount,
-      highlightedWarningCount,
-      reviewRequestedCount: summaryReviewRequestedCount,
-      approvedPrCount: summaryApprovedPrCount,
-      relevantPrCount: summaryMyOpenPrCount + summaryReviewRequestedCount,
+      readyToMergeCount: summaryCounts.readyToMergeCount,
+      failedBuildCount: summaryCounts.failedBuildCount,
+      failedBuildBadgeCount: summaryCounts.failedBuildBadgeCount,
+      highlightedCommentCount: summaryCounts.highlightedCommentCount,
+      highlightedReadyCount: summaryCounts.highlightedReadyCount,
+      highlightedWarningCount: summaryCounts.highlightedWarningCount,
+      reviewRequestedCount: summaryCounts.reviewRequestedCount,
+      approvedPrCount: summaryCounts.approvedPrCount,
+      relevantPrCount: summaryCounts.relevantPrCount,
     });
   }, [
     data.connectionStatus,
     data.missingUsername,
-    readyToMergeCount,
-    failedBuildCount,
-    failedBuildBadgeCount,
-    highlightedCommentCount,
-    highlightedReadyCount,
-    highlightedWarningCount,
-    summaryApprovedPrCount,
-    summaryMyOpenPrCount,
-    summaryReviewRequestedCount,
+    summaryCounts.readyToMergeCount,
+    summaryCounts.failedBuildCount,
+    summaryCounts.failedBuildBadgeCount,
+    summaryCounts.highlightedCommentCount,
+    summaryCounts.highlightedReadyCount,
+    summaryCounts.highlightedWarningCount,
+    summaryCounts.reviewRequestedCount,
+    summaryCounts.approvedPrCount,
+    summaryCounts.relevantPrCount,
     onSummaryMetricsChange,
   ]);
 
@@ -805,26 +747,6 @@ export function GitHubCard({
   );
 }
 
-type GitHubViewItem =
-  | {
-      kind: 'notification';
-      key: string;
-      owner: string;
-      repositoryName: string;
-      title: string;
-      updatedAt: string;
-      value: GitHubNotification;
-    }
-  | {
-      kind: 'pull-request';
-      key: string;
-      owner: string;
-      repositoryName: string;
-      title: string;
-      updatedAt: string;
-      value: GitHubPullRequestItem;
-    };
-
 function PullRequestRow({
   pullRequest,
   newNotificationCount,
@@ -1011,54 +933,6 @@ function PullRequestCommentBadge({
       )}
     </span>
   );
-}
-
-function mapPullRequestToFocusItem(
-  pullRequest: GitHubPullRequestItem,
-): FocusItem {
-  return {
-    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
-    source: 'github',
-    sourceLabel: 'GitHub',
-    reference: `#${pullRequest.pullNumber}`,
-    url: pullRequest.url,
-    title: pullRequest.title,
-    statusLabel: getFocusStatusLabel(pullRequest.reviewStatus),
-    statusTone: getFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKey(pullRequest.title),
-  };
-}
-
-function getFocusStatusLabel(
-  reviewStatus: GitHubPullRequestItem['reviewStatus'],
-) {
-  if (reviewStatus === 'approved') {
-    return 'Approved';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'Changes Requested';
-  }
-
-  if (reviewStatus === 'draft') {
-    return 'Draft';
-  }
-
-  return 'Open';
-}
-
-function getFocusStatusTone(
-  reviewStatus: GitHubPullRequestItem['reviewStatus'],
-): FocusItem['statusTone'] {
-  if (reviewStatus === 'approved') {
-    return 'emerald';
-  }
-
-  if (reviewStatus === 'changes-requested') {
-    return 'amber';
-  }
-
-  return 'violet';
 }
 
 function PullRequestCheckStatusIcon({
@@ -1459,293 +1333,12 @@ function ListItemSkeleton() {
   );
 }
 
-function getGitHubViewContent(
-  activeGitHubView: ActiveGitHubView,
-  data: GitHubDashboardData,
-  notifications: GitHubNotification[],
-  myOpenPRs: GitHubPullRequestItem[],
-  reviewRequestedPRs: GitHubPullRequestItem[],
-) {
-  if (activeGitHubView === 'notifications') {
-    return {
-      count: notifications.length,
-      countLabel: `${notifications.length} notifications`,
-      itemLabel: 'notifications',
-      emptyMessage:
-        data.connectionStatus === 'connected'
-          ? 'No notifications right now.'
-          : getEmptyListMessage(data),
-      items: notifications.map((notification) => ({
-        kind: 'notification' as const,
-        key: notification.id,
-        owner: getOwnerFromRepositoryName(notification.repository.full_name),
-        repositoryName: notification.repository.full_name,
-        title: notification.subject.title,
-        updatedAt: notification.updated_at,
-        value: notification,
-      })),
-    };
-  }
-
-  if (activeGitHubView === 'review') {
-    return {
-      count: data.reviewRequestedCount,
-      countLabel: `${data.reviewRequestedCount} review requests`,
-      itemLabel: 'PRs',
-      emptyMessage:
-        data.connectionStatus === 'connected'
-          ? 'No pull requests need your review.'
-          : getEmptyListMessage(data),
-      items: reviewRequestedPRs.map((pullRequest) =>
-        mapPullRequestViewItem(pullRequest),
-      ),
-    };
-  }
-
-  return {
-    count: data.openPrsCount,
-    countLabel: `${data.openPrsCount} open PRs`,
-    itemLabel: 'PRs',
-    emptyMessage: getEmptyListMessage(data),
-    items: myOpenPRs.map((pullRequest) => mapPullRequestViewItem(pullRequest)),
-  };
-}
-
-function mapPullRequestViewItem(
-  pullRequest: GitHubPullRequestItem,
-): GitHubViewItem {
-  return {
-    kind: 'pull-request',
-    key: pullRequest.url,
-    owner: getOwnerFromRepositoryName(pullRequest.repositoryName),
-    repositoryName: pullRequest.repositoryName,
-    title: pullRequest.title,
-    updatedAt: pullRequest.updatedAt,
-    value: pullRequest,
-  };
-}
-
-function getOwnerFromRepositoryName(repositoryName: string) {
-  return repositoryName.split('/')[0] ?? '';
-}
-
-function getRepositoryLabel(repositoryName: string) {
-  const segments = repositoryName.split('/');
-  return segments[segments.length - 1] ?? repositoryName;
-}
-
-function filterGitHubItems(
-  items: GitHubViewItem[],
-  organizationFilter: string,
-) {
-  if (organizationFilter === 'all') {
-    return items;
-  }
-
-  return items.filter((item) => item.owner === organizationFilter);
-}
-
-function filterGitHubPullRequests(
-  pullRequests: GitHubPullRequestItem[],
-  organizationFilter: string,
-  prStatusFilter: GitHubPrStatusFilter = 'all',
-) {
-  const organizationFilteredPullRequests =
-    organizationFilter === 'all'
-      ? pullRequests
-      : pullRequests.filter(
-          (pullRequest) => pullRequest.owner === organizationFilter,
-        );
-
-  if (prStatusFilter === 'approved') {
-    return organizationFilteredPullRequests.filter(
-      (pullRequest) => pullRequest.reviewStatus === 'approved',
-    );
-  }
-
-  if (prStatusFilter === 'ready-to-merge') {
-    return organizationFilteredPullRequests.filter((pullRequest) =>
-      isPullRequestReadyToMerge(pullRequest),
-    );
-  }
-
-  if (prStatusFilter === 'waiting-review') {
-    return organizationFilteredPullRequests.filter(
-      (pullRequest) =>
-        pullRequest.reviewStatus === 'waiting-review' ||
-        pullRequest.reviewStatus === 'changes-requested',
-    );
-  }
-
-  return organizationFilteredPullRequests;
-}
-
-function sortGitHubItems(items: GitHubViewItem[], sortOrder: GitHubListSort) {
-  const sortedItems = [...items];
-
-  sortedItems.sort((left, right) => {
-    if (sortOrder === 'oldest-updated') {
-      return (
-        new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
-      );
-    }
-
-    if (sortOrder === 'repository-asc') {
-      return left.repositoryName.localeCompare(right.repositoryName);
-    }
-
-    if (sortOrder === 'title-asc') {
-      return left.title.localeCompare(right.title);
-    }
-
-    return (
-      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
-    );
-  });
-
-  return sortedItems;
-}
-
-function getNoFilterResultsMessage(itemLabel: string) {
-  return `No ${itemLabel} match the current filters.`;
-}
-
 function formatCount(value: number, isLoading: boolean) {
   if (isLoading) {
     return '...';
   }
 
   return String(value);
-}
-
-function formatReason(reason: string) {
-  return reason.replace(/-/g, ' ');
-}
-
-function shouldDisplayNotification(notification: GitHubNotification) {
-  return notification.subject.type === 'PullRequest';
-}
-
-function getNotificationTypeLabel(notification: GitHubNotification) {
-  if (notification.reason === 'review_requested') {
-    return 'Review requested';
-  }
-
-  return formatReason(notification.reason);
-}
-
-function getPullRequestNewNotificationCountByKey(
-  notifications: GitHubNotification[],
-  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState,
-) {
-  return notifications.reduce<Record<string, number>>(
-    (counts, notification) => {
-      const identity = getPullRequestIdentityFromNotification(notification);
-      if (!identity) {
-        return counts;
-      }
-
-      const key = getPullRequestIdentityKey(identity);
-      const seenAt = gitHubPrNotificationSeenAtState[key];
-      const updatedAt = Date.parse(notification.updated_at);
-      const isNew =
-        typeof seenAt !== 'number' ||
-        (Number.isFinite(updatedAt) && updatedAt > seenAt);
-
-      if (isNew) {
-        counts[key] = (counts[key] ?? 0) + 1;
-      }
-
-      return counts;
-    },
-    {},
-  );
-}
-
-function getPullRequestNewCommentCountByKey(
-  notifications: GitHubNotification[],
-  gitHubPrNotificationSeenAtState: GitHubPrNotificationSeenAtState,
-) {
-  return getPullRequestNewNotificationCountByKey(
-    notifications.filter((notification) => notification.reason === 'comment'),
-    gitHubPrNotificationSeenAtState,
-  );
-}
-
-function getNotificationIconKind(
-  subjectType: string,
-): 'pull-request' | 'issue' | 'commit' | 'discussion' {
-  if (subjectType === 'Issue') {
-    return 'issue';
-  }
-
-  if (subjectType === 'Commit') {
-    return 'commit';
-  }
-
-  if (subjectType === 'Discussion') {
-    return 'discussion';
-  }
-
-  return 'pull-request';
-}
-
-function getPullRequestIdentityFromNotification(
-  notification: GitHubNotification,
-) {
-  if (!notification.subject.url) {
-    return null;
-  }
-
-  const apiPath = notification.subject.url.replace(
-    'https://api.github.com/repos/',
-    '',
-  );
-  const [owner, repo, resource, pullNumber] = apiPath.split('/');
-
-  if (resource !== 'pulls' || !owner || !repo || !pullNumber) {
-    return null;
-  }
-
-  return {
-    owner,
-    repo,
-    pullNumber: Number(pullNumber),
-  };
-}
-
-function getPullRequestIdentityKey(pullRequestIdentity: {
-  owner: string;
-  repo: string;
-  pullNumber: number;
-}) {
-  return `${pullRequestIdentity.owner}/${pullRequestIdentity.repo}#${pullRequestIdentity.pullNumber}`;
-}
-
-function getNotificationUrl(notification: GitHubNotification) {
-  if (notification.subject.url) {
-    const apiPath = notification.subject.url.replace(
-      'https://api.github.com/repos/',
-      '',
-    );
-    const [owner, repo, resource, id] = apiPath.split('/');
-
-    if (resource === 'pulls') {
-      return `https://github.com/${owner}/${repo}/pull/${id}`;
-    }
-
-    if (resource === 'issues') {
-      return `https://github.com/${owner}/${repo}/issues/${id}`;
-    }
-  }
-
-  return `https://github.com/${notification.repository.full_name}`;
-}
-
-function getGitHubPullRequestAttentionStateKey(
-  pullRequest: GitHubPullRequestItem,
-) {
-  return `${pullRequest.repositoryName}#${pullRequest.pullNumber}`;
 }
 
 function areGitHubPrReadyStatesEqual(
@@ -1808,24 +1401,4 @@ function areGitHubPrWarningStatesEqual(
   }
 
   return true;
-}
-
-function getEmptyListMessage(data: GitHubDashboardData) {
-  if (data.connectionStatus === 'not-connected') {
-    return 'Connect GitHub to load pull requests.';
-  }
-
-  if (data.connectionStatus === 'invalid') {
-    return 'Update the saved token in Settings, then refresh.';
-  }
-
-  if (data.missingUsername) {
-    return 'Add your GitHub username in Settings to load your pull requests.';
-  }
-
-  if (data.connectionStatus === 'error') {
-    return 'GitHub data is temporarily unavailable.';
-  }
-
-  return 'No open pull requests or review requests right now.';
 }
