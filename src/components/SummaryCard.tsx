@@ -15,6 +15,11 @@ type FocusInternalDragPayload = {
   itemSource: FocusItem['source'];
 };
 
+type TopLevelDropIndicator = {
+  targetId: string;
+  position: 'before' | 'after';
+};
+
 type SummaryCardProps = {
   items: FocusItem[];
   jiraBaseUrl?: string;
@@ -44,6 +49,7 @@ export function SummaryCard({
 }: SummaryCardProps) {
   const [isDropTargetActive, setIsDropTargetActive] = useState(false);
   const [activeInternalDrag, setActiveInternalDrag] = useState<FocusInternalDragPayload | null>(null);
+  const [activeTopLevelDropIndicator, setActiveTopLevelDropIndicator] = useState<TopLevelDropIndicator | null>(null);
   const visibleItems = items.slice(0, limit);
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -52,8 +58,8 @@ export function SummaryCard({
 
     const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
     if (internalDrag?.source === 'top-level') {
-      onMoveTopLevelItemToEnd(internalDrag.itemId);
       setActiveInternalDrag(null);
+      setActiveTopLevelDropIndicator(null);
       return;
     }
 
@@ -99,6 +105,59 @@ export function SummaryCard({
   function handleInternalDragEnd() {
     setActiveInternalDrag(null);
     setIsDropTargetActive(false);
+    setActiveTopLevelDropIndicator(null);
+  }
+
+  function handleTopLevelCardDragOver(
+    event: React.DragEvent<HTMLDivElement>,
+    targetId: string,
+  ) {
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
+    setActiveTopLevelDropIndicator((current) =>
+      current?.targetId === targetId && current.position === position
+        ? current
+        : { targetId, position },
+    );
+  }
+
+  function handleTopLevelCardDragLeave(event: React.DragEvent<HTMLDivElement>, targetId: string) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setActiveTopLevelDropIndicator((current) =>
+        current?.targetId === targetId ? null : current,
+      );
+    }
+  }
+
+  function handleTopLevelCardDrop(event: React.DragEvent<HTMLDivElement>, targetId: string) {
+    event.preventDefault();
+
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+      setActiveTopLevelDropIndicator(null);
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
+    applyTopLevelDrop({
+      dragItemId: dragPayload.itemId,
+      targetId,
+      position,
+      visibleItems,
+      onReorderTopLevelItem,
+      onMoveTopLevelItemToEnd
+    });
+    setActiveTopLevelDropIndicator(null);
+    setActiveInternalDrag(null);
   }
 
   return (
@@ -124,11 +183,29 @@ export function SummaryCard({
 
       <div className="mt-3.5 space-y-1.5">
         {visibleItems.map((item) => (
-          <div key={item.id} className="space-y-1.5">
-            <TopLevelReorderSlot
-              activeInternalDrag={activeInternalDrag}
-              targetId={item.id}
-              onReorder={onReorderTopLevelItem}
+          <div
+            key={item.id}
+            onDragOver={(event) => handleTopLevelCardDragOver(event, item.id)}
+            onDragLeave={(event) => handleTopLevelCardDragLeave(event, item.id)}
+            onDrop={(event) => handleTopLevelCardDrop(event, item.id)}
+            className={`relative transition-[padding] duration-150 ${
+              activeTopLevelDropIndicator?.targetId === item.id &&
+              activeTopLevelDropIndicator.position === 'before'
+                ? 'pt-3'
+                : ''
+            } ${
+              activeTopLevelDropIndicator?.targetId === item.id &&
+              activeTopLevelDropIndicator.position === 'after'
+                ? 'pb-3'
+                : ''
+            }`}
+          >
+            <TopLevelInsertionIndicator
+              isVisible={
+                activeTopLevelDropIndicator?.targetId === item.id &&
+                activeTopLevelDropIndicator.position === 'before'
+              }
+              position="top"
             />
             <FocusItemCard
               item={item}
@@ -140,6 +217,13 @@ export function SummaryCard({
               onNestNewPullRequest={onNestNewPullRequest}
               onNestExistingPullRequest={onNestExistingPullRequest}
               onReorderNestedPullRequest={onReorderNestedPullRequest}
+            />
+            <TopLevelInsertionIndicator
+              isVisible={
+                activeTopLevelDropIndicator?.targetId === item.id &&
+                activeTopLevelDropIndicator.position === 'after'
+              }
+              position="bottom"
             />
           </div>
         ))}
@@ -179,7 +263,7 @@ export function SummaryCard({
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 text-[0.82rem] text-white/40">
-          <span>Focus on up to {limit} items</span>
+          <span>Focus on up to {limit} items. Drag cards to reorder.</span>
           <span className="text-[var(--text-tertiary)]" aria-hidden="true">
             <InfoIcon />
           </span>
@@ -287,6 +371,7 @@ function FocusJiraCard({
       JSON.stringify(payload)
     );
     event.dataTransfer.setData('text/plain', item.reference);
+    setCustomDragImage(event.dataTransfer, event.currentTarget);
   }
 
   function handleNestDragOver(event: React.DragEvent<HTMLDivElement>) {
@@ -351,7 +436,8 @@ function FocusJiraCard({
       onDragEnter={handleNestDragEnter}
       onDragLeave={handleNestDragLeave}
       onBlur={handleNestBlur}
-      className={`rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 ${
+      title="Drag to reorder"
+      className={`cursor-grab rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 active:cursor-grabbing ${
         isNestTargetActive
           ? 'border-dashed border-violet-400/45 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(167,139,250,0.16),0_14px_30px_rgba(76,29,149,0.22)]'
           : 'border-white/[0.05] bg-[var(--card-bg-soft)] hover:border-white/10'
@@ -376,6 +462,9 @@ function FocusJiraCard({
             <div className="flex min-w-0 items-start gap-2 pr-1">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="shrink-0 text-white/28" aria-hidden="true">
+                    <DragHandleIcon />
+                  </span>
                   <span className="shrink-0 text-[0.63rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     {item.sourceLabel}
                   </span>
@@ -512,6 +601,9 @@ function FocusPullRequestCard({
       JSON.stringify(payload)
     );
     event.dataTransfer.setData('text/plain', item.reference);
+    if (!isNested) {
+      setCustomDragImage(event.dataTransfer, event.currentTarget);
+    }
   }
 
   return (
@@ -519,7 +611,10 @@ function FocusPullRequestCard({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={onInternalDragEnd}
-      className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 pr-8 ${
+      title={isNested ? undefined : 'Drag to reorder'}
+      className={`relative grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 ${
+        isNested ? 'pr-8' : 'cursor-grab pr-8 active:cursor-grabbing'
+      } ${
         isNested ? 'rounded-[10px] border border-white/[0.04] bg-white/[0.03] px-2 py-1.5 transition hover:border-white/10 hover:bg-white/[0.05]' : 'rounded-[14px] bg-[var(--card-bg-soft)] px-3 py-2.5 shadow-[var(--shadow-card-soft)]'
       }`}
     >
@@ -557,6 +652,9 @@ function FocusPullRequestCard({
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="shrink-0 text-white/28" aria-hidden="true">
+                    <DragHandleIcon />
+                  </span>
                   <span className="shrink-0 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     {item.sourceLabel}
                   </span>
@@ -588,67 +686,6 @@ function FocusPullRequestCard({
         ) : null}
       </div>
     </div>
-  );
-}
-
-function TopLevelReorderSlot({
-  activeInternalDrag,
-  targetId,
-  onReorder
-}: {
-  activeInternalDrag: FocusInternalDragPayload | null;
-  targetId: string;
-  onReorder: (itemId: string, targetId: string) => void;
-}) {
-  const [isActive, setIsActive] = useState(false);
-
-  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
-    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }
-
-  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
-    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
-    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
-      return;
-    }
-
-    event.preventDefault();
-    setIsActive(true);
-  }
-
-  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setIsActive(false);
-    }
-  }
-
-  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setIsActive(false);
-
-    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
-    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
-      return;
-    }
-
-    onReorder(dragPayload.itemId, targetId);
-  }
-
-  return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      className={`h-2 rounded-full transition ${isActive ? 'bg-violet-400/40' : 'bg-transparent'}`}
-      aria-hidden="true"
-    />
   );
 }
 
@@ -734,6 +771,89 @@ function getNestedEndTargetId(parentId: string) {
   return `__end__:${parentId}`;
 }
 
+function applyTopLevelDrop({
+  dragItemId,
+  targetId,
+  position,
+  visibleItems,
+  onReorderTopLevelItem,
+  onMoveTopLevelItemToEnd
+}: {
+  dragItemId: string;
+  targetId: string;
+  position: 'before' | 'after';
+  visibleItems: FocusItem[];
+  onReorderTopLevelItem: (itemId: string, targetId: string) => void;
+  onMoveTopLevelItemToEnd: (itemId: string) => void;
+}) {
+  if (dragItemId === targetId) {
+    return;
+  }
+
+  if (position === 'before') {
+    onReorderTopLevelItem(dragItemId, targetId);
+    return;
+  }
+
+  const targetIndex = visibleItems.findIndex((item) => item.id === targetId);
+  if (targetIndex < 0) {
+    return;
+  }
+
+  const nextItem = visibleItems[targetIndex + 1];
+  if (!nextItem) {
+    onMoveTopLevelItemToEnd(dragItemId);
+    return;
+  }
+
+  onReorderTopLevelItem(dragItemId, nextItem.id);
+}
+
+function TopLevelInsertionIndicator({
+  isVisible,
+  position
+}: {
+  isVisible: boolean;
+  position: 'top' | 'bottom';
+}) {
+  return (
+    <div
+      className={`pointer-events-none absolute left-2 right-2 z-20 transition-opacity duration-150 ${
+        position === 'top' ? 'top-0 -translate-y-1/2' : 'bottom-0 translate-y-1/2'
+      } ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      aria-hidden="true"
+    >
+      <div className="h-1 rounded-full bg-violet-400/80 shadow-[0_0_0_1px_rgba(167,139,250,0.2),0_0_18px_rgba(139,92,246,0.3)]" />
+    </div>
+  );
+}
+
+function setCustomDragImage(dataTransfer: DataTransfer, sourceElement: HTMLDivElement) {
+  const dragPreview = sourceElement.cloneNode(true);
+  if (!(dragPreview instanceof HTMLDivElement)) {
+    return;
+  }
+
+  const sourceRect = sourceElement.getBoundingClientRect();
+  dragPreview.style.width = `${sourceRect.width}px`;
+  dragPreview.style.maxWidth = `${sourceRect.width}px`;
+  dragPreview.style.position = 'fixed';
+  dragPreview.style.top = '-10000px';
+  dragPreview.style.left = '-10000px';
+  dragPreview.style.pointerEvents = 'none';
+  dragPreview.style.margin = '0';
+  dragPreview.style.transform = 'none';
+  dragPreview.style.opacity = '0.96';
+  dragPreview.style.zIndex = '9999';
+  document.body.appendChild(dragPreview);
+
+  dataTransfer.setDragImage(dragPreview, 24, 24);
+
+  requestAnimationFrame(() => {
+    dragPreview.remove();
+  });
+}
+
 function getJiraPrAlignmentWarning(item: FocusJiraItem) {
   if (item.children.length === 0) {
     return null;
@@ -774,7 +894,7 @@ function isValidRootDrop(dataTransfer: DataTransfer, activeInternalDrag: FocusIn
 
   const internalDrag = activeInternalDrag ?? readInternalDragPayload(dataTransfer);
   if (internalDrag) {
-    return internalDrag.source === 'top-level';
+    return false;
   }
 
   return false;
@@ -922,6 +1042,19 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="m6.5 6.5 11 11m0-11-11 11" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function DragHandleIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+      <circle cx="5" cy="4" r="1" />
+      <circle cx="11" cy="4" r="1" />
+      <circle cx="5" cy="8" r="1" />
+      <circle cx="11" cy="8" r="1" />
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="11" cy="12" r="1" />
     </svg>
   );
 }
