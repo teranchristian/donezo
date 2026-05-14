@@ -1,3 +1,5 @@
+import { getStoredJsonValue } from './storage/backend';
+
 export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
 export type GitHubPullRequestState = 'open' | 'merged' | 'closed';
 
@@ -354,7 +356,8 @@ async function getCachedGitHubDashboardData(
   cacheToken: string,
   options: { ignoreExpiration?: boolean } = {}
 ) {
-  const cached = await readStorageValue<CachedGitHubDashboardData | null>(CACHE_KEY, null);
+  const cached =
+    (await getStoredJsonValue<CachedGitHubDashboardData>(CACHE_KEY)) ?? null;
   if (!cached) {
     return null;
   }
@@ -377,28 +380,6 @@ function createCacheToken(username: string, token: string, ownerFilter = '') {
   }
 
   return `${username}:${(hash >>> 0).toString(16)}`;
-}
-
-function hasChromeStorage() {
-  return typeof chrome !== 'undefined' && Boolean(chrome.storage?.local);
-}
-
-async function readStorageValue<T>(key: string, fallback: T) {
-  if (hasChromeStorage()) {
-    const result = await chrome.storage.local.get(key);
-    return (result[key] as T | undefined) ?? fallback;
-  }
-
-  const raw = localStorage.getItem(key);
-  if (!raw) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
 }
 
 function sendMessage<TResponse>(message: unknown) {

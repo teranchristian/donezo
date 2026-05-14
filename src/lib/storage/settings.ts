@@ -1,11 +1,8 @@
 import {
-  getChromeStorageValues,
-  getLocalStorageJsonValue,
-  getLocalStorageRawValue,
-  hasChromeStorage,
-  setChromeStorageValues,
-  setLocalStorageJsonValue,
-  setLocalStorageRawValue
+  getStoredJsonValue,
+  getStoredRawValue,
+  setStoredJsonValue,
+  setStoredRawValue,
 } from './backend';
 import {
   DEFAULT_GITHUB_OWNER_FILTER,
@@ -24,48 +21,44 @@ import type { DashboardSettings, GitHubListOrganizationFilter } from './types';
 export { getDefaultSettings } from './defaults';
 
 export async function getStoredSettings() {
-  if (hasChromeStorage()) {
-    const result = await getChromeStorageValues([
-      SETTINGS_STORAGE_KEY,
-      GITHUB_OWNER_FILTER_STORAGE_KEY,
-      JIRA_BASE_URL_STORAGE_KEY,
-      JIRA_EMAIL_STORAGE_KEY,
-      JIRA_API_TOKEN_STORAGE_KEY
-    ] as const);
+  const storedSettings = await getStoredJsonValue<Partial<DashboardSettings>>(
+    SETTINGS_STORAGE_KEY,
+  );
+  const [ownerFilter, baseUrl, email, apiToken] = await Promise.all([
+    getStoredRawValue(GITHUB_OWNER_FILTER_STORAGE_KEY),
+    getStoredRawValue(JIRA_BASE_URL_STORAGE_KEY),
+    getStoredRawValue(JIRA_EMAIL_STORAGE_KEY),
+    getStoredRawValue(JIRA_API_TOKEN_STORAGE_KEY),
+  ]);
 
-    return mergeSettings(result[SETTINGS_STORAGE_KEY] as Partial<DashboardSettings> | undefined, {
-      ownerFilter: result[GITHUB_OWNER_FILTER_STORAGE_KEY] as string | undefined,
-      baseUrl: result[JIRA_BASE_URL_STORAGE_KEY] as string | undefined,
-      email: result[JIRA_EMAIL_STORAGE_KEY] as string | undefined,
-      apiToken: result[JIRA_API_TOKEN_STORAGE_KEY] as string | undefined
-    });
-  }
-
-  return mergeSettings(getLocalStorageJsonValue<Partial<DashboardSettings>>(SETTINGS_STORAGE_KEY) ?? undefined, {
-    ownerFilter: getLocalStorageRawValue(GITHUB_OWNER_FILTER_STORAGE_KEY) ?? undefined,
-    baseUrl: getLocalStorageRawValue(JIRA_BASE_URL_STORAGE_KEY) ?? undefined,
-    email: getLocalStorageRawValue(JIRA_EMAIL_STORAGE_KEY) ?? undefined,
-    apiToken: getLocalStorageRawValue(JIRA_API_TOKEN_STORAGE_KEY) ?? undefined
+  return mergeSettings(storedSettings ?? undefined, {
+    ownerFilter,
+    baseUrl,
+    email,
+    apiToken,
   });
 }
 
 export async function saveStoredSettings(settings: DashboardSettings) {
-  if (hasChromeStorage()) {
-    await setChromeStorageValues({
-      [SETTINGS_STORAGE_KEY]: settings,
-      [GITHUB_OWNER_FILTER_STORAGE_KEY]: settings.integrations.github.ownerFilter.trim(),
-      [JIRA_BASE_URL_STORAGE_KEY]: normalizeBaseUrl(settings.integrations.jira.baseUrl),
-      [JIRA_EMAIL_STORAGE_KEY]: settings.integrations.jira.email.trim(),
-      [JIRA_API_TOKEN_STORAGE_KEY]: settings.integrations.jira.apiToken.trim()
-    });
-    return;
-  }
-
-  setLocalStorageJsonValue(SETTINGS_STORAGE_KEY, settings);
-  setLocalStorageRawValue(GITHUB_OWNER_FILTER_STORAGE_KEY, settings.integrations.github.ownerFilter.trim());
-  setLocalStorageRawValue(JIRA_BASE_URL_STORAGE_KEY, normalizeBaseUrl(settings.integrations.jira.baseUrl));
-  setLocalStorageRawValue(JIRA_EMAIL_STORAGE_KEY, settings.integrations.jira.email.trim());
-  setLocalStorageRawValue(JIRA_API_TOKEN_STORAGE_KEY, settings.integrations.jira.apiToken.trim());
+  await Promise.all([
+    setStoredJsonValue(SETTINGS_STORAGE_KEY, settings),
+    setStoredRawValue(
+      GITHUB_OWNER_FILTER_STORAGE_KEY,
+      settings.integrations.github.ownerFilter.trim(),
+    ),
+    setStoredRawValue(
+      JIRA_BASE_URL_STORAGE_KEY,
+      normalizeBaseUrl(settings.integrations.jira.baseUrl),
+    ),
+    setStoredRawValue(
+      JIRA_EMAIL_STORAGE_KEY,
+      settings.integrations.jira.email.trim(),
+    ),
+    setStoredRawValue(
+      JIRA_API_TOKEN_STORAGE_KEY,
+      settings.integrations.jira.apiToken.trim(),
+    ),
+  ]);
 }
 
 function mergeSettings(

@@ -1,9 +1,6 @@
 import {
-  getChromeStorageValue,
-  getLocalStorageJsonValue,
-  hasChromeStorage,
-  setChromeStorageValues,
-  setLocalStorageJsonValue
+  getStoredJsonValue,
+  setStoredJsonValue,
 } from './backend';
 import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from './keys';
 import type { FocusItem, FocusJiraItem, FocusPullRequestItem } from './types';
@@ -20,27 +17,19 @@ type LegacyFocusItem = {
 };
 
 export async function getStoredTodayFocusItems() {
-  if (hasChromeStorage()) {
-    return mergeFocusItems(await getChromeStorageValue<FocusItem[]>(TODAY_FOCUS_ITEMS_STORAGE_KEY));
-  }
-
-  const raw = localStorage.getItem(TODAY_FOCUS_ITEMS_STORAGE_KEY);
-  if (raw === null) {
+  const storedItems = await getStoredJsonValue<FocusItem[]>(
+    TODAY_FOCUS_ITEMS_STORAGE_KEY,
+  );
+  if (storedItems === null) {
     return null;
   }
 
-  return mergeFocusItems(getLocalStorageJsonValue<FocusItem[]>(TODAY_FOCUS_ITEMS_STORAGE_KEY)) ?? [];
+  return mergeFocusItems(storedItems) ?? [];
 }
 
 export async function saveStoredTodayFocusItems(items: FocusItem[]) {
   const normalizedItems = mergeFocusItems(items) ?? [];
-
-  if (hasChromeStorage()) {
-    await setChromeStorageValues({ [TODAY_FOCUS_ITEMS_STORAGE_KEY]: normalizedItems });
-    return;
-  }
-
-  setLocalStorageJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedItems);
+  await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedItems);
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
