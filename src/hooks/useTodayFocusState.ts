@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { TODAY_FOCUS_MAX_ITEMS } from '../components/SummaryCard';
-import type { JiraIssue } from '../lib/jiraApi';
 import type { GitHubPullRequestItem } from '../lib/githubApi';
 import {
-  extractJiraKey,
-  getGitHubFocusStatusLabel,
-  getGitHubFocusStatusTone,
-} from '../lib/githubDomain';
+  getMatchingGitHubFocusPullRequests as getMatchingFocusPullRequestsForJiraKey,
+  mapGitHubPullRequestToFocusItem,
+} from '../lib/focusMapping';
+import type { JiraIssue } from '../lib/jiraApi';
 import {
   getStoredTodayFocusItems,
   saveStoredTodayFocusItems,
@@ -334,7 +333,7 @@ function syncTodayFocusJiraLinkedPullRequests(
 
   const matchingPullRequestsByJiraKey = new Map<string, FocusPullRequestItem[]>();
   for (const pullRequest of pullRequests) {
-    const jiraKey = extractJiraKey(pullRequest.title);
+    const jiraKey = mapGitHubPullRequestToFocusItem(pullRequest).jiraKey;
     if (!jiraKey || !jiraKeys.has(jiraKey)) {
       continue;
     }
@@ -586,26 +585,5 @@ function getMatchingGitHubFocusPullRequests(
   pullRequests: GitHubPullRequestItem[],
   jiraKey: string,
 ) {
-  return pullRequests
-    .filter(
-      (pullRequest) =>
-        extractJiraKey(pullRequest.title) === jiraKey,
-    )
-    .map((pullRequest) => mapGitHubPullRequestToFocusItem(pullRequest));
-}
-
-function mapGitHubPullRequestToFocusItem(
-  pullRequest: GitHubPullRequestItem,
-): FocusPullRequestItem {
-  return {
-    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
-    source: 'github',
-    sourceLabel: 'GitHub',
-    reference: `#${pullRequest.pullNumber}`,
-    url: pullRequest.url,
-    title: pullRequest.title,
-    statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
-    statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKey(pullRequest.title),
-  };
+  return getMatchingFocusPullRequestsForJiraKey(pullRequests, jiraKey);
 }

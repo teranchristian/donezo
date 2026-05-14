@@ -1,5 +1,6 @@
 import { ReactNode, useMemo } from 'react';
 import { formatRelativeTime } from '../lib/date';
+import { mapJiraIssueToFocusItem } from '../lib/focusMapping';
 import {
   getJiraRelatedIssueTooltip,
   isJiraIssueHighPriority,
@@ -8,14 +9,13 @@ import {
 import {
   getJiraBrowseUrl,
   getJiraIssueCounts,
-  getJiraIssueFocusTone,
   getJiraSearchUrl,
   isBlockingIssue,
   type JiraConnectionStatus,
   type JiraDashboardData,
   type JiraIssue
 } from '../lib/jiraApi';
-import { type ActiveJiraView, type FocusItem } from '../lib/storage';
+import { type ActiveJiraView } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 import { StatusBadge } from './StatusBadge';
@@ -154,7 +154,7 @@ export function JiraCard({
                     key={issue.id}
                     issue={issue}
                     baseUrl={baseUrl}
-                    isInTodayFocus={todayFocusItemIds.has(mapIssueToFocusItem(issue, baseUrl).id)}
+                    isInTodayFocus={todayFocusItemIds.has(mapJiraIssueToFocusItem(issue, baseUrl).id)}
                   />
                 ))}
               </div>
@@ -204,7 +204,7 @@ function IssueRow({
       draggable
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'copy';
-        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapIssueToFocusItem(issue, baseUrl)));
+        event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapJiraIssueToFocusItem(issue, baseUrl)));
         event.dataTransfer.setData('text/plain', issue.key);
       }}
     >
@@ -255,22 +255,6 @@ function IssueRow({
       </div>
     </a>
   );
-}
-
-function mapIssueToFocusItem(issue: JiraIssue, baseUrl: string): FocusItem {
-  return {
-    id: `jira:${issue.key}`,
-    source: 'jira',
-    sourceLabel: 'Jira',
-    reference: issue.key,
-    url: getJiraBrowseUrl(baseUrl, issue.key),
-    title: issue.summary,
-    statusLabel: issue.status.name,
-    statusTone: getJiraIssueFocusTone(issue),
-    jiraKey: issue.key,
-    jiraStatusCategoryKey: issue.status.statusCategory?.key?.trim().toLowerCase() ?? undefined,
-    children: []
-  };
 }
 
 function RelatedIssueLink({

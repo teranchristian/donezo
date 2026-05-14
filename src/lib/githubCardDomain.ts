@@ -4,10 +4,8 @@ import type {
   GitHubNotification,
   GitHubPullRequestItem,
 } from './githubApi';
+import { mapGitHubPullRequestToFocusItem } from './focusMapping';
 import {
-  extractJiraKey,
-  getGitHubFocusStatusLabel,
-  getGitHubFocusStatusTone,
   getGitHubPullRequestAttentionStateKey,
   getGitHubPullRequestWarningStateKey,
   isGitHubPrReadyHighlighted,
@@ -16,7 +14,6 @@ import {
 } from './githubDomain';
 import type {
   ActiveGitHubView,
-  FocusItem,
   GitHubListSort,
   GitHubPrNotificationSeenAtState,
   GitHubPrReadyState,
@@ -74,18 +71,8 @@ export function mapPullRequestViewItem(
 
 export function mapPullRequestToFocusItem(
   pullRequest: GitHubPullRequestItem,
-): FocusItem {
-  return {
-    id: `github:${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
-    source: 'github',
-    sourceLabel: 'GitHub',
-    reference: `#${pullRequest.pullNumber}`,
-    url: pullRequest.url,
-    title: pullRequest.title,
-    statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
-    statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKey(pullRequest.title),
-  };
+) {
+  return mapGitHubPullRequestToFocusItem(pullRequest);
 }
 
 export function getOwnerFromRepositoryName(repositoryName: string) {
