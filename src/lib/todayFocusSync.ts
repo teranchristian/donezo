@@ -206,12 +206,14 @@ function reconcileGitHubFocusPullRequestItem(
   const nextStatusLabel = getGitHubFocusStatusLabel(pullRequest.reviewStatus);
   const nextStatusTone = getGitHubFocusStatusTone(pullRequest.reviewStatus);
   const nextUrl = pullRequest.url;
+  const nextRepositoryName = pullRequest.repositoryName;
 
   if (
     item.title === nextTitle &&
     item.statusLabel === nextStatusLabel &&
     item.statusTone === nextStatusTone &&
-    item.url === nextUrl
+    item.url === nextUrl &&
+    item.repositoryName === nextRepositoryName
   ) {
     return item;
   }
@@ -221,7 +223,8 @@ function reconcileGitHubFocusPullRequestItem(
     title: nextTitle,
     statusLabel: nextStatusLabel,
     statusTone: nextStatusTone,
-    url: nextUrl
+    url: nextUrl,
+    repositoryName: nextRepositoryName
   };
 }
 

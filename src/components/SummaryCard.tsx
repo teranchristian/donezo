@@ -2,6 +2,7 @@ import { FocusEvent, useEffect, useState } from 'react';
 import { CardShell } from './CardShell';
 import { type FocusItem, type FocusJiraItem, type FocusPullRequestItem } from '../lib/storage';
 import { FocusTargetIcon } from './TodayFocusIndicator';
+import { getRepositoryLabel } from '../lib/githubCardDomain';
 import { getJiraBrowseUrl, normalizeJiraBaseUrl } from '../lib/jiraApi';
 
 export const TODAY_FOCUS_MAX_ITEMS = 3;
@@ -586,6 +587,7 @@ function FocusPullRequestCard({
 }) {
   const statusToneClass = getStatusToneClass(item.statusTone);
   const pullRequestUrl = getFocusItemUrl(item, jiraBaseUrl);
+  const repositoryLabel = getRepositoryLabel(item.repositoryName);
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     const payload = {
@@ -647,7 +649,12 @@ function FocusPullRequestCard({
                     {item.statusLabel}
                   </span>
                 </div>
-                <p className="mt-0.5 truncate text-[0.75rem] font-medium leading-4 text-primary">{item.title}</p>
+                <p className="mt-0.5 truncate text-[0.75rem] font-medium leading-4" title={item.title}>
+                  <span className="mr-1 text-[0.66rem] font-normal text-secondary">
+                    {repositoryLabel}
+                  </span>
+                  <span className="text-primary">{item.title}</span>
+                </p>
               </>
             ) : (
               <>
@@ -662,7 +669,12 @@ function FocusPullRequestCard({
                     {item.reference}
                   </FocusReferenceLink>
                 </div>
-                <p className="mt-1 line-clamp-2 text-[0.79rem] font-medium leading-4.5 text-primary">{item.title}</p>
+                <p className="mt-1 line-clamp-2 text-[0.79rem] font-medium leading-4.5" title={item.title}>
+                  <span className="mr-1 text-[0.66rem] font-normal text-secondary">
+                    {repositoryLabel}
+                  </span>
+                  <span className="text-primary">{item.title}</span>
+                </p>
               </>
             )}
           </div>

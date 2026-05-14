@@ -243,6 +243,7 @@ function getDefaultTodayFocusItems(): FocusItem[] {
           statusLabel: 'Approved',
           statusTone: 'emerald',
           jiraKey: 'CLK-112',
+          repositoryName: 'dashboard',
         },
       ],
     },

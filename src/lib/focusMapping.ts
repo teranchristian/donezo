@@ -22,6 +22,7 @@ export function mapGitHubPullRequestToFocusItem(
     statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
     statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
     jiraKey: extractJiraKey(pullRequest.title),
+    repositoryName: pullRequest.repositoryName,
   };
 }
 

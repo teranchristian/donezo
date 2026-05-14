@@ -19,6 +19,7 @@ type FocusItemBase = {
 export type FocusPullRequestItem = FocusItemBase & {
   source: 'github';
   jiraKey: string | null;
+  repositoryName: string;
 };
 
 export type FocusJiraItem = FocusItemBase & {

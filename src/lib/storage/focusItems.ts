@@ -68,7 +68,10 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
     return {
       ...normalizedBase,
       source: 'github',
-      jiraKey: normalizeJiraKey('jiraKey' in item ? item.jiraKey : null)
+      jiraKey: normalizeJiraKey('jiraKey' in item ? item.jiraKey : null),
+      repositoryName: normalizeRepositoryName(
+        'repositoryName' in item ? item.repositoryName : item.id,
+      ),
     };
   }
 
@@ -98,4 +101,18 @@ function normalizeJiraKey(value: unknown) {
 
 function normalizeJiraStatusCategoryKey(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
+}
+
+function normalizeRepositoryName(value: unknown) {
+  if (typeof value === 'string' && value.trim()) {
+    const trimmedValue = value.trim();
+    if (trimmedValue.startsWith('github:')) {
+      const match = trimmedValue.match(/^github:([^#]+)#\d+$/);
+      return match?.[1] ?? 'Unknown repository';
+    }
+
+    return trimmedValue;
+  }
+
+  return 'Unknown repository';
 }
