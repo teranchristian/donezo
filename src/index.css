@@ -441,7 +441,9 @@ input {
   transition:
     background 0.16s ease,
     transform 0.16s ease,
-    box-shadow 0.16s ease;
+    box-shadow 0.16s ease,
+    opacity 0.18s ease,
+    filter 0.18s ease;
 }
 
 .repo-launcher-result:hover,
@@ -451,6 +453,13 @@ input {
     inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 10px 30px rgba(0, 0, 0, 0.16);
   transform: translateY(-1px);
+}
+
+.repo-launcher-result--hiding {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
+  filter: saturate(0.7);
+  pointer-events: none;
 }
 
 .repo-launcher-result__titleRow {

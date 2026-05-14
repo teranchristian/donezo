@@ -196,7 +196,7 @@ export function DashboardPage({
                 onSelectPrevious={repoLauncher.selectPreviousResult}
                 onOpenSelected={repoLauncher.openSelectedRepository}
                 onOpenResult={repoLauncher.openRepositoryAtIndex}
-                onHideRepository={(repository) => void handleHideRepository(repository)}
+                onHideRepository={handleHideRepository}
               />
             }
             gitHubSummaryMetrics={gitHubSummaryMetrics}

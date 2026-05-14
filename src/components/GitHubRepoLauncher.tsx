@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GitHubRepository } from '../lib/githubApi';
 
 type GitHubRepoLauncherProps = {
@@ -18,8 +18,10 @@ type GitHubRepoLauncherProps = {
   onSelectPrevious: () => void;
   onOpenSelected: () => void;
   onOpenResult: (index: number) => void;
-  onHideRepository: (repository: GitHubRepository) => void;
+  onHideRepository: (repository: GitHubRepository) => Promise<void>;
 };
+
+const HIDE_ANIMATION_DURATION_MS = 180;
 
 export function GitHubRepoLauncher({
   isOpen,
@@ -41,6 +43,7 @@ export function GitHubRepoLauncher({
   onHideRepository
 }: GitHubRepoLauncherProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [hidingRepositoryIds, setHidingRepositoryIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -56,6 +59,32 @@ export function GitHubRepoLauncher({
       window.cancelAnimationFrame(frameId);
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+
+    setHidingRepositoryIds([]);
+  }, [isOpen]);
+
+  async function handleHideRepository(repository: GitHubRepository) {
+    if (hidingRepositoryIds.includes(repository.id)) {
+      return;
+    }
+
+    setHidingRepositoryIds((current) => [...current, repository.id]);
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, HIDE_ANIMATION_DURATION_MS);
+    });
+
+    try {
+      await onHideRepository(repository);
+    } catch {
+      setHidingRepositoryIds((current) => current.filter((id) => id !== repository.id));
+    }
+  }
 
   return (
     <>
@@ -146,22 +175,37 @@ export function GitHubRepoLauncher({
                     : 'Start typing to search repositories.'}
                 </div>
               ) : (
-                results.map((repository, index) => (
+                results.map((repository, index) => {
+                  const isHiding = hidingRepositoryIds.includes(repository.id);
+
+                  return (
                   <div
                     key={repository.id}
-                    onClick={() => onOpenResult(index)}
-                    onMouseEnter={() => onSelectIndex(index)}
+                    onClick={() => {
+                      if (!isHiding) {
+                        onOpenResult(index);
+                      }
+                    }}
+                    onMouseEnter={() => {
+                      if (!isHiding) {
+                        onSelectIndex(index);
+                      }
+                    }}
                     onKeyDown={(event) => {
+                      if (isHiding) {
+                        return;
+                      }
+
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         onOpenResult(index);
                       }
                     }}
                     role="button"
-                    tabIndex={0}
+                    tabIndex={isHiding ? -1 : 0}
                     className={`repo-launcher-result ${
                       index === selectedIndex ? 'repo-launcher-result--active' : ''
-                    }`}
+                    } ${isHiding ? 'repo-launcher-result--hiding' : ''}`}
                   >
                     <div className="repo-launcher-result__titleRow">
                       <span className="repo-launcher-result__title">{repository.name}</span>
@@ -178,11 +222,12 @@ export function GitHubRepoLauncher({
                           onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            onHideRepository(repository);
+                            void handleHideRepository(repository);
                           }}
                           className="repo-launcher-hide"
                           aria-label={`Hide ${repository.fullName}`}
                           title="Hide from search results"
+                          disabled={isHiding}
                         >
                           <svg
                             viewBox="0 0 24 24"
@@ -209,7 +254,8 @@ export function GitHubRepoLauncher({
                       </span>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
