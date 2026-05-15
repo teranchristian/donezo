@@ -609,6 +609,49 @@ async function fetchGitHubGraphQL(query, variables, token, meta = {}) {
   return result.data;
 }
 
+async function fetchGitHubGraphQLResponse(query, variables, token, meta = {}) {
+  let response;
+  const operationName = getGraphQlOperationName(query);
+  const label = meta.label ?? operationName;
+
+  try {
+    logBackgroundFetchDebug('GitHubFetch', 'graphql-start', {
+      label,
+      operationName
+    });
+    response = await fetch(GITHUB_GRAPHQL_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query, variables })
+    });
+  } catch (error) {
+    throw new GitHubApiError(0, 'network', 'GitHub could not be reached right now.');
+  }
+
+  let result;
+  try {
+    result = await response.json();
+  } catch (error) {
+    throw new GitHubApiError(response.status, 'graphql', 'GitHub returned an invalid response.');
+  }
+
+  if (!response.ok) {
+    throw createGitHubApiErrorFromResponse(response.status, result.errors);
+  }
+
+  logBackgroundFetchDebug('GitHubFetch', 'graphql-finished', {
+    label,
+    operationName,
+    status: response.status
+  });
+
+  return result;
+}
+
 async function testGitHubConnection(token) {
   const trimmedToken = normalizeGitHubToken(token);
   if (!trimmedToken) {
@@ -629,20 +672,16 @@ async function testGitHubConnection(token) {
 
 async function getGitHubOwnerOptions(payload) {
   const token = normalizeGitHubToken(payload.token);
+  const username = normalizeGitHubUsername(payload.username);
   if (!token) {
     return [];
   }
 
   logBackgroundFetchDebug('GitHubOwnerOptions', 'start', {});
-  const viewerResponse = await fetchGitHub('https://api.github.com/user', token, {
-    label: 'owner-options:user'
-  });
-  const viewer = await viewerResponse.json();
-  const viewerLogin = String(viewer?.login ?? '').trim();
   const owners = new Set();
 
-  if (viewerLogin) {
-    owners.add(viewerLogin);
+  if (username) {
+    owners.add(username);
   }
 
   try {
@@ -1453,16 +1492,40 @@ async function getGitHubPullRequestStates(payload) {
     return {};
   }
 
-  const data = await fetchGitHubGraphQL(
+  const result = await fetchGitHubGraphQLResponse(
     buildGitHubPullRequestStatesQuery(uniquePullRequests),
     {},
-    token
+    token,
+    { label: 'pull-request-states' }
   );
+  const errors = Array.isArray(result?.errors) ? result.errors : [];
+  const nonNotFoundErrors = errors.filter((error) => error?.type !== 'NOT_FOUND');
+  if (nonNotFoundErrors.length > 0) {
+    throw createGitHubGraphQlError(nonNotFoundErrors);
+  }
+
+  const notFoundIndexes = new Set(
+    errors
+      .map((error) => {
+        const pathKey = Array.isArray(error?.path) ? String(error.path[0] ?? '') : '';
+        const match = pathKey.match(/^pr(\d+)$/);
+        return match ? Number(match[1]) : null;
+      })
+      .filter((index) => Number.isInteger(index))
+  );
+
+  const data = result?.data ?? {};
   const statesById = {};
 
   uniquePullRequests.forEach((pullRequest, index) => {
-    const result = data?.[`pr${index}`]?.pullRequest;
-    const state = result?.merged ? 'merged' : result?.state === 'OPEN' ? 'open' : 'closed';
+    const pullRequestResult = data?.[`pr${index}`]?.pullRequest;
+    const state = notFoundIndexes.has(index)
+      ? 'not-found'
+      : pullRequestResult?.merged
+        ? 'merged'
+        : pullRequestResult?.state === 'OPEN'
+          ? 'open'
+          : 'closed';
     const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
     const requestIds = requestIdsByPullRequestKey.get(key) ?? [];
 

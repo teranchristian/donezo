@@ -1,7 +1,7 @@
 import { getStoredJsonValue } from './storage/backend';
 
 export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
-export type GitHubPullRequestState = 'open' | 'merged' | 'closed';
+export type GitHubPullRequestState = 'open' | 'merged' | 'closed' | 'not-found';
 
 export type GitHubNotification = {
   id: string;
@@ -175,8 +175,12 @@ export async function testGitHubConnection(token: string): Promise<GitHubConnect
   }
 }
 
-export async function fetchGitHubOwnerOptions(token: string): Promise<string[]> {
-  const trimmedToken = token.trim();
+export async function fetchGitHubOwnerOptions(options: {
+  token: string;
+  username?: string;
+}): Promise<string[]> {
+  const trimmedToken = options.token.trim();
+  const trimmedUsername = options.username?.trim() ?? '';
   if (!trimmedToken) {
     return [];
   }
@@ -189,7 +193,8 @@ export async function fetchGitHubOwnerOptions(token: string): Promise<string[]> 
     const response = await sendMessage<GitHubOwnerOptionsResponse>({
       type: 'FETCH_GITHUB_OWNER_OPTIONS',
       payload: {
-        token: trimmedToken
+        token: trimmedToken,
+        username: trimmedUsername
       }
     });
 

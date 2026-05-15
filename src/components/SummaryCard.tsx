@@ -958,6 +958,9 @@ function normalizeDroppedItem(item: FocusItem): FocusItem {
 
 function getFocusItemUrl(item: FocusItem, jiraBaseUrl?: string) {
   if (item.url) {
+    if (item.source === 'github' && isNotFoundPullRequestFocusItem(item)) {
+      return undefined;
+    }
     return item.url;
   }
 
@@ -973,6 +976,10 @@ function getFocusItemUrl(item: FocusItem, jiraBaseUrl?: string) {
 
   const [, repositoryName, pullNumber] = match;
   return `https://github.com/${repositoryName}/pull/${pullNumber}`;
+}
+
+function isNotFoundPullRequestFocusItem(item: FocusPullRequestItem) {
+  return item.statusLabel.trim().toLowerCase() === 'not found';
 }
 
 function FocusReferenceLink({

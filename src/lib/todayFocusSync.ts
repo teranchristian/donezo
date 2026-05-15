@@ -241,7 +241,8 @@ function applyGitHubPullRequestStateToFocusItem(
     return item;
   }
 
-  const nextStatusLabel = state === 'merged' ? 'Merged' : 'Closed';
+  const nextStatusLabel =
+    state === 'merged' ? 'Merged' : state === 'not-found' ? 'Not found' : 'Closed';
   const nextStatusTone: FocusPullRequestItem['statusTone'] =
     state === 'merged' ? 'emerald' : 'amber';
   if (item.statusLabel === nextStatusLabel && item.statusTone === nextStatusTone) {
@@ -281,5 +282,5 @@ function getFocusPullRequestId(pullRequest: GitHubPullRequestItem) {
 
 function isTerminalGitHubFocusStatus(statusLabel: string) {
   const normalizedStatus = statusLabel.trim().toLowerCase();
-  return normalizedStatus === 'merged' || normalizedStatus === 'closed';
+  return normalizedStatus === 'merged' || normalizedStatus === 'closed' || normalizedStatus === 'not found';
 }

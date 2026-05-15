@@ -212,7 +212,10 @@ export function useGitHubDashboard({
 
     let isCancelled = false;
 
-    void fetchGitHubOwnerOptions(token).then((owners) => {
+    void fetchGitHubOwnerOptions({
+      token,
+      username: settings.username
+    }).then((owners) => {
       if (isCancelled || !isMountedRef.current) {
         return;
       }
@@ -325,7 +328,10 @@ export function useGitHubDashboard({
 
     setGitHubSettingsTestStatus(status);
     if (status === 'connected') {
-      const owners = await fetchGitHubOwnerOptions(token);
+      const owners = await fetchGitHubOwnerOptions({
+        token,
+        username: settings.username
+      });
       if (isMountedRef.current) {
         setGitHubOwnerOptions(owners);
       }
@@ -335,7 +341,7 @@ export function useGitHubDashboard({
 
     setIsTestingGitHubSettings(false);
     return status;
-  }, []);
+  }, [settings.username]);
 
   const refresh = useCallback(async () => {
     if (gitHubMockScenario) {
