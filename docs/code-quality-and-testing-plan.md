@@ -4,11 +4,11 @@
 
 Keep improving maintainability and add meaningful regression protection without disrupting current behavior.
 
-This document reflects the current codebase, not the earlier baseline. Several structural improvements have already landed, so the remaining work is now mostly about testing, finishing a few extractions, and tightening module boundaries.
+This version reflects the codebase as it exists now. Earlier extractions have already landed, so the remaining work is no longer a broad structural rewrite. The priority is to finish a smaller set of refactors, add the test harness, and start unit coverage where the boundaries are already clean.
 
 ## Current State
 
-### Completed Since The Original Plan
+### Completed
 
 - App-level orchestration is no longer concentrated only in `src/App.tsx`.
 - The dashboard now uses focused hooks for major workflows:
@@ -23,6 +23,10 @@ This document reflects the current codebase, not the earlier baseline. Several s
   - `src/lib/jiraDomain.ts`
   - `src/lib/dashboardRouting.ts`
   - `src/lib/todayFocusSync.ts`
+  - `src/lib/githubCardDomain.ts`
+  - `src/lib/dashboardPageDomain.ts`
+  - `src/lib/focusMapping.ts`
+  - `src/lib/githubRepoSearchDomain.ts`
 - Storage has already been split out of the old monolithic `src/lib/storage.ts` into:
   - `src/lib/storage/backend.ts`
   - `src/lib/storage/settings.ts`
@@ -38,234 +42,204 @@ This document reflects the current codebase, not the earlier baseline. Several s
 - There is still no unit test harness in the repo.
 - `package.json` has no `test` script and no Vitest or Testing Library dependencies.
 - `README.md` does not document any test workflow.
-- Some modules are still large enough that they remain expensive to reason about and test:
-  - `src/components/GitHubCard.tsx`
-  - `src/pages/DashboardPage.tsx`
-  - `src/hooks/useTodayFocusState.ts`
-  - `src/hooks/useGitHubDashboard.ts`
-  - `src/hooks/useJiraDashboard.ts`
-- Some pure helper logic still lives inside component and hook files instead of dedicated library modules.
+- Several large files still mix orchestration, UI behavior, and pure helpers in ways that make them expensive to reason about and test.
 
-## Main Remaining Problems
+## What Needs Refactor
 
-### 1. Testing infrastructure has not started
+This is the remaining code-quality work that is still worth doing.
 
-The earlier extraction work created good test targets, but the repo still cannot run unit tests.
+### 1. Extract pure Today focus mutations out of the hook
 
-### 2. Large modules still mix rendering and view-specific behavior
+`src/hooks/useTodayFocusState.ts` is still one of the clearest refactor targets.
 
-The biggest remaining hotspot is `src/components/GitHubCard.tsx`. It still owns:
+The hook now has a reasonable public boundary, but it still contains a large block of pure logic that should move out into a dedicated library module:
 
-- list shaping and filtering
-- summary metric calculation
-- notification highlighting logic
+- item add/remove behavior
+- duplicate detection
+- Jira-to-PR grouping behavior
+- nesting rules
+- top-level reorder logic
+- nested PR reorder logic
+- default item seeding
+
+The hook should ideally keep:
+
+- storage loading and saving
+- React state and refs
+- effect wiring
+- command handlers that call extracted pure helpers
+
+### 2. Split the long API modules by concern
+
+`src/lib/githubApi.ts` and `src/lib/jiraApi.ts` are both now doing multiple jobs at once.
+
+#### `src/lib/githubApi.ts`
+
+It currently mixes:
+
+- exported domain-facing types
+- Chrome message bridge calls
+- cache lookup behavior
+- cache token creation
+- bridge transport plumbing
+
+Worth extracting later:
+
+- a small GitHub bridge module for `chrome.runtime.sendMessage(...)`
+- cache helpers
+- shared request/response types if they keep growing
+
+#### `src/lib/jiraApi.ts`
+
+It currently mixes:
+
+- exported Jira types
+- connection and dashboard loading
+- URL and query helpers
+- issue normalization
+- linked-issue relationship interpretation
+- bridge transport plumbing
+
+Worth extracting later:
+
+- a Jira bridge module
+- Jira normalization/link parsing helpers
+- Jira URL/query helpers
+
+The important change here is separation by concern, not just moving files from `lib/` to `services/`. A `services/` folder is reasonable for transport-facing modules, but normalization and domain helpers should not stay bundled into the same long service file.
+
+### 3. Shrink the dashboard hooks another step
+
+The app-level hooks were a good extraction, but some of them still combine several responsibilities.
+
+#### `src/hooks/useGitHubDashboard.ts`
+
+Still combines:
+
+- initial load orchestration
+- mock mode application
+- cache sync from storage events
+- foreground visibility sync
+- settings connection test state
+- refresh loading state
+- debug logging
+
+#### `src/hooks/useJiraDashboard.ts`
+
+Still combines:
+
+- initial load orchestration
+- automatic connection verification
+- cache sync from storage events
+- foreground visibility sync
+- refresh state transitions
+
+These hooks do not need a large redesign, but they are good candidates for second-level extraction of pure refresh/state-transition helpers and event-sync helpers.
+
+### 4. Keep tracking the biggest UI hotspots honestly
+
+The remaining big files are not all equally urgent, but they should stay visible in the plan.
+
+#### `src/components/SummaryCard.tsx`
+
+This is now one of the biggest UI files in the repo and should be tracked explicitly.
+
+It currently mixes:
+
+- drag and drop behavior
+- top-level reorder behavior
+- nested PR reorder behavior
+- nest-target validation
+- focus-item rendering
+- helper formatting and status logic
+
+#### `src/components/GitHubCard.tsx`
+
+This has already improved because a lot of shaping logic now lives in `src/lib/githubCardDomain.ts`, but it is still large and still owns:
+
 - persistent PR ready and warning state orchestration
 - notification PR resolution behavior
-- rendering for multiple views
+- multiple list and row render paths
+- view-level interaction behavior
 
-`src/pages/DashboardPage.tsx` is also still large and includes alert composition and integration-specific dashboard framing that could be easier to verify if extracted.
+#### `src/pages/DashboardPage.tsx`
 
-### 3. Today focus behavior is only partially modularized
+This is in better shape now that alert derivation lives in `src/lib/dashboardPageDomain.ts`. It is no longer the strongest extraction candidate, but it is still a large integration page and should be kept under review if more dashboard-specific orchestration gets added.
 
-`src/lib/todayFocusSync.ts` now holds important reconciliation rules, but `src/hooks/useTodayFocusState.ts` still contains a large amount of pure manipulation logic:
+## Testing Setup
 
-- add/remove behavior
-- nesting rules
-- reorder logic
-- duplicate detection
-- default item seeding
-- PR-to-Jira grouping behavior
+This work has not started yet.
 
-That logic is testable in principle, but it is still embedded in a hook file.
-
-### 4. API and hook modules still combine fetch behavior with transformation logic
-
-`src/lib/githubApi.ts`, `src/lib/jiraApi.ts`, `src/hooks/useGitHubDashboard.ts`, and `src/hooks/useJiraDashboard.ts` still contain logic that would be easier to test if more normalization and state-transition helpers were extracted into pure modules.
-
-## Guiding Principles
-
-- Prefer finishing testability work over starting another broad refactor.
-- Extract pure helpers before adding component-heavy tests.
-- Keep production behavior stable while shrinking large modules.
-- Add tests around existing boundaries before introducing new abstractions.
-- Update this document as phases are completed so it stays status-aware.
-
-## Status By Original Phase
-
-### Phase 1: Establish Test Foundations
-
-Status: not started
-
-Missing:
+### Missing foundation
 
 - `vitest`
 - `@testing-library/react`
 - `@testing-library/jest-dom`
 - `jsdom`
-- test scripts in `package.json`
-- test setup file
-- test documentation
+- `test` and `test:watch` scripts in `package.json`
+- a shared test setup file
+- README documentation for running tests
 
-### Phase 2: Extract Pure Domain Logic
+### Expected first setup deliverables
 
-Status: mostly complete
+- add the test dependencies
+- add `test` and `test:watch` scripts
+- add a shared setup file for Vitest and DOM assertions
+- document the local test workflow in `README.md`
 
-Completed:
+## First Unit Tests To Add
 
-- GitHub domain rules extracted to `src/lib/githubDomain.ts`
-- Jira domain rules extracted to `src/lib/jiraDomain.ts`
-- dashboard hash parsing/building extracted to `src/lib/dashboardRouting.ts`
-- today focus reconciliation extracted to `src/lib/todayFocusSync.ts`
+These modules are already clean enough to start with and should come before hook or component-heavy tests.
 
-Still missing:
+### Best first targets
 
-- move remaining pure list and metric helpers out of `src/components/GitHubCard.tsx`
-- move remaining pure alert helpers out of `src/pages/DashboardPage.tsx` if we want them directly unit-tested
-- extract pure Today focus mutation helpers out of `src/hooks/useTodayFocusState.ts`
+#### 1. `src/lib/dashboardRouting.ts`
 
-### Phase 3: Add First Unit Tests
+This is one of the safest and highest-value first test targets.
 
-Status: not started
+Add tests for:
 
-Good first targets already exist:
+- parsing valid hash states
+- rejecting invalid hash states
+- building route hashes correctly
+- preserving defaults when params are missing
 
-- `src/lib/dashboardRouting.ts`
+#### 2. `src/lib/githubDomain.ts`
+
+This is also ready now and has clear business rules that should be protected.
+
+Add tests for:
+
+- ready-to-merge rules
+- warning-state transitions
+- focus status labels and tones
+- Jira key extraction from PR titles
+
+### Good next targets after that
+
 - `src/lib/todayFocusSync.ts`
-- `src/lib/githubDomain.ts`
 - `src/lib/jiraDomain.ts`
 - storage normalization helpers in `src/lib/storage/*`
+- `src/lib/githubCardDomain.ts`
+- `src/lib/dashboardPageDomain.ts`
 
-### Phase 4: Split Storage Responsibilities
-
-Status: largely complete
-
-Completed:
-
-- storage backend abstraction exists
-- settings logic is split out
-- navigation and GitHub preference state are split into `preferences.ts`
-- today focus persistence is split into `focusItems.ts`
-- notes persistence is split into `notes.ts`
-- types/defaults/keys are split into dedicated modules
-
-Still missing or worth reconsidering:
-
-- if GitHub state keeps growing, `preferences.ts` may still be too broad and could be split again by concern
-- storage normalization helpers currently remain private to their modules and have no direct tests yet
-
-### Phase 5: Extract App-Level Hooks
-
-Status: mostly complete
-
-Completed:
-
-- `useGitHubDashboard`
-- `useJiraDashboard`
-- `useGitHubMockMode`
-- `useDashboardNavigation`
-- `useTodayFocusState`
-- `useTodayFocusFallbacks`
-
-Still missing:
-
-- some hook internals are still large and may need second-level helper extraction
-- the hooks exist, but they are not yet backed by tests
-
-## Revised Next Phases
-
-## Phase A: Add The Test Harness
-
-### Deliverables
-
-- add `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, and `jsdom`
-- add `test` and `test:watch` scripts to `package.json`
-- add a shared test setup file
-- document test commands in `README.md`
-
-### Expected Outcome
-
-The repo can run unit tests locally and in CI once CI is added.
-
-## Phase B: Cover Existing Pure Modules First
-
-### First Test Targets
-
-- `src/lib/dashboardRouting.ts`
-  - parse valid hash states
-  - reject invalid hash states
-  - build route hashes correctly
-  - keep defaults when params are missing
-- `src/lib/todayFocusSync.ts`
-  - Jira reconciliation
-  - GitHub reconciliation
-  - terminal PR state behavior
-  - missing Jira and PR detection
-- `src/lib/githubDomain.ts`
-  - ready-to-merge rules
-  - warning-state transitions
-  - focus status labels and tones
-  - Jira key extraction
-- `src/lib/jiraDomain.ts`
-  - in-progress rules
-  - high-priority rules
-  - focus tone decisions
-  - tooltip formatting
-- `src/lib/storage/*`
-  - settings normalization
-  - focus item migration and normalization
-  - preference fallback/default behavior
-
-### Expected Outcome
-
-The app gains regression coverage around the rules that are already cleanly extracted.
-
-## Phase C: Extract Remaining Pure Helpers From Large UI And Hook Files
-
-### Candidate Extractions
-
-- from `src/components/GitHubCard.tsx`
-  - PR list filtering and sorting helpers
-  - summary metric calculation
-  - notification grouping/count helpers
-  - view-model shaping helpers
-- from `src/hooks/useTodayFocusState.ts`
-  - add/remove helpers
-  - nesting and reorder helpers
-  - grouping and duplicate detection helpers
-- from `src/pages/DashboardPage.tsx`
-  - dashboard alert derivation
-  - review alert detail formatting
-
-### Expected Outcome
-
-The largest files lose non-UI logic and become easier to test with smaller, targeted unit tests.
-
-## Phase D: Add Hook And Component-Level Tests Only Where They Pay Off
-
-### Candidate Targets
-
-- `useDashboardNavigation`
-- `useGitHubMockMode`
-- `useTodayFocusState`
-- `SettingsPage` save and validation flows
-- focused rendering tests for `GitHubCard` and `JiraCard` only after more helper extraction
-
-### Expected Outcome
-
-Behavior with real user impact gets covered without making the test suite brittle.
-
-## Priority Order
+## Recommended Order
 
 1. Add the test harness.
-2. Test the already-extracted pure modules.
-3. Extract the remaining pure helpers from `GitHubCard`, `DashboardPage`, and `useTodayFocusState`.
-4. Add hook and selective component tests.
+2. Add unit tests for `src/lib/dashboardRouting.ts`.
+3. Add unit tests for `src/lib/githubDomain.ts`.
+4. Extract pure Today focus mutation helpers out of `src/hooks/useTodayFocusState.ts`.
+5. Split `src/lib/githubApi.ts` and `src/lib/jiraApi.ts` by concern.
+6. Reassess whether hook and component-level tests are worth adding after those extractions.
 
 ## Definition Of Done For This Plan
 
 This plan is in good shape when:
 
 - local unit tests are part of normal development
-- core GitHub, Jira, routing, storage, and Today focus rules are covered by unit tests
-- the remaining very large files have had their pure logic reduced further
-- this document no longer describes already-completed refactors as future work
+- the repo has a documented test workflow
+- `dashboardRouting` and `githubDomain` are covered first
+- additional pure modules follow with regression coverage
+- `useTodayFocusState` no longer owns most of the Today focus mutation rules
+- `githubApi.ts` and `jiraApi.ts` no longer mix transport, normalization, and helper concerns in one file
+- the largest UI hotspots are tracked accurately in this document
