@@ -402,34 +402,6 @@ async function refreshGitHubDashboardFromStoredSettings(source = 'stored-setting
   });
 }
 
-async function pollGitHubDashboardFromStoredSettings(source = 'github-alarm') {
-  const settings = await getStoredDashboardSettings();
-  const username = normalizeGitHubUsername(settings?.integrations?.github?.username);
-  const token = normalizeGitHubToken(settings?.integrations?.github?.token);
-  const ownerFilter = normalizeGitHubOwnerFilter(settings?.integrations?.github?.ownerFilter);
-  const requestId = createGitHubBackgroundRequestId(source);
-
-  logGitHubRefreshDebug('stored-settings-poll', {
-    requestId,
-    source,
-    ownerFilter,
-    hasUsername: Boolean(username),
-    hasToken: Boolean(token)
-  });
-
-  if (!token) {
-    return;
-  }
-
-  await pollGitHubNotificationActivity({
-    username,
-    token,
-    ownerFilter,
-    requestId,
-    source
-  });
-}
-
 async function refreshJiraDashboardFromStoredSettings() {
   const settings = await getStoredDashboardSettings();
   const jiraBaseUrl = normalizeJiraBaseUrl(settings?.integrations?.jira?.baseUrl);
@@ -480,7 +452,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     logGitHubRefreshDebug('alarm-fired', {
       alarmName: alarm.name
     });
-    void pollGitHubDashboardFromStoredSettings('github-alarm');
+    void refreshGitHubDashboardFromStoredSettings('github-alarm');
     return;
   }
 
@@ -542,27 +514,6 @@ function getChangedSignalIds(previousSignals, nextSignals, options) {
   for (const previousSignal of previousSignals) {
     if (!nextIds.has(previousSignal.id)) {
       changedIds.push(previousSignal.id);
-    }
-  }
-
-  return changedIds;
-}
-
-function getChangedSubsetSignalIds(previousSignals, nextSignals, options) {
-  const previousById = new Map(
-    previousSignals.map((signal) => [
-      signal.id,
-      getSignalSignature(signal, options.expectedKeys, options.kind)
-    ])
-  );
-  const changedIds = [];
-
-  for (const signal of nextSignals) {
-    if (
-      previousById.get(signal.id) !==
-      getSignalSignature(signal, options.expectedKeys, options.kind)
-    ) {
-      changedIds.push(signal.id);
     }
   }
 
@@ -764,22 +715,12 @@ function getGitHubNotificationsSinceIso() {
   return new Date(Date.now() - GITHUB_NOTIFICATIONS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function getLatestNotificationUpdatedAt(notifications) {
-  if (!Array.isArray(notifications) || notifications.length === 0) {
-    return '';
-  }
-
-  return String(notifications[0]?.updated_at ?? '').trim();
-}
-
-async function getGitHubNotifications(token, options = {}) {
+async function getGitHubNotifications(token) {
   const notifications = [];
   let page = 1;
-  const since = String(options.since ?? '').trim() || getGitHubNotificationsSinceIso();
-  const pageLimit = Number(options.pageLimit);
+  const since = getGitHubNotificationsSinceIso();
   logBackgroundFetchDebug('GitHubNotifications', 'start', {
-    since,
-    pageLimit: Number.isFinite(pageLimit) && pageLimit > 0 ? pageLimit : null
+    since
   });
 
   while (true) {
@@ -797,10 +738,6 @@ async function getGitHubNotifications(token, options = {}) {
     const pageNotifications = await response.json();
 
     notifications.push(...pageNotifications);
-
-    if (Number.isFinite(pageLimit) && pageLimit > 0 && page >= pageLimit) {
-      break;
-    }
 
     if (pageNotifications.length < GITHUB_NOTIFICATIONS_PAGE_SIZE) {
       break;
@@ -1172,32 +1109,6 @@ async function buildGitHubDashboardDataFromFetchResults(options) {
   };
 }
 
-function buildGitHubDashboardDataWithCachedNotifications(options) {
-  const cachedNotifications = Array.isArray(options.cachedNotifications)
-    ? options.cachedNotifications
-    : [];
-  const pullRequestResult = options.pullRequestResult ?? {
-    authored: { items: [], total_count: 0 },
-    reviewRequested: { items: [], total_count: 0 }
-  };
-  const pullRequests = mergePullRequestSeeds(
-    pullRequestResult.authored.items,
-    pullRequestResult.reviewRequested.items
-  );
-
-  return {
-    connectionStatus: 'connected',
-    notificationsCount: cachedNotifications.length,
-    openPrsCount: pullRequestResult.authored.total_count,
-    reviewRequestedCount: pullRequestResult.reviewRequested.total_count,
-    notifications: cachedNotifications,
-    pullRequests,
-    errorMessage: null,
-    missingUsername: false,
-    lastUpdatedAt: Date.now()
-  };
-}
-
 function mergePullRequests(items) {
   const deduped = new Map();
   for (const item of items) {
@@ -1468,36 +1379,20 @@ async function pollGitHubNotificationActivity(payload) {
   }
 
   const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
-  const [cachedDashboardData, previousNotificationSignals, previousPullRequestSignals] = await Promise.all([
-    getCachedGitHubDashboardData(cacheToken, { ignoreExpiration: true }),
+  const [previousNotificationSignals, previousPullRequestSignals] = await Promise.all([
     getCachedGitHubNotificationSignals(cacheToken),
     getCachedGitHubPullRequestSignals(cacheToken)
   ]);
-  const latestNotificationUpdatedAt = getLatestNotificationUpdatedAt(cachedDashboardData?.notifications);
-
-  if (!latestNotificationUpdatedAt) {
-    const data = await loadGitHubDashboardData({
-      username,
-      token,
-      ownerFilter,
-      forceRefresh: true,
-      requestId: payload.requestId,
-      source: payload.source ?? 'background-poll-empty-cache'
-    });
-
-    return {
-      hasChanges: true,
-      data,
-      changedNotificationIds: []
-    };
-  }
-
-  const notifications = await getGitHubNotifications(token, {
-    since: latestNotificationUpdatedAt,
-    pageLimit: 1
-  });
+  const [notifications, pullRequestResult] = await Promise.all([
+    getGitHubNotifications(token),
+    username ? getDashboardPullRequests(username, token, ownerFilter) : null
+  ]);
+  const pullRequests = pullRequestResult
+    ? mergePullRequestSeeds(pullRequestResult.authored.items, pullRequestResult.reviewRequested.items)
+    : [];
   const nextNotificationSignals = getPullRequestNotificationSignals(notifications);
-  const changedNotificationIds = getChangedSubsetSignalIds(
+  const nextPullRequestSignals = getDashboardPullRequestSignals(pullRequests);
+  const changedNotificationIds = getChangedSignalIds(
     previousNotificationSignals,
     nextNotificationSignals,
     {
@@ -1505,80 +1400,35 @@ async function pollGitHubNotificationActivity(payload) {
       kind: 'notification'
     }
   );
-
-  const pullRequestResult = username ? await getDashboardPullRequests(username, token, ownerFilter) : null;
-  const pullRequests = pullRequestResult
-    ? mergePullRequestSeeds(pullRequestResult.authored.items, pullRequestResult.reviewRequested.items)
-    : [];
-  const nextPullRequestSignals = getDashboardPullRequestSignals(pullRequests);
   const changedPullRequestIds = getChangedSignalIds(previousPullRequestSignals, nextPullRequestSignals, {
     expectedKeys: GITHUB_PULL_REQUEST_SIGNAL_KEYS,
     kind: 'pull request'
   });
-  if (changedNotificationIds.length === 0) {
-    if (changedPullRequestIds.length === 0) {
-      logGitHubRefreshDebug('poll-skipped-full-refresh', {
-        requestId: payload.requestId ?? null,
-        source: payload.source ?? 'background-poll',
-        latestNotificationUpdatedAt
-      });
+  const hasChanges = changedNotificationIds.length > 0 || changedPullRequestIds.length > 0;
+  let data;
 
-      return {
-        hasChanges: false,
-        changedNotificationIds: []
-      };
-    }
-
-    const data = buildGitHubDashboardDataWithCachedNotifications({
-      cachedNotifications: cachedDashboardData?.notifications,
+  if (hasChanges) {
+    data = await buildGitHubDashboardDataFromFetchResults({
+      notifications,
       pullRequestResult: pullRequestResult ?? {
         authored: { items: [], total_count: 0 },
         reviewRequested: { items: [], total_count: 0 }
-      }
+      },
+      token,
+      ownerFilter
     });
-
-    await Promise.all([
-      saveCachedGitHubDashboardData(cacheToken, data),
-      saveCachedGitHubPullRequestSignals(cacheToken, data.pullRequests)
-    ]);
-
-    return {
-      hasChanges: true,
-      data,
-      changedNotificationIds: changedPullRequestIds
-    };
   }
 
-  const fullNotifications = await getGitHubNotifications(token);
-  const nextFullNotificationSignals = getPullRequestNotificationSignals(fullNotifications);
-  const changedFullNotificationIds = getChangedSignalIds(
-    previousNotificationSignals,
-    nextFullNotificationSignals,
-    {
-      expectedKeys: GITHUB_NOTIFICATION_SIGNAL_KEYS,
-      kind: 'notification'
-    }
-  );
-  const data = await buildGitHubDashboardDataFromFetchResults({
-    notifications: fullNotifications,
-    pullRequestResult: pullRequestResult ?? {
-      authored: { items: [], total_count: 0 },
-      reviewRequested: { items: [], total_count: 0 }
-    },
-    token,
-    ownerFilter
-  });
-
   await Promise.all([
-    saveCachedGitHubNotificationSignals(cacheToken, data.notifications),
-    saveCachedGitHubPullRequestSignals(cacheToken, data.pullRequests),
-    saveCachedGitHubDashboardData(cacheToken, data)
+    saveCachedGitHubNotificationSignals(cacheToken, data?.notifications ?? notifications),
+    saveCachedGitHubPullRequestSignals(cacheToken, data?.pullRequests ?? pullRequests),
+    ...(data ? [saveCachedGitHubDashboardData(cacheToken, data)] : [])
   ]);
 
   return {
-    hasChanges: true,
+    hasChanges,
     data,
-    changedNotificationIds: [...new Set([...changedFullNotificationIds, ...changedPullRequestIds])]
+    changedNotificationIds: [...new Set([...changedNotificationIds, ...changedPullRequestIds])]
   };
 }
 
