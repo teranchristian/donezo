@@ -1,48 +1,124 @@
-# Chrome Home Page
+# Donezo
 
-A personal Chrome new tab dashboard built with React, TypeScript, Vite, and Tailwind CSS.
+Donezo is a Chrome new tab extension for day-to-day engineering work. It replaces the default new tab page with a dashboard that combines GitHub, Jira, Today focus, and local notes into one workspace.
 
-This project replaces the default Chrome new tab page with a work dashboard focused on:
+The app is built with React, TypeScript, Vite, and Tailwind CSS. It is currently optimized for a personal workflow, but the codebase is structured around configurable local settings for GitHub and Jira.
 
-- GitHub pull requests and notifications
-- Jira active work
-- A drag-and-drop "Today focus" area
-- Quick notes stored locally
-
-The extension is currently tailored to a personal workflow, but the code is structured around configurable local settings for GitHub and Jira.
-
-## What It Does
+## Overview
 
 When the extension is loaded in Chrome, opening a new tab shows a dashboard with:
 
-- A greeting header
-- A GitHub card with:
-  - Your open PRs
-  - Review-requested PRs
-  - Notifications
-  - Status signals such as review state, CI state, merge state, and draft state
-- A Jira card with:
-  - Active assigned issues
-  - In Progress issues
-  - Blocking issues
-  - High Priority issues
-- A Today focus card where you can drag Jira issues and GitHub PRs to define the top items for the day
-- A Quick capture notes card for short local notes
-- A Settings page for profile name and integration credentials
+- a dashboard header and integration switcher
+- a GitHub workspace card for PRs, review requests, and notifications
+- a Jira workspace card for active assigned issues
+- a Today focus board for the top items you want to close today
+- a notes card for quick local capture
+- a settings page for profile, GitHub, and Jira configuration
+
+## Core Features
+
+### GitHub dashboard
+
+The GitHub side of the dashboard includes:
+
+- your open pull requests
+- pull requests requesting your review
+- GitHub notifications related to pull requests
+- review status, CI status, merge state, and draft state signals
+- status filters such as approved, ready to merge, and waiting review
+- owner or organization scoping through Settings
+
+The dashboard fetches GitHub data through the extension background service worker rather than calling GitHub directly from the React UI.
+
+### Jira dashboard
+
+The Jira side of the dashboard includes:
+
+- active assigned issues
+- in-progress issue counts
+- blocking issue counts
+- high-priority issue counts
+- links back to Jira
+
+The default Jira query used by the app is:
+
+```text
+assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC
+```
+
+### Today focus
+
+Today focus is a small planning board for the day.
+
+It supports:
+
+- dragging Jira issues into Today focus
+- dragging GitHub pull requests into Today focus
+- nesting GitHub pull requests under Jira items
+- reordering top-level items and nested pull requests
+- a limit of 3 top-level focus items
+
+It also has some useful automation:
+
+- when you add a Jira ticket, GitHub pull requests with the same Jira key in the PR title are linked automatically
+- standalone GitHub pull requests with the same Jira key can be grouped under the related Jira item
+- Jira-backed focus items stay synced with fresh Jira title and status data
+- GitHub-backed focus items stay synced with fresh PR title, URL, and review status data
+- if a focus item is no longer present in the main dashboard payload, fallback lookups try to refresh Jira issue details and GitHub PR terminal states
+
+### GitHub notifications and favicon state
+
+Donezo surfaces GitHub notification activity in two ways:
+
+- a notifications view inside the GitHub card
+- dynamic favicon and browser-tab title updates based on PR attention state
+
+The favicon changes when the dashboard detects:
+
+- failed build attention
+- warning attention
+- new comment attention
+- ready-to-merge attention
+
+The document title also shows the active attention count when one of those states is present.
+
+### Owner filtering
+
+GitHub data can be scoped to a specific owner or organization from Settings.
+
+Behavior:
+
+- the owner list is loaded from GitHub when you open the dropdown
+- leaving it on `All` keeps the combined view
+- the selected owner filter affects dashboard data and repository search indexing
+
+### Repository search
+
+Donezo includes a repository launcher for fast GitHub navigation.
+
+Features:
+
+- open from the dashboard header
+- keyboard shortcut: `Cmd+K` or `Ctrl+K`
+- ranked search across indexed repositories
+- owner-aware repository indexing
+- keyboard navigation with arrow keys and `Enter`
+- ability to hide repositories from search results
+- hidden repositories can be restored from Settings
 
 ## How It Works
 
-The app has two layers:
+The app has two runtime layers:
 
 1. The React UI in `src/`
-2. A Chrome extension background service worker in [`public/background.js`](/Users/xtian/dev/chrome-home-page/public/background.js)
+2. A Chrome extension background service worker in [public/background.js](/Users/xtian/dev/donezo/public/background.js)
 
-The UI does not call GitHub or Jira directly for the main dashboard data. Instead it sends messages through `chrome.runtime.sendMessage(...)` to the background script, and the background script performs the API requests.
+The React app does not perform the main GitHub and Jira API requests directly. Instead it sends messages through `chrome.runtime.sendMessage(...)` to the background service worker, and the background worker performs the API calls and caching.
 
 This matters because:
 
-- Full GitHub and Jira integration only works when the app is running as a Chrome extension
-- Plain Vite dev mode is useful for UI work, but the full message bridge is not available there
+- full GitHub and Jira integration only works in the extension runtime
+- plain Vite dev mode is still useful for UI work and local behavior, but the Chrome message bridge is not fully available there
 
 ## Integrations
 
@@ -53,83 +129,78 @@ The GitHub integration uses:
 - REST API calls for notifications and connection checks
 - GraphQL API calls for pull request search and metadata
 
-The dashboard fetches:
+The dashboard currently fetches:
 
-- Recent notifications from the last 7 days
+- recent GitHub notifications
 - PRs authored by you
 - PRs requesting your review
-- Review decision state
-- Merge state
-- CI/check state
+- review decision state
+- merge state
+- CI and check state
+- repository search index data
 
-It also polls GitHub roughly every 60 seconds to detect activity changes and refresh the dashboard when needed.
+GitHub data is cached and refreshed through the background worker. The app also watches for dashboard cache changes and foreground visibility changes so the UI stays in sync.
 
 ### Jira
 
-The Jira integration uses the Atlassian REST API with basic auth using:
+The Jira integration uses Atlassian REST APIs with:
 
 - Jira base URL
-- Jira account email
+- Atlassian account email
 - Jira API token
 
-The main Jira query currently used by the app is:
+The dashboard derives:
 
-```text
-assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC
-```
+- active issue counts
+- in-progress counts
+- blocking issue relationships
+- high-priority issue subsets
+- Jira browse links
 
-The dashboard also derives:
+Jira data is also cached and refreshed through the background worker and UI refresh flow.
 
-- In-progress issue counts
-- Blocking relationships
-- High-priority subsets
-- Browse links back to Jira
+## Settings
 
-Jira data is also refreshed on an interval of about 60 seconds.
+The Settings page manages:
 
-## Today Focus
+- display name
+- GitHub username
+- GitHub personal access token
+- dashboard owner or org filter
+- hidden repositories restore list
+- Jira base URL
+- Jira email
+- Jira API token
+- GitHub dev mode toggle
 
-The "Today focus" area is a small daily planning board.
-
-- You can drag Jira issues into it
-- You can drag GitHub PRs into it
-- You can nest PRs under Jira items
-- The list is capped at 3 top-level items
-- Jira-backed focus items are reconciled with fresh Jira data so their title/status stay up to date
-
-This makes it possible to track a Jira task and attach the related PRs underneath it.
+Connection testing is built into the Settings page for both GitHub and Jira.
 
 ## Storage
 
-Settings and dashboard-local state are stored in local browser storage.
+Settings and dashboard-local state are stored locally.
 
 Depending on runtime, the app uses:
 
 - `chrome.storage.local` inside the extension
-- `localStorage` as a fallback for local browser UI usage
+- `localStorage` fallback for local browser UI usage
 
 Stored data includes:
 
-- Name
-- GitHub username, token, and owner/org filter
-- Jira base URL, email, and API token
-- Notes
+- profile name
+- GitHub settings
+- Jira settings
+- notes
 - Today focus items
-- Active tab/view selections
-- Some cached dashboard data
+- active dashboard view state
+- GitHub attention state
+- hidden repositories
+- cached GitHub and Jira dashboard data
 
-## Token Setup
+## GitHub Token Setup
 
-### GitHub Token
+The app expects a GitHub personal access token.
 
-The settings page expects a GitHub Personal Access Token (classic).
-
-Create it here:
-
-- `https://github.com/settings/tokens`
-- Choose `Tokens (classic)`
-
-Scopes currently documented by the app:
+The Settings page currently documents these scopes:
 
 - `repo`
 - `notifications`
@@ -138,30 +209,24 @@ Scopes currently documented by the app:
 
 You should also enter:
 
-- Your GitHub username
-- An optional default owner/org filter
+- your GitHub username
+- an optional default owner or org filter
 
-The extension validates the token from the settings page before using it.
-
-### Jira Token
+## Jira Token Setup
 
 The Jira integration expects:
 
-- Your Jira site URL, for example `https://your-company.atlassian.net`
-- Your Atlassian account email
-- An Atlassian API token
+- your Jira site URL, for example `https://your-company.atlassian.net`
+- your Atlassian account email
+- an Atlassian API token
 
-Create the Jira token here:
+Typical setup flow:
 
-- `https://id.atlassian.com/manage-profile/security/api-tokens`
-
-Setup flow:
-
-1. Create an API token in Atlassian
-2. Use your Jira email address
-3. Use the API token, not your Atlassian password
-4. Save the values in Settings
-5. Test the Jira connection from the settings page
+1. Create an Atlassian API token.
+2. Use your Jira email address.
+3. Use the API token rather than your Atlassian password.
+4. Save the values in Settings.
+5. Test the connection from the Settings page.
 
 ## Development
 
@@ -171,15 +236,13 @@ Setup flow:
 - npm
 - Google Chrome
 
-Install dependencies:
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-### Run in Dev Mode
-
-Start the Vite dev server:
+### Run the Vite dev server
 
 ```bash
 npm run dev
@@ -187,52 +250,31 @@ npm run dev
 
 Important limitation:
 
-- This runs the React app in normal browser dev mode
-- The Chrome extension background runtime is not active there
-- GitHub and Jira API flows that depend on `chrome.runtime.sendMessage(...)` will not fully work
+- this runs the React app in normal browser dev mode
+- the Chrome extension background runtime is not active there
+- GitHub and Jira flows that depend on `chrome.runtime.sendMessage(...)` will not fully work
 
-Dev mode is mainly for:
+Vite dev mode is mainly useful for:
 
-- Layout work
-- Styling changes
-- Component development
-- Non-extension local state behavior
+- layout and styling work
+- component development
+- non-extension local state behavior
 
-### Dev Mode Mock Data
-
-The dashboard also supports a stored developer mode for GitHub mock data.
-
-How it works:
-
-- `dev_mode=true` in the URL enables dev mode as a bootstrap step
-- After that, dev mode is stored locally and no longer depends on the URL
-- The active mock scenario is selected from the header menu dropdown
-- The Settings page includes an `Enable dev mode` toggle
-
-Example bootstrap URL:
-
-```text
-chrome-extension://<extension-id>/index.html#github?view=prs&dev_mode=true
-```
-
-Notes:
-
-- `dev_mode=true` turns on dev mode, but scenario selection still happens in the menu
-- Tab and filter navigation should not carry mock flags in the hash anymore
-- Clearing dev mode returns the dashboard to live GitHub data
-- Legacy `mock=true` and older scenario-style mock URLs may still be recognized for compatibility
-
-## Production Build
-
-Build the extension assets:
+### Build the extension
 
 ```bash
 npm run build
 ```
 
-This outputs the packaged app to `dist/`.
+This outputs the packaged extension to `dist/`.
 
-## Load the Extension in Chrome
+### Preview the built app
+
+```bash
+npm run preview
+```
+
+### Load the extension in Chrome
 
 After building:
 
@@ -241,45 +283,74 @@ After building:
 3. Click `Load unpacked`
 4. Select the `dist/` folder
 
-Once loaded, opening a new Chrome tab should show this dashboard instead of the default new tab page.
+Once loaded, opening a new Chrome tab should show Donezo instead of the default new tab page.
 
 If you make code changes:
 
 1. Re-run `npm run build`
 2. Reload the extension in `chrome://extensions`
 
+## Dev Mode And Mock Data
+
+The dashboard supports a stored GitHub dev mode for mock scenarios.
+
+How it works:
+
+- GitHub dev mode is enabled from the Settings page
+- once enabled, dev mode is stored locally
+- the active mock scenario is selected from the header menu
+- the Settings page includes an `Enable dev mode` toggle
+
+Notes:
+
+- scenario selection still happens in the UI
+- clearing dev mode returns the dashboard to live GitHub data
+
 ## Project Structure
 
-Key files:
+Key files and modules:
 
-- [`src/App.tsx`](/Users/xtian/dev/chrome-home-page/src/App.tsx): app state, loading, polling, routing
-- [`src/pages/DashboardPage.tsx`](/Users/xtian/dev/chrome-home-page/src/pages/DashboardPage.tsx): main dashboard composition and today-focus behavior
-- [`src/pages/SettingsPage.tsx`](/Users/xtian/dev/chrome-home-page/src/pages/SettingsPage.tsx): credentials and preferences UI
-- [`src/lib/githubApi.ts`](/Users/xtian/dev/chrome-home-page/src/lib/githubApi.ts): UI-side GitHub bridge helpers
-- [`src/lib/jiraApi.ts`](/Users/xtian/dev/chrome-home-page/src/lib/jiraApi.ts): UI-side Jira bridge helpers
-- [`src/lib/storage.ts`](/Users/xtian/dev/chrome-home-page/src/lib/storage.ts): settings, notes, focus, and UI storage helpers
-- [`src/lib/todayFocusSync.ts`](/Users/xtian/dev/chrome-home-page/src/lib/todayFocusSync.ts): focus/Jira reconciliation logic
-- [`public/manifest.json`](/Users/xtian/dev/chrome-home-page/public/manifest.json): Chrome extension manifest
-- [`public/background.js`](/Users/xtian/dev/chrome-home-page/public/background.js): background service worker and external API access
-
-## Current Focus
-
-From the current codebase, the product focus is a compact daily work cockpit:
-
-- Centralize GitHub and Jira into one new-tab view
-- Surface active PR and review work quickly
-- Keep a lightweight daily focus list
-- Preserve notes and dashboard preferences locally
-- Refresh data automatically without turning the dashboard into a full project-management app
+- [src/App.tsx](/Users/xtian/dev/donezo/src/App.tsx): app bootstrapping, routing, settings loading, and dashboard composition
+- [src/pages/DashboardPage.tsx](/Users/xtian/dev/donezo/src/pages/DashboardPage.tsx): main dashboard composition
+- [src/pages/SettingsPage.tsx](/Users/xtian/dev/donezo/src/pages/SettingsPage.tsx): settings and connection management
+- [src/components/GitHubCard.tsx](/Users/xtian/dev/donezo/src/components/GitHubCard.tsx): GitHub dashboard UI
+- [src/components/JiraCard.tsx](/Users/xtian/dev/donezo/src/components/JiraCard.tsx): Jira dashboard UI
+- [src/components/SummaryCard.tsx](/Users/xtian/dev/donezo/src/components/SummaryCard.tsx): Today focus board UI
+- [src/components/GitHubRepoLauncher.tsx](/Users/xtian/dev/donezo/src/components/GitHubRepoLauncher.tsx): repository search launcher UI
+- [src/hooks/useGitHubDashboard.ts](/Users/xtian/dev/donezo/src/hooks/useGitHubDashboard.ts): GitHub dashboard loading and refresh behavior
+- [src/hooks/useJiraDashboard.ts](/Users/xtian/dev/donezo/src/hooks/useJiraDashboard.ts): Jira dashboard loading and refresh behavior
+- [src/hooks/useTodayFocusState.ts](/Users/xtian/dev/donezo/src/hooks/useTodayFocusState.ts): Today focus state and mutations
+- [src/hooks/useTodayFocusFallbacks.ts](/Users/xtian/dev/donezo/src/hooks/useTodayFocusFallbacks.ts): focused fallback refresh logic for Today focus items
+- [src/hooks/useFaviconState.ts](/Users/xtian/dev/donezo/src/hooks/useFaviconState.ts): favicon and title attention state
+- [src/lib/githubApi.ts](/Users/xtian/dev/donezo/src/lib/githubApi.ts): UI-side GitHub bridge helpers
+- [src/lib/jiraApi.ts](/Users/xtian/dev/donezo/src/lib/jiraApi.ts): UI-side Jira bridge helpers
+- [src/lib/githubDomain.ts](/Users/xtian/dev/donezo/src/lib/githubDomain.ts): GitHub domain rules
+- [src/lib/githubCardDomain.ts](/Users/xtian/dev/donezo/src/lib/githubCardDomain.ts): GitHub card list shaping and summary helpers
+- [src/lib/jiraDomain.ts](/Users/xtian/dev/donezo/src/lib/jiraDomain.ts): Jira domain rules
+- [src/lib/todayFocusSync.ts](/Users/xtian/dev/donezo/src/lib/todayFocusSync.ts): Today focus reconciliation logic
+- [src/lib/focusMapping.ts](/Users/xtian/dev/donezo/src/lib/focusMapping.ts): Jira and PR to focus-item mapping
+- [src/lib/githubRepoSearchDomain.ts](/Users/xtian/dev/donezo/src/lib/githubRepoSearchDomain.ts): repository ranking and search scoring
+- [src/lib/storage/](/Users/xtian/dev/donezo/src/lib/storage): storage modules for settings, notes, focus items, preferences, and defaults
+- [public/background.js](/Users/xtian/dev/donezo/public/background.js): Chrome extension background worker and external API access
+- [public/manifest.json](/Users/xtian/dev/donezo/public/manifest.json): Chrome extension manifest
 
 ## Scripts
 
 - `npm run dev` - run the Vite development server
-- `npm run build` - type-check and build to `dist/`
+- `npm run build` - type-check and build the extension into `dist/`
 - `npm run preview` - preview the built Vite app locally
 
-## Notes
+## Current Limitations
 
-- The extension requests host permissions for `https://api.github.com/*` and `https://*.atlassian.net/*`
-- Cached GitHub and Jira dashboard data use a short TTL of about 5 minutes
-- The project currently appears to be intentionally optimized for one personal workflow rather than multi-user deployment
+- the app is primarily shaped around one personal workflow
+- full GitHub and Jira behavior depends on the extension runtime
+- there is currently no automated test harness configured in the repo
+
+## Extension Permissions
+
+The extension currently requests:
+
+- `storage`
+- `alarms`
+- host access to `https://api.github.com/*`
+- host access to `https://*.atlassian.net/*`
