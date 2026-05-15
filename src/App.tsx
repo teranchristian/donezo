@@ -141,6 +141,7 @@ export default function App() {
             <SettingsPage
               settings={settings}
               gitHubOwnerOptions={gitHubDashboard.gitHubOwnerOptions}
+              onLoadGitHubOwnerOptions={gitHubDashboard.loadOwnerOptions}
               onSave={handleSaveSettings}
               onTestGitHubConnection={gitHubDashboard.testConnectionStatus}
               onTestJiraConnection={jiraDashboard.testConnectionStatus}

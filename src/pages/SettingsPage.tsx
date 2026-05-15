@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
 import { InfoBanner } from '../components/InfoBanner';
@@ -9,6 +9,10 @@ import { DashboardSettings } from '../lib/storage';
 type SettingsPageProps = {
   settings: DashboardSettings;
   gitHubOwnerOptions: string[];
+  onLoadGitHubOwnerOptions: (options: {
+    token: string;
+    username?: string;
+  }) => Promise<string[]>;
   onSave: (settings: DashboardSettings) => Promise<void>;
   isGitHubDevModeEnabled: boolean;
   onSetGitHubDevMode: (isEnabled: boolean) => Promise<void>;
@@ -44,6 +48,7 @@ const JIRA_TEST_STATUS_COPY: Record<JiraConnectionStatus, string> = {
 export function SettingsPage({
   settings,
   gitHubOwnerOptions,
+  onLoadGitHubOwnerOptions,
   onSave,
   isGitHubDevModeEnabled,
   onSetGitHubDevMode,
@@ -58,6 +63,8 @@ export function SettingsPage({
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [isLoadingGitHubOwnerOptions, setIsLoadingGitHubOwnerOptions] = useState(false);
+  const isLoadingGitHubOwnerOptionsRef = useRef(false);
   const [lastSuccessfulGitHubTestToken, setLastSuccessfulGitHubTestToken] = useState(
     gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
   );
@@ -134,11 +141,35 @@ export function SettingsPage({
     setSaveMessage('Hidden repositories updated.');
   }
 
-  const ownerOptions = getGitHubOwnerOptions(gitHubOwnerOptions, draft.integrations.github.ownerFilter);
+  const ownerOptions = getGitHubOwnerOptions({
+    ownerOptions: gitHubOwnerOptions,
+    selectedOwner: draft.integrations.github.ownerFilter,
+    username: draft.integrations.github.username,
+    isLoading: isLoadingGitHubOwnerOptions
+  });
   const hasValidatedCurrentGitHubToken =
     gitHubTestStatus === 'connected' && draft.integrations.github.token.trim() === lastSuccessfulGitHubTestToken;
-  const shouldShowOwnerFilter = hasValidatedCurrentGitHubToken && ownerOptions.length > 0;
+  const shouldShowOwnerFilter = hasValidatedCurrentGitHubToken;
   const hiddenRepositories = draft.integrations.github.hiddenRepositories;
+
+  async function handleLoadGitHubOwnerOptions() {
+    if (isLoadingGitHubOwnerOptionsRef.current) {
+      return;
+    }
+
+    isLoadingGitHubOwnerOptionsRef.current = true;
+    setIsLoadingGitHubOwnerOptions(true);
+
+    try {
+      await onLoadGitHubOwnerOptions({
+        token: draft.integrations.github.token,
+        username: draft.integrations.github.username
+      });
+    } finally {
+      isLoadingGitHubOwnerOptionsRef.current = false;
+      setIsLoadingGitHubOwnerOptions(false);
+    }
+  }
 
   return (
     <main className="min-h-screen px-5 py-6 text-stone-100 sm:px-8 lg:px-12">
@@ -283,7 +314,7 @@ export function SettingsPage({
                 <label className="block">
                   <span className="mb-2 block text-sm text-stone-300">Dashboard owner or org</span>
                   <select
-                    value={draft.integrations.github.ownerFilter.trim() || 'all'}
+                    value={draft.integrations.github.ownerFilter.trim() || (ownerOptions.some((option) => option.value === 'all') ? 'all' : '__loading__')}
                     onChange={(event) =>
                       setDraft((current) => ({
                         ...current,
@@ -291,21 +322,31 @@ export function SettingsPage({
                           ...current.integrations,
                           github: {
                             ...current.integrations.github,
-                            ownerFilter: event.target.value === 'all' ? '' : event.target.value
+                            ownerFilter:
+                              event.target.value === 'all' || event.target.value === '__loading__'
+                                ? ''
+                                : event.target.value
                           }
                         }
                       }))
                     }
+                    onFocus={() => void handleLoadGitHubOwnerOptions()}
+                    onMouseDown={() => void handleLoadGitHubOwnerOptions()}
                     className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
                   >
                     {ownerOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="bg-panel text-stone-100">
+                      <option
+                        key={option.value}
+                        value={option.value}
+                        disabled={option.disabled}
+                        className="bg-panel text-stone-100"
+                      >
                         {option.label}
                       </option>
                     ))}
                   </select>
                   <p className="mt-2 text-sm leading-6 text-stone-400">
-                    Loaded from GitHub after a successful connection test. Leave it on All to keep your combined view.
+                    Loads from GitHub when you open the dropdown. Leave it on All to keep your combined view.
                   </p>
                 </label>
               ) : null}
@@ -515,7 +556,17 @@ export function SettingsPage({
   );
 }
 
-function getGitHubOwnerOptions(ownerOptions: string[], selectedOwner: string) {
+function getGitHubOwnerOptions({
+  ownerOptions,
+  selectedOwner,
+  username,
+  isLoading
+}: {
+  ownerOptions: string[];
+  selectedOwner: string;
+  username: string;
+  isLoading: boolean;
+}) {
   const owners = new Set<string>();
 
   for (const owner of ownerOptions) {
@@ -525,12 +576,29 @@ function getGitHubOwnerOptions(ownerOptions: string[], selectedOwner: string) {
     }
   }
 
+  const trimmedUsername = username.trim();
+  if (trimmedUsername) {
+    owners.add(trimmedUsername);
+  }
+
   const trimmedSelectedOwner = selectedOwner.trim();
+
+  if (owners.size === 0 && isLoading) {
+    const options = [];
+
+    if (trimmedSelectedOwner && trimmedSelectedOwner !== 'all') {
+      options.push({ value: trimmedSelectedOwner, label: trimmedSelectedOwner, disabled: false });
+    }
+
+    options.push({ value: '__loading__', label: 'Loading owners...', disabled: true });
+    return options;
+  }
+
   const sortedOwners = [...owners].sort((left, right) => left.localeCompare(right));
-  const options = [{ value: 'all', label: 'All' }];
+  const options = [{ value: 'all', label: 'All', disabled: false }];
 
   for (const owner of sortedOwners) {
-    options.push({ value: owner, label: owner });
+    options.push({ value: owner, label: owner, disabled: false });
   }
 
   if (
@@ -538,7 +606,7 @@ function getGitHubOwnerOptions(ownerOptions: string[], selectedOwner: string) {
     trimmedSelectedOwner !== 'all' &&
     !options.some((option) => option.value === trimmedSelectedOwner)
   ) {
-    options.push({ value: trimmedSelectedOwner, label: trimmedSelectedOwner });
+    options.push({ value: trimmedSelectedOwner, label: trimmedSelectedOwner, disabled: false });
   }
 
   return options;

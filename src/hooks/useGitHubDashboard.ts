@@ -199,34 +199,29 @@ export function useGitHubDashboard({
     };
   }, [applyMockScenarioData, gitHubMockScenario, isLoadingSettings, refreshGitHubData, settings.ownerFilter, settings.token, settings.username]);
 
-  useEffect(() => {
-    if (isLoadingSettings || gitHubMockScenario) {
-      return;
-    }
-
-    const token = settings.token.trim();
-    if (!token || gitHubSettingsTestStatus !== 'connected') {
-      setGitHubOwnerOptions([]);
-      return;
-    }
-
-    let isCancelled = false;
-
-    void fetchGitHubOwnerOptions({
-      token,
-      username: settings.username
-    }).then((owners) => {
-      if (isCancelled || !isMountedRef.current) {
-        return;
+  const loadOwnerOptions = useCallback(
+    async (options: { token: string; username?: string }) => {
+      const token = options.token.trim();
+      if (!token) {
+        if (isMountedRef.current) {
+          setGitHubOwnerOptions([]);
+        }
+        return [];
       }
 
-      setGitHubOwnerOptions(owners);
-    });
+      const owners = await fetchGitHubOwnerOptions({
+        token,
+        username: options.username
+      });
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [gitHubMockScenario, gitHubSettingsTestStatus, isLoadingSettings, settings.token]);
+      if (isMountedRef.current) {
+        setGitHubOwnerOptions(owners);
+      }
+
+      return owners;
+    },
+    []
+  );
 
   useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) {
@@ -327,15 +322,7 @@ export function useGitHubDashboard({
     const status = await testGitHubConnection(token);
 
     setGitHubSettingsTestStatus(status);
-    if (status === 'connected') {
-      const owners = await fetchGitHubOwnerOptions({
-        token,
-        username: settings.username
-      });
-      if (isMountedRef.current) {
-        setGitHubOwnerOptions(owners);
-      }
-    } else if (isMountedRef.current) {
+    if (status !== 'connected' && isMountedRef.current) {
       setGitHubOwnerOptions([]);
     }
 
@@ -369,6 +356,7 @@ export function useGitHubDashboard({
     gitHubOwnerOptions,
     gitHubSettingsTestStatus,
     isTestingGitHubSettings,
+    loadOwnerOptions,
     testConnectionStatus,
     refresh
   };
