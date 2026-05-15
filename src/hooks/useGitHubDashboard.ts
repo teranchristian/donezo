@@ -5,7 +5,6 @@ import {
   getEmptyGitHubDashboardData,
   getLatestGitHubDashboardData,
   loadGitHubDashboardData,
-  pollGitHubNotificationActivity,
   testGitHubConnection,
   type GitHubConnectionStatus,
   type GitHubDashboardData
@@ -18,6 +17,22 @@ import {
 import type { GitHubMockScenario } from '../mocks/github/scenarios';
 
 const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
+const GITHUB_REFRESH_DEBUG = true;
+
+let gitHubRefreshRequestSequence = 0;
+
+function createGitHubRefreshRequestId(source: string) {
+  gitHubRefreshRequestSequence += 1;
+  return `${source}-${gitHubRefreshRequestSequence}`;
+}
+
+function logGitHubRefreshDebug(event: string, details: Record<string, unknown>) {
+  if (!GITHUB_REFRESH_DEBUG) {
+    return;
+  }
+
+  console.log(`[GitHubRefresh] ${event}`, details);
+}
 
 type UseGitHubDashboardOptions = {
   settings: DashboardSettings['integrations']['github'];
@@ -72,12 +87,32 @@ export function useGitHubDashboard({
       ownerFilter: string;
       forceRefresh?: boolean;
       showLoadingIndicator: boolean;
+      source: string;
+      requestId?: string;
     }) => {
+      const requestId = options.requestId ?? createGitHubRefreshRequestId(options.source);
+
       if (isGitHubRefreshInFlightRef.current) {
+        logGitHubRefreshDebug('refresh-skipped-in-flight', {
+          requestId,
+          source: options.source,
+          forceRefresh: Boolean(options.forceRefresh),
+          showLoadingIndicator: options.showLoadingIndicator
+        });
         return;
       }
 
       isGitHubRefreshInFlightRef.current = true;
+      logGitHubRefreshDebug('refresh-start', {
+        requestId,
+        source: options.source,
+        forceRefresh: Boolean(options.forceRefresh),
+        showLoadingIndicator: options.showLoadingIndicator,
+        ownerFilter: options.ownerFilter,
+        hasUsername: Boolean(options.username.trim()),
+        hasToken: Boolean(options.token.trim())
+      });
+
       if (options.showLoadingIndicator) {
         setIsGitHubLoading(true);
       }
@@ -87,7 +122,17 @@ export function useGitHubDashboard({
           username: options.username,
           token: options.token,
           ownerFilter: options.ownerFilter,
-          forceRefresh: options.forceRefresh
+          forceRefresh: options.forceRefresh,
+          source: options.source,
+          requestId
+        });
+        logGitHubRefreshDebug('refresh-finished', {
+          requestId,
+          source: options.source,
+          forceRefresh: Boolean(options.forceRefresh),
+          connectionStatus: data.connectionStatus,
+          notificationsCount: data.notificationsCount,
+          pullRequestsCount: data.pullRequests.length
         });
 
         if (!isMountedRef.current) {
@@ -144,7 +189,8 @@ export function useGitHubDashboard({
         token: settings.token,
         ownerFilter: settings.ownerFilter,
         forceRefresh: Boolean(cachedData),
-        showLoadingIndicator: !cachedData
+        showLoadingIndicator: !cachedData,
+        source: 'initial-load'
       });
     })();
 
@@ -180,59 +226,6 @@ export function useGitHubDashboard({
   }, [gitHubMockScenario, gitHubSettingsTestStatus, isLoadingSettings, settings.token]);
 
   useEffect(() => {
-    if (isLoadingSettings || gitHubMockScenario) {
-      return;
-    }
-
-    const username = settings.username;
-    const token = settings.token.trim();
-    if (!token) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const pollForGitHubActivity = async () => {
-      if (isCancelled || isGitHubRefreshInFlightRef.current) {
-        return;
-      }
-
-      setIsCheckingGitHubActivity(true);
-
-      try {
-        const result = await pollGitHubNotificationActivity({
-          username,
-          token,
-          ownerFilter: settings.ownerFilter
-        });
-        if (!isCancelled && isMountedRef.current) {
-          setLastGitHubActivityCheckAt(Date.now());
-        }
-
-        if (isCancelled || !result.hasChanges || !result.data || !isMountedRef.current) {
-          return;
-        }
-
-        setGitHubData(result.data);
-        setGitHubSettingsTestStatus(result.data.connectionStatus);
-      } finally {
-        if (!isCancelled && isMountedRef.current) {
-          setIsCheckingGitHubActivity(false);
-        }
-      }
-    };
-
-    const intervalId = window.setInterval(() => {
-      void pollForGitHubActivity();
-    }, 60 * 1000);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
-
-  useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) {
       return;
     }
@@ -255,6 +248,12 @@ export function useGitHubDashboard({
       }
 
       void (async () => {
+        const requestId = createGitHubRefreshRequestId('storage-cache-sync');
+        logGitHubRefreshDebug('storage-cache-change', {
+          requestId,
+          changedKeys: Object.keys(changes),
+          cacheUpdated: Boolean(changes[GITHUB_DASHBOARD_CACHE_KEY])
+        });
         const cachedData = await getLatestGitHubDashboardData({
           username: settings.username,
           token: settings.token,
@@ -265,6 +264,8 @@ export function useGitHubDashboard({
           return;
         }
 
+        setIsCheckingGitHubActivity(false);
+        setLastGitHubActivityCheckAt(Date.now());
         setGitHubData(cachedData);
         setGitHubSettingsTestStatus(cachedData.connectionStatus);
       })();
@@ -347,7 +348,8 @@ export function useGitHubDashboard({
       token: settings.token,
       ownerFilter: settings.ownerFilter,
       forceRefresh: true,
-      showLoadingIndicator: true
+      showLoadingIndicator: true,
+      source: 'manual-refresh'
     });
   }, [applyMockScenarioData, gitHubMockScenario, refreshGitHubData, settings.ownerFilter, settings.token, settings.username]);
 

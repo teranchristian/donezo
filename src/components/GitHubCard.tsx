@@ -693,6 +693,7 @@ export function GitHubCard({
                       key={item.key}
                       notification={item.value}
                       pullRequestState={
+                        item.value.pullRequestState ??
                         notificationPullRequestStates[item.value.id]
                       }
                     />

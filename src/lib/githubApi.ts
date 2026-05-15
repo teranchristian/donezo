@@ -10,6 +10,7 @@ export type GitHubNotification = {
   updated_at: string;
   reason: string;
   authorLogin?: string;
+  pullRequestState?: GitHubPullRequestState;
   repository: {
     full_name: string;
   };
@@ -237,6 +238,8 @@ export async function loadGitHubDashboardData(options: {
   token: string;
   ownerFilter?: string;
   forceRefresh?: boolean;
+  source?: string;
+  requestId?: string;
 }): Promise<GitHubDashboardData> {
   const username = options.username.trim();
   const token = options.token.trim();
@@ -260,7 +263,9 @@ export async function loadGitHubDashboardData(options: {
         username,
         token,
         ownerFilter,
-        forceRefresh: Boolean(options.forceRefresh)
+        forceRefresh: Boolean(options.forceRefresh),
+        source: options.source,
+        requestId: options.requestId
       }
     });
 

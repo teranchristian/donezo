@@ -17,6 +17,7 @@ const GITHUB_POLL_ALARM_NAME = 'github-dashboard-poll';
 const JIRA_POLL_ALARM_NAME = 'jira-dashboard-poll';
 const BACKGROUND_POLL_PERIOD_MINUTES = 1;
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
+const GITHUB_REFRESH_DEBUG = true;
 const GITHUB_PULL_REQUESTS_QUERY = `
   query DashboardPullRequests(
     $authoredQuery: String!
@@ -120,6 +121,33 @@ const gitHubActivityPollRequests = new Map();
 const gitHubPullRequestStateRequests = new Map();
 const gitHubPullRequestStatesRequests = new Map();
 const gitHubRepoIndexRequests = new Map();
+let gitHubBackgroundRefreshSequence = 0;
+
+function createGitHubBackgroundRequestId(source = 'background') {
+  gitHubBackgroundRefreshSequence += 1;
+  return `${source}-${gitHubBackgroundRefreshSequence}`;
+}
+
+function logGitHubRefreshDebug(event, details) {
+  if (!GITHUB_REFRESH_DEBUG) {
+    return;
+  }
+
+  console.log(`[GitHubRefresh][bg] ${event}`, details);
+}
+
+function logBackgroundFetchDebug(scope, event, details) {
+  if (!GITHUB_REFRESH_DEBUG) {
+    return;
+  }
+
+  console.log(`[${scope}][bg] ${event}`, details);
+}
+
+function getGraphQlOperationName(query) {
+  const match = String(query ?? '').match(/\b(query|mutation)\s+([A-Za-z0-9_]+)/);
+  return match?.[2] ?? 'AnonymousOperation';
+}
 const GITHUB_NOTIFICATION_SIGNAL_KEYS = ['id', 'updatedAt', 'unread'];
 const GITHUB_PULL_REQUEST_SIGNAL_KEYS = [
   'id',
@@ -345,11 +373,20 @@ async function syncBackgroundPollingAlarms() {
   }
 }
 
-async function refreshGitHubDashboardFromStoredSettings() {
+async function refreshGitHubDashboardFromStoredSettings(source = 'stored-settings-change') {
   const settings = await getStoredDashboardSettings();
   const username = normalizeGitHubUsername(settings?.integrations?.github?.username);
   const token = normalizeGitHubToken(settings?.integrations?.github?.token);
   const ownerFilter = normalizeGitHubOwnerFilter(settings?.integrations?.github?.ownerFilter);
+  const requestId = createGitHubBackgroundRequestId(source);
+
+  logGitHubRefreshDebug('stored-settings-refresh', {
+    requestId,
+    source,
+    ownerFilter,
+    hasUsername: Boolean(username),
+    hasToken: Boolean(token)
+  });
 
   if (!token) {
     return;
@@ -359,13 +396,9 @@ async function refreshGitHubDashboardFromStoredSettings() {
     username,
     token,
     ownerFilter,
-    forceRefresh: true
-  });
-  await loadGitHubRepoIndex({
-    username,
-    token,
-    ownerFilter,
-    forceRefresh: true
+    forceRefresh: true,
+    requestId,
+    source
   });
 }
 
@@ -374,6 +407,11 @@ async function refreshJiraDashboardFromStoredSettings() {
   const jiraBaseUrl = normalizeJiraBaseUrl(settings?.integrations?.jira?.baseUrl);
   const jiraEmail = String(settings?.integrations?.jira?.email ?? '').trim();
   const jiraApiToken = String(settings?.integrations?.jira?.apiToken ?? '').trim();
+  logBackgroundFetchDebug('JiraRefresh', 'stored-settings-refresh', {
+    hasBaseUrl: Boolean(jiraBaseUrl),
+    hasEmail: Boolean(jiraEmail),
+    hasToken: Boolean(jiraApiToken)
+  });
 
   if (!jiraBaseUrl || !jiraEmail || !jiraApiToken) {
     return;
@@ -398,14 +436,23 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     return;
   }
 
+  logGitHubRefreshDebug('settings-storage-change', {
+    changedKeys: Object.keys(changes),
+    settingsChanged: Boolean(changes[SETTINGS_STORAGE_KEY]),
+    oldValue: changes[SETTINGS_STORAGE_KEY]?.oldValue,
+    newValue: changes[SETTINGS_STORAGE_KEY]?.newValue
+  });
   void syncBackgroundPollingAlarms();
-  void refreshGitHubDashboardFromStoredSettings();
+  void refreshGitHubDashboardFromStoredSettings('settings-storage-change');
   void refreshJiraDashboardFromStoredSettings();
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === GITHUB_POLL_ALARM_NAME) {
-    void refreshGitHubDashboardFromStoredSettings();
+    logGitHubRefreshDebug('alarm-fired', {
+      alarmName: alarm.name
+    });
+    void refreshGitHubDashboardFromStoredSettings('github-alarm');
     return;
   }
 
@@ -473,10 +520,15 @@ function getChangedSignalIds(previousSignals, nextSignals, options) {
   return changedIds;
 }
 
-async function fetchGitHub(url, token) {
+async function fetchGitHub(url, token, meta = {}) {
   let response;
+  const label = meta.label ?? 'rest';
 
   try {
+    logBackgroundFetchDebug('GitHubFetch', 'rest-start', {
+      label,
+      url
+    });
     response = await fetch(url, {
       headers: {
         Accept: 'application/vnd.github+json',
@@ -499,13 +551,24 @@ async function fetchGitHub(url, token) {
     throw new GitHubApiError(response.status);
   }
 
+  logBackgroundFetchDebug('GitHubFetch', 'rest-finished', {
+    label,
+    url,
+    status: response.status
+  });
   return response;
 }
 
-async function fetchGitHubGraphQL(query, variables, token) {
+async function fetchGitHubGraphQL(query, variables, token, meta = {}) {
   let response;
+  const operationName = getGraphQlOperationName(query);
+  const label = meta.label ?? operationName;
 
   try {
+    logBackgroundFetchDebug('GitHubFetch', 'graphql-start', {
+      label,
+      operationName
+    });
     response = await fetch(GITHUB_GRAPHQL_URL, {
       method: 'POST',
       headers: {
@@ -538,6 +601,11 @@ async function fetchGitHubGraphQL(query, variables, token) {
     throw new GitHubApiError(response.status, 'graphql', 'GitHub returned an empty response.');
   }
 
+  logBackgroundFetchDebug('GitHubFetch', 'graphql-finished', {
+    label,
+    operationName,
+    status: response.status
+  });
   return result.data;
 }
 
@@ -565,7 +633,10 @@ async function getGitHubOwnerOptions(payload) {
     return [];
   }
 
-  const viewerResponse = await fetchGitHub('https://api.github.com/user', token);
+  logBackgroundFetchDebug('GitHubOwnerOptions', 'start', {});
+  const viewerResponse = await fetchGitHub('https://api.github.com/user', token, {
+    label: 'owner-options:user'
+  });
   const viewer = await viewerResponse.json();
   const viewerLogin = String(viewer?.login ?? '').trim();
   const owners = new Set();
@@ -575,7 +646,9 @@ async function getGitHubOwnerOptions(payload) {
   }
 
   try {
-    const organizationsResponse = await fetchGitHub('https://api.github.com/user/orgs?per_page=100', token);
+    const organizationsResponse = await fetchGitHub('https://api.github.com/user/orgs?per_page=100', token, {
+      label: 'owner-options:orgs'
+    });
     const organizations = await organizationsResponse.json();
 
     if (Array.isArray(organizations)) {
@@ -592,7 +665,11 @@ async function getGitHubOwnerOptions(payload) {
     }
   }
 
-  return [...owners].sort((left, right) => left.localeCompare(right));
+  const sortedOwners = [...owners].sort((left, right) => left.localeCompare(right));
+  logBackgroundFetchDebug('GitHubOwnerOptions', 'finished', {
+    ownerCount: sortedOwners.length
+  });
+  return sortedOwners;
 }
 
 function getGitHubNotificationsSinceIso() {
@@ -603,6 +680,9 @@ async function getGitHubNotifications(token) {
   const notifications = [];
   let page = 1;
   const since = getGitHubNotificationsSinceIso();
+  logBackgroundFetchDebug('GitHubNotifications', 'start', {
+    since
+  });
 
   while (true) {
     const searchParams = new URLSearchParams({
@@ -613,7 +693,8 @@ async function getGitHubNotifications(token) {
     });
     const response = await fetchGitHub(
       `https://api.github.com/notifications?${searchParams.toString()}`,
-      token
+      token,
+      { label: `notifications:page-${page}` }
     );
     const pageNotifications = await response.json();
 
@@ -626,6 +707,10 @@ async function getGitHubNotifications(token) {
     page += 1;
   }
 
+  logBackgroundFetchDebug('GitHubNotifications', 'finished', {
+    pageCount: page,
+    notificationsCount: notifications.length
+  });
   return notifications;
 }
 
@@ -666,6 +751,10 @@ function buildRepositorySearchQuery(ownerFilter) {
 async function getAccessibleGitHubRepos(token, ownerFilter) {
   const repos = [];
   let cursor = null;
+  let page = 1;
+  logBackgroundFetchDebug('GitHubRepoIndex', 'repo-search-start', {
+    ownerFilter
+  });
 
   while (true) {
     const data = await fetchGitHubGraphQL(
@@ -675,7 +764,8 @@ async function getAccessibleGitHubRepos(token, ownerFilter) {
         first: GITHUB_REPO_PAGE_SIZE,
         after: cursor
       },
-      token
+      token,
+      { label: `repo-search:page-${page}` }
     );
     const searchResult = data?.search;
     const pageRepos = Array.isArray(searchResult?.nodes) ? searchResult.nodes : [];
@@ -691,8 +781,14 @@ async function getAccessibleGitHubRepos(token, ownerFilter) {
     }
 
     cursor = searchResult.pageInfo.endCursor;
+    page += 1;
   }
 
+  logBackgroundFetchDebug('GitHubRepoIndex', 'repo-search-finished', {
+    ownerFilter,
+    pageCount: page,
+    repoCount: repos.length
+  });
   return repos;
 }
 
@@ -722,15 +818,26 @@ async function loadGitHubRepoIndex(payload) {
   const username = normalizeGitHubUsername(payload.username);
   const token = normalizeGitHubToken(payload.token);
   const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
+  const requestId = String(payload.requestId ?? createGitHubBackgroundRequestId('repo-index'));
 
   if (!token) {
     return [];
   }
 
+  logBackgroundFetchDebug('GitHubRepoIndex', 'load-start', {
+    requestId,
+    forceRefresh: Boolean(payload.forceRefresh),
+    ownerFilter,
+    hasUsername: Boolean(username)
+  });
   const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
   if (!payload.forceRefresh) {
     const cached = await getCachedGitHubRepoIndex(cacheToken);
     if (cached) {
+      logBackgroundFetchDebug('GitHubRepoIndex', 'cache-hit', {
+        requestId,
+        repoCount: cached.length
+      });
       return cached;
     }
   }
@@ -742,6 +849,10 @@ async function loadGitHubRepoIndex(payload) {
     .sort(sortGitHubRepoIndex);
 
   await saveCachedGitHubRepoIndex(cacheToken, data);
+  logBackgroundFetchDebug('GitHubRepoIndex', 'load-finished', {
+    requestId,
+    repoCount: data.length
+  });
   return data;
 }
 
@@ -770,25 +881,29 @@ function getPullRequestIdentityFromNotification(notification) {
   };
 }
 
-function buildGitHubNotificationAuthorsQuery(pullRequests) {
+function buildGitHubNotificationDetailsQuery(pullRequests) {
   const queryBody = pullRequests
     .map(
       (pullRequest, index) => `
-      pr${index}: repository(owner: ${JSON.stringify(pullRequest.owner)}, name: ${JSON.stringify(pullRequest.repo)}) {
+      pr${index}: repository(owner: ${JSON.stringify(pullRequest.owner)}, name: ${JSON.stringify(
+        pullRequest.repo
+      )}) {
         pullRequest(number: ${pullRequest.pullNumber}) {
           author {
             login
           }
+          state
+          merged
         }
       }`
     )
     .join('\n');
 
-  return `query NotificationPullRequestAuthors {${queryBody}
+  return `query NotificationPullRequestDetails {${queryBody}
   }`;
 }
 
-async function getGitHubNotificationAuthorLogins(notifications, token) {
+async function getGitHubNotificationDetails(notifications, token) {
   const uniquePullRequests = [];
   const notificationIdsByPullRequestKey = new Map();
 
@@ -815,28 +930,38 @@ async function getGitHubNotificationAuthorLogins(notifications, token) {
     return {};
   }
 
+  logBackgroundFetchDebug('GitHubNotificationDetails', 'start', {
+    notificationCount: notifications.length,
+    uniquePullRequestCount: uniquePullRequests.length
+  });
   const data = await fetchGitHubGraphQL(
-    buildGitHubNotificationAuthorsQuery(uniquePullRequests),
+    buildGitHubNotificationDetailsQuery(uniquePullRequests),
     {},
-    token
+    token,
+    { label: `notification-details:${uniquePullRequests.length}` }
   );
-  const authorLoginsByNotificationId = {};
+  const detailsByNotificationId = {};
 
   uniquePullRequests.forEach((pullRequest, index) => {
-    const authorLogin = data?.[`pr${index}`]?.pullRequest?.author?.login ?? '';
-    if (!authorLogin) {
-      return;
-    }
+    const result = data?.[`pr${index}`]?.pullRequest;
+    const authorLogin = result?.author?.login ?? '';
+    const pullRequestState = result?.merged ? 'merged' : result?.state === 'OPEN' ? 'open' : 'closed';
 
     const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
     const notificationIds = notificationIdsByPullRequestKey.get(key) ?? [];
 
     notificationIds.forEach((notificationId) => {
-      authorLoginsByNotificationId[notificationId] = authorLogin;
+      detailsByNotificationId[notificationId] = {
+        authorLogin,
+        pullRequestState
+      };
     });
   });
 
-  return authorLoginsByNotificationId;
+  logBackgroundFetchDebug('GitHubNotificationDetails', 'finished', {
+    detailsCount: Object.keys(detailsByNotificationId).length
+  });
+  return detailsByNotificationId;
 }
 
 function buildOwnerScopedQuery(query, ownerFilter) {
@@ -864,6 +989,10 @@ function filterNotificationsByOwner(notifications, ownerFilter) {
 }
 
 async function getDashboardPullRequests(username, token, ownerFilter) {
+  logBackgroundFetchDebug('GitHubDashboardPullRequests', 'start', {
+    ownerFilter,
+    username
+  });
   const data = await fetchGitHubGraphQL(
     GITHUB_PULL_REQUESTS_QUERY,
     {
@@ -877,13 +1006,14 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
       ),
       first: GITHUB_PULL_REQUEST_PAGE_SIZE
     },
-    token
+    token,
+    { label: 'dashboard-pull-requests' }
   );
 
   const authored = data?.authoredPullRequests;
   const reviewRequested = data?.reviewRequestedPullRequests;
 
-  return {
+  const result = {
     authored: {
       items: (authored?.nodes ?? []).map((node) => mapGraphQlPullRequest(node, 'authored')),
       total_count: authored?.issueCount ?? 0
@@ -895,6 +1025,11 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
       total_count: reviewRequested?.issueCount ?? 0
     }
   };
+  logBackgroundFetchDebug('GitHubDashboardPullRequests', 'finished', {
+    authoredCount: result.authored.items.length,
+    reviewRequestedCount: result.reviewRequested.items.length
+  });
+  return result;
 }
 
 async function buildGitHubDashboardDataFromFetchResults(options) {
@@ -907,10 +1042,14 @@ async function buildGitHubDashboardDataFromFetchResults(options) {
     reviewRequested: { items: [], total_count: 0 }
   };
   const token = normalizeGitHubToken(options.token);
-  const notificationAuthorLogins = await getGitHubNotificationAuthorLogins(notifications, token);
+  const notificationDetailsById = await getGitHubNotificationDetails(notifications, token);
   const enrichedNotifications = notifications.map((notification) =>
-    notificationAuthorLogins[notification.id]
-      ? { ...notification, authorLogin: notificationAuthorLogins[notification.id] }
+    notificationDetailsById[notification.id]
+      ? {
+          ...notification,
+          authorLogin: notificationDetailsById[notification.id].authorLogin,
+          pullRequestState: notificationDetailsById[notification.id].pullRequestState
+        }
       : notification
   );
   const pullRequests = mergePullRequestSeeds(
@@ -1119,15 +1258,29 @@ async function loadGitHubDashboardData(payload) {
   const username = normalizeGitHubUsername(payload.username);
   const token = normalizeGitHubToken(payload.token);
   const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
+  const requestId = String(payload.requestId ?? createGitHubBackgroundRequestId('load-dashboard'));
 
   if (!token) {
     return getEmptyGitHubDashboardData('not-connected');
   }
 
+  logGitHubRefreshDebug('load-dashboard-start', {
+    requestId,
+    source: payload.source ?? 'unknown',
+    forceRefresh: Boolean(payload.forceRefresh),
+    ownerFilter,
+    hasUsername: Boolean(username),
+    hasToken: Boolean(token)
+  });
+
   const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
   if (!payload.forceRefresh) {
     const cached = await getCachedGitHubDashboardData(cacheToken);
     if (cached) {
+      logGitHubRefreshDebug('load-dashboard-cache-hit', {
+        requestId,
+        source: payload.source ?? 'unknown'
+      });
       return cached;
     }
   }
@@ -1161,6 +1314,13 @@ async function loadGitHubDashboardData(payload) {
       saveCachedGitHubNotificationSignals(cacheToken, data.notifications),
       saveCachedGitHubPullRequestSignals(cacheToken, data.pullRequests)
     ]);
+    logGitHubRefreshDebug('load-dashboard-finished', {
+      requestId,
+      source: payload.source ?? 'unknown',
+      forceRefresh: Boolean(payload.forceRefresh),
+      notificationsCount: data.notificationsCount,
+      pullRequestsCount: data.pullRequests.length
+    });
     return data;
   } catch (error) {
     return mapGitHubDashboardError(error);
@@ -1545,6 +1705,10 @@ async function fetchBlockingIssueDetails(jiraBaseUrl, auth, issueKeys) {
 }
 
 async function fetchJiraIssuesByJql(jiraBaseUrl, auth, jql, maxResults) {
+  logBackgroundFetchDebug('JiraFetch', 'jql-start', {
+    maxResults,
+    jql
+  });
   const result = await fetchJira(`${jiraBaseUrl}/rest/api/3/search/jql`, {
     method: 'POST',
     headers: {
@@ -1572,7 +1736,13 @@ async function fetchJiraIssuesByJql(jiraBaseUrl, auth, jql, maxResults) {
     missingBlockingIssueKeys
   );
 
-  return mergeBlockingIssueDetails(fetchedIssues, blockingIssueDetailsByKey).map(normalizeJiraIssue);
+  const issues = mergeBlockingIssueDetails(fetchedIssues, blockingIssueDetailsByKey).map(normalizeJiraIssue);
+  logBackgroundFetchDebug('JiraFetch', 'jql-finished', {
+    fetchedIssueCount: fetchedIssues.length,
+    normalizedIssueCount: issues.length,
+    missingBlockingIssueCount: missingBlockingIssueKeys.length
+  });
+  return issues;
 }
 
 async function fetchJiraIssuesByKeys(jiraBaseUrl, auth, issueKeys) {
@@ -1586,6 +1756,9 @@ async function fetchJiraIssuesByKeys(jiraBaseUrl, auth, issueKeys) {
 }
 
 async function fetchJira(endpoint, options) {
+  logBackgroundFetchDebug('JiraFetch', 'request-start', {
+    endpoint
+  });
   const response = await fetch(endpoint, options);
 
   if (response.status === 401) {
@@ -1600,6 +1773,10 @@ async function fetchJira(endpoint, options) {
     };
   }
 
+  logBackgroundFetchDebug('JiraFetch', 'request-finished', {
+    endpoint,
+    status: response.status
+  });
   return { success: true, response };
 }
 
@@ -1652,6 +1829,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const username = normalizeGitHubUsername(payload.username);
       const token = normalizeGitHubToken(payload.token);
       const ownerFilter = normalizeGitHubOwnerFilter(payload.ownerFilter);
+      const requestId = String(payload.requestId ?? createGitHubBackgroundRequestId('message-dashboard'));
       const requestKey = JSON.stringify({
         type: message.type,
         username,
@@ -1660,9 +1838,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         forceRefresh: Boolean(payload.forceRefresh)
       });
 
+      logGitHubRefreshDebug('message-fetch-dashboard', {
+        requestId,
+        requestKey,
+        forceRefresh: Boolean(payload.forceRefresh),
+        ownerFilter,
+        hasUsername: Boolean(username),
+        hasToken: Boolean(token)
+      });
+
       try {
         const data = await withSharedPromise(gitHubDashboardRequests, requestKey, () =>
-          loadGitHubDashboardData(payload)
+          loadGitHubDashboardData({
+            ...payload,
+            requestId,
+            source: payload.source ?? 'message-fetch-dashboard'
+          })
         );
         sendResponse({ success: true, data });
       } catch (error) {

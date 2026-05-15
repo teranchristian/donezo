@@ -68,7 +68,7 @@ export function useGitHubRepoLauncher({
         username,
         token: trimmedToken,
         ownerFilter,
-        forceRefresh: cachedRepositories.length > 0
+        forceRefresh: false
       });
 
       if (isCancelled) {

@@ -134,43 +134,6 @@ export function useJiraDashboard({ settings, isLoadingSettings }: UseJiraDashboa
   }, [isLoadingSettings, settings.apiToken, settings.baseUrl, settings.email]);
 
   useEffect(() => {
-    if (isLoadingSettings) {
-      return;
-    }
-
-    const { baseUrl, email, apiToken } = settings;
-    if (!baseUrl.trim() || !email.trim() || !apiToken.trim()) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const pollForJiraActivity = async () => {
-      if (isCancelled || isJiraRefreshInFlightRef.current) {
-        return;
-      }
-
-      await refreshJiraData({
-        baseUrl,
-        email,
-        apiToken,
-        forceRefresh: true,
-        reason: 'poll',
-        showLoadingIndicator: false
-      });
-    };
-
-    const intervalId = window.setInterval(() => {
-      void pollForJiraActivity();
-    }, 60 * 1000);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [isLoadingSettings, refreshJiraData, settings.apiToken, settings.baseUrl, settings.email]);
-
-  useEffect(() => {
     if (typeof chrome === 'undefined' || !chrome.storage?.onChanged) {
       return;
     }
