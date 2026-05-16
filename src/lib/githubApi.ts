@@ -32,9 +32,10 @@ export type GitHubPullRequestItem = {
   totalCommentCount: number;
   authorLogin: string;
   isDraft: boolean;
+  createdAt: string;
   updatedAt: string;
   url: string;
-  source: 'authored' | 'review-requested';
+  source: 'authored' | 'review-requested' | 'recent';
   reviewStatus: 'approved' | 'changes-requested' | 'waiting-review' | 'draft' | 'open';
   ciStatus: 'passing' | 'failing' | 'pending' | 'no-checks';
   mergeStateStatus:
@@ -57,9 +58,11 @@ export type GitHubDashboardData = {
   connectionStatus: GitHubConnectionStatus;
   notificationsCount: number;
   openPrsCount: number;
+  recentOpenPrsCount: number;
   reviewRequestedCount: number;
   notifications: GitHubNotification[];
   pullRequests: GitHubPullRequestItem[];
+  recentPullRequests: GitHubPullRequestItem[];
   errorMessage: string | null;
   missingUsername: boolean;
   lastUpdatedAt: number | null;
@@ -142,12 +145,37 @@ export function getEmptyGitHubDashboardData(
     connectionStatus,
     notificationsCount: 0,
     openPrsCount: 0,
+    recentOpenPrsCount: 0,
     reviewRequestedCount: 0,
     notifications: [],
     pullRequests: [],
+    recentPullRequests: [],
     errorMessage: null,
     missingUsername: false,
     lastUpdatedAt: null
+  };
+}
+
+function normalizeGitHubDashboardData(
+  data: GitHubDashboardData | null | undefined
+): GitHubDashboardData | null {
+  if (!data) {
+    return null;
+  }
+
+  return {
+    ...getEmptyGitHubDashboardData(data.connectionStatus),
+    ...data,
+    notifications: Array.isArray(data.notifications) ? data.notifications : [],
+    pullRequests: Array.isArray(data.pullRequests) ? data.pullRequests : [],
+    recentPullRequests: Array.isArray(data.recentPullRequests)
+      ? data.recentPullRequests
+      : [],
+    recentOpenPrsCount: Number.isFinite(data.recentOpenPrsCount)
+      ? data.recentOpenPrsCount
+      : Array.isArray(data.recentPullRequests)
+        ? data.recentPullRequests.length
+        : 0,
   };
 }
 
@@ -275,7 +303,7 @@ export async function loadGitHubDashboardData(options: {
     });
 
     if (response?.success && response.data) {
-      return response.data;
+      return normalizeGitHubDashboardData(response.data) ?? getEmptyGitHubDashboardData('error');
     }
 
     return {
@@ -455,7 +483,7 @@ async function getCachedGitHubDashboardData(
     return null;
   }
 
-  return cached.data;
+  return normalizeGitHubDashboardData(cached.data);
 }
 
 async function getCachedGitHubRepoIndex(

@@ -45,6 +45,7 @@ export function useTodayFocusFallbacks({
   }, [
     gitHubData.lastUpdatedAt,
     gitHubData.pullRequests,
+    gitHubData.recentPullRequests,
     hasLoadedTodayFocusItems,
     settings.integrations.github.token,
   ]);
@@ -144,9 +145,19 @@ export function useTodayFocusFallbacks({
       return;
     }
 
+    const dashboardPullRequests = Array.isArray(gitHubData.pullRequests)
+      ? gitHubData.pullRequests
+      : [];
+    const recentPullRequests = Array.isArray(gitHubData.recentPullRequests)
+      ? gitHubData.recentPullRequests
+      : [];
+    const availablePullRequests = [
+      ...dashboardPullRequests,
+      ...recentPullRequests,
+    ];
     const syncResult = reconcileTodayFocusGitHubItems(
       todayFocusItemsRef.current,
-      gitHubData.pullRequests,
+      availablePullRequests,
     );
     if (syncResult.missingPullRequests.length === 0) {
       return;

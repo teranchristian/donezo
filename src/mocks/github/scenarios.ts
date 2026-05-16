@@ -31,6 +31,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
   connectionStatus: 'connected',
   notificationsCount: 4,
   openPrsCount: 4,
+  recentOpenPrsCount: 2,
   reviewRequestedCount: 1,
   missingUsername: false,
   lastUpdatedAt: Date.now(),
@@ -84,6 +85,36 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       ciStatus: 'no-checks',
       mergeStateStatus: 'CLEAN',
       updatedAt: '2026-05-06T08:20:00.000Z'
+    })
+  ],
+  recentPullRequests: [
+    createPullRequest({
+      id: 301,
+      title: 'Ship operator quick filters for dashboards',
+      repositoryName: 'acme/platform-web',
+      owner: 'acme',
+      repo: 'platform-web',
+      pullNumber: 1548,
+      reviewStatus: 'open',
+      ciStatus: 'pending',
+      mergeStateStatus: 'CLEAN',
+      source: 'recent',
+      authorLogin: 'ava',
+      updatedAt: '2026-05-06T09:44:00.000Z'
+    }),
+    createPullRequest({
+      id: 302,
+      title: 'Stabilize launch metrics export formatting',
+      repositoryName: 'acme/chrome-home-page',
+      owner: 'acme',
+      repo: 'chrome-home-page',
+      pullNumber: 94,
+      reviewStatus: 'open',
+      ciStatus: 'passing',
+      mergeStateStatus: 'CLEAN',
+      source: 'recent',
+      authorLogin: 'noah',
+      updatedAt: '2026-05-06T09:15:00.000Z'
     })
   ],
   notifications: []
@@ -164,6 +195,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     dashboardData.openPrsCount = dashboardData.pullRequests.filter(
       (pullRequest) => pullRequest.source === 'authored'
     ).length;
+    dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
     dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
       (pullRequest) => pullRequest.source === 'review-requested'
     ).length;
@@ -281,6 +313,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       })
     ];
     dashboardData.notificationsCount = dashboardData.notifications.length;
+    dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
 
     return {
       key: 'comment-badges',
@@ -410,6 +443,7 @@ function createPullRequest(
     totalCommentCount: overrides.totalCommentCount ?? 0,
     authorLogin: overrides.authorLogin ?? 'xtian',
     isDraft: overrides.reviewStatus === 'draft',
+    createdAt: overrides.createdAt ?? overrides.updatedAt,
     updatedAt: overrides.updatedAt,
     url: overrides.url ?? `https://github.com/${overrides.owner}/${overrides.repo}/pull/${overrides.pullNumber}`,
     source: overrides.source ?? 'authored',

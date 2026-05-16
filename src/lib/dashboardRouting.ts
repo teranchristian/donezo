@@ -14,7 +14,7 @@ export type DashboardNavigationState = {
 
 const DEFAULT_DASHBOARD_NAVIGATION_STATE: DashboardNavigationState = {
   activeIntegration: 'github',
-  activeGitHubView: 'prs',
+  activeGitHubView: 'my-prs',
   githubPrStatusFilter: 'all',
   activeJiraView: 'active'
 };
@@ -51,7 +51,7 @@ export function parseDashboardHashNavigation(hash: string): DashboardNavigationS
     ...DEFAULT_DASHBOARD_NAVIGATION_STATE,
     activeIntegration: 'github',
     activeGitHubView,
-    githubPrStatusFilter: activeGitHubView === 'prs'
+    githubPrStatusFilter: activeGitHubView === 'my-prs'
       ? mergeGitHubPrStatusFilter(searchParams.get('status'))
       : DEFAULT_DASHBOARD_NAVIGATION_STATE.githubPrStatusFilter
   };
@@ -66,7 +66,7 @@ export function buildDashboardHashNavigation(state: DashboardNavigationState) {
   }
 
   searchParams.set('view', state.activeGitHubView);
-  if (state.activeGitHubView === 'prs') {
+  if (state.activeGitHubView === 'my-prs') {
     searchParams.set('status', state.githubPrStatusFilter);
   }
 
@@ -80,9 +80,15 @@ function mergeGitHubPrStatusFilter(filter: string | null): GitHubPrStatusFilter 
 }
 
 function mergeActiveGitHubView(activeGitHubView: string | null): ActiveGitHubView {
-  return activeGitHubView === 'notifications' || activeGitHubView === 'review' || activeGitHubView === 'prs'
-    ? activeGitHubView
-    : 'prs';
+  if (activeGitHubView === 'my-prs' || activeGitHubView === 'review' || activeGitHubView === 'prs') {
+    return activeGitHubView;
+  }
+
+  if (activeGitHubView === 'notifications') {
+    return 'prs';
+  }
+
+  return 'my-prs';
 }
 
 function mergeActiveJiraView(activeJiraView: string | null): ActiveJiraView {

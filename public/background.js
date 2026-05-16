@@ -22,6 +22,7 @@ const GITHUB_PULL_REQUESTS_QUERY = `
   query DashboardPullRequests(
     $authoredQuery: String!
     $reviewRequestedQuery: String!
+    $recentOpenQuery: String!
     $first: Int!
   ) {
     authoredPullRequests: search(query: $authoredQuery, type: ISSUE, first: $first) {
@@ -36,6 +37,12 @@ const GITHUB_PULL_REQUESTS_QUERY = `
         ...PullRequestFields
       }
     }
+    recentOpenPullRequests: search(query: $recentOpenQuery, type: ISSUE, first: $first) {
+      issueCount
+      nodes {
+        ...PullRequestFields
+      }
+    }
   }
 
   fragment PullRequestFields on PullRequest {
@@ -43,6 +50,7 @@ const GITHUB_PULL_REQUESTS_QUERY = `
     title
     url
     isDraft
+    createdAt
     updatedAt
     totalCommentsCount
     reviewDecision
@@ -206,9 +214,11 @@ function getEmptyGitHubDashboardData(connectionStatus = 'not-connected') {
     connectionStatus,
     notificationsCount: 0,
     openPrsCount: 0,
+    recentOpenPrsCount: 0,
     reviewRequestedCount: 0,
     notifications: [],
     pullRequests: [],
+    recentPullRequests: [],
     errorMessage: null,
     missingUsername: false,
     lastUpdatedAt: null
@@ -895,114 +905,6 @@ async function loadGitHubRepoIndex(payload) {
   return data;
 }
 
-function getPullRequestIdentityFromNotification(notification) {
-  const subjectUrl = String(notification?.subject?.url ?? '').trim();
-  if (!subjectUrl) {
-    return null;
-  }
-
-  const apiPath = subjectUrl.replace('https://api.github.com/repos/', '');
-  const [owner, repo, resource, pullNumber] = apiPath.split('/');
-
-  if (resource !== 'pulls' || !owner || !repo || !pullNumber) {
-    return null;
-  }
-
-  const parsedPullNumber = Number(pullNumber);
-  if (!Number.isFinite(parsedPullNumber) || parsedPullNumber <= 0) {
-    return null;
-  }
-
-  return {
-    owner,
-    repo,
-    pullNumber: parsedPullNumber
-  };
-}
-
-function buildGitHubNotificationDetailsQuery(pullRequests) {
-  const queryBody = pullRequests
-    .map(
-      (pullRequest, index) => `
-      pr${index}: repository(owner: ${JSON.stringify(pullRequest.owner)}, name: ${JSON.stringify(
-        pullRequest.repo
-      )}) {
-        pullRequest(number: ${pullRequest.pullNumber}) {
-          author {
-            login
-          }
-          state
-          merged
-        }
-      }`
-    )
-    .join('\n');
-
-  return `query NotificationPullRequestDetails {${queryBody}
-  }`;
-}
-
-async function getGitHubNotificationDetails(notifications, token) {
-  const uniquePullRequests = [];
-  const notificationIdsByPullRequestKey = new Map();
-
-  for (const notification of notifications) {
-    if (notification?.subject?.type !== 'PullRequest') {
-      continue;
-    }
-
-    const pullRequestIdentity = getPullRequestIdentityFromNotification(notification);
-    if (!pullRequestIdentity) {
-      continue;
-    }
-
-    const key = `${pullRequestIdentity.owner}/${pullRequestIdentity.repo}#${pullRequestIdentity.pullNumber}`;
-    if (!notificationIdsByPullRequestKey.has(key)) {
-      notificationIdsByPullRequestKey.set(key, []);
-      uniquePullRequests.push(pullRequestIdentity);
-    }
-
-    notificationIdsByPullRequestKey.get(key).push(notification.id);
-  }
-
-  if (uniquePullRequests.length === 0) {
-    return {};
-  }
-
-  logBackgroundFetchDebug('GitHubNotificationDetails', 'start', {
-    notificationCount: notifications.length,
-    uniquePullRequestCount: uniquePullRequests.length
-  });
-  const data = await fetchGitHubGraphQL(
-    buildGitHubNotificationDetailsQuery(uniquePullRequests),
-    {},
-    token,
-    { label: `notification-details:${uniquePullRequests.length}` }
-  );
-  const detailsByNotificationId = {};
-
-  uniquePullRequests.forEach((pullRequest, index) => {
-    const result = data?.[`pr${index}`]?.pullRequest;
-    const authorLogin = result?.author?.login ?? '';
-    const pullRequestState = result?.merged ? 'merged' : result?.state === 'OPEN' ? 'open' : 'closed';
-
-    const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
-    const notificationIds = notificationIdsByPullRequestKey.get(key) ?? [];
-
-    notificationIds.forEach((notificationId) => {
-      detailsByNotificationId[notificationId] = {
-        authorLogin,
-        pullRequestState
-      };
-    });
-  });
-
-  logBackgroundFetchDebug('GitHubNotificationDetails', 'finished', {
-    detailsCount: Object.keys(detailsByNotificationId).length
-  });
-  return detailsByNotificationId;
-}
-
 function buildOwnerScopedQuery(query, ownerFilter) {
   const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
 
@@ -1011,6 +913,18 @@ function buildOwnerScopedQuery(query, ownerFilter) {
   }
 
   return `${query} user:${normalizedOwnerFilter}`;
+}
+
+function getRecentOpenPullRequestsSinceIso() {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+}
+
+function buildRecentOpenPullRequestsQuery(ownerFilter) {
+  const since = getRecentOpenPullRequestsSinceIso();
+  return buildOwnerScopedQuery(
+    `is:pr is:open draft:false created:>=${since}`,
+    ownerFilter,
+  );
 }
 
 function filterNotificationsByOwner(notifications, ownerFilter) {
@@ -1032,6 +946,7 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
     ownerFilter,
     username
   });
+  const recentOpenQuery = buildRecentOpenPullRequestsQuery(ownerFilter);
   const data = await fetchGitHubGraphQL(
     GITHUB_PULL_REQUESTS_QUERY,
     {
@@ -1043,6 +958,7 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
         `is:pr is:open review-requested:${username}`,
         ownerFilter,
       ),
+      recentOpenQuery,
       first: GITHUB_PULL_REQUEST_PAGE_SIZE
     },
     token,
@@ -1051,6 +967,7 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
 
   const authored = data?.authoredPullRequests;
   const reviewRequested = data?.reviewRequestedPullRequests;
+  const recentOpen = data?.recentOpenPullRequests;
 
   const result = {
     authored: {
@@ -1062,11 +979,18 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
         mapGraphQlPullRequest(node, 'review-requested')
       ),
       total_count: reviewRequested?.issueCount ?? 0
+    },
+    recentOpen: {
+      items: (recentOpen?.nodes ?? []).map((node) =>
+        mapGraphQlPullRequest(node, 'recent')
+      ),
+      total_count: recentOpen?.issueCount ?? 0
     }
   };
   logBackgroundFetchDebug('GitHubDashboardPullRequests', 'finished', {
     authoredCount: result.authored.items.length,
-    reviewRequestedCount: result.reviewRequested.items.length
+    reviewRequestedCount: result.reviewRequested.items.length,
+    recentOpenCount: result.recentOpen.items.length
   });
   return result;
 }
@@ -1078,19 +1002,9 @@ async function buildGitHubDashboardDataFromFetchResults(options) {
   );
   const pullRequestResult = options.pullRequestResult ?? {
     authored: { items: [], total_count: 0 },
-    reviewRequested: { items: [], total_count: 0 }
+    reviewRequested: { items: [], total_count: 0 },
+    recentOpen: { items: [], total_count: 0 }
   };
-  const token = normalizeGitHubToken(options.token);
-  const notificationDetailsById = await getGitHubNotificationDetails(notifications, token);
-  const enrichedNotifications = notifications.map((notification) =>
-    notificationDetailsById[notification.id]
-      ? {
-          ...notification,
-          authorLogin: notificationDetailsById[notification.id].authorLogin,
-          pullRequestState: notificationDetailsById[notification.id].pullRequestState
-        }
-      : notification
-  );
   const pullRequests = mergePullRequestSeeds(
     pullRequestResult.authored.items,
     pullRequestResult.reviewRequested.items
@@ -1098,11 +1012,13 @@ async function buildGitHubDashboardDataFromFetchResults(options) {
 
   return {
     connectionStatus: 'connected',
-    notificationsCount: enrichedNotifications.length,
+    notificationsCount: notifications.length,
     openPrsCount: pullRequestResult.authored.total_count,
+    recentOpenPrsCount: pullRequestResult.recentOpen.total_count,
     reviewRequestedCount: pullRequestResult.reviewRequested.total_count,
-    notifications: enrichedNotifications,
+    notifications,
     pullRequests,
+    recentPullRequests: pullRequestResult.recentOpen.items,
     errorMessage: null,
     missingUsername: false,
     lastUpdatedAt: Date.now()
@@ -1144,6 +1060,7 @@ function mapGraphQlPullRequest(pullRequest, source) {
     totalCommentCount: Number(pullRequest.totalCommentsCount ?? 0),
     authorLogin: pullRequest.author?.login ?? '',
     isDraft: pullRequest.isDraft,
+    createdAt: pullRequest.createdAt,
     updatedAt: pullRequest.updatedAt,
     url: pullRequest.url,
     source,
@@ -1492,49 +1409,57 @@ async function getGitHubPullRequestStates(payload) {
     return {};
   }
 
-  const result = await fetchGitHubGraphQLResponse(
-    buildGitHubPullRequestStatesQuery(uniquePullRequests),
-    {},
-    token,
-    { label: 'pull-request-states' }
-  );
-  const errors = Array.isArray(result?.errors) ? result.errors : [];
-  const nonNotFoundErrors = errors.filter((error) => error?.type !== 'NOT_FOUND');
-  if (nonNotFoundErrors.length > 0) {
-    throw createGitHubGraphQlError(nonNotFoundErrors);
-  }
+  try {
+    const result = await fetchGitHubGraphQLResponse(
+      buildGitHubPullRequestStatesQuery(uniquePullRequests),
+      {},
+      token,
+      { label: 'pull-request-states' }
+    );
+    const errors = Array.isArray(result?.errors) ? result.errors : [];
+    const nonNotFoundErrors = errors.filter((error) => error?.type !== 'NOT_FOUND');
+    if (nonNotFoundErrors.length > 0) {
+      throw createGitHubGraphQlError(nonNotFoundErrors);
+    }
 
-  const notFoundIndexes = new Set(
-    errors
-      .map((error) => {
-        const pathKey = Array.isArray(error?.path) ? String(error.path[0] ?? '') : '';
-        const match = pathKey.match(/^pr(\d+)$/);
-        return match ? Number(match[1]) : null;
-      })
-      .filter((index) => Number.isInteger(index))
-  );
+    const notFoundIndexes = new Set(
+      errors
+        .map((error) => {
+          const pathKey = Array.isArray(error?.path) ? String(error.path[0] ?? '') : '';
+          const match = pathKey.match(/^pr(\d+)$/);
+          return match ? Number(match[1]) : null;
+        })
+        .filter((index) => Number.isInteger(index))
+    );
 
-  const data = result?.data ?? {};
-  const statesById = {};
+    const data = result?.data ?? {};
+    const statesById = {};
 
-  uniquePullRequests.forEach((pullRequest, index) => {
-    const pullRequestResult = data?.[`pr${index}`]?.pullRequest;
-    const state = notFoundIndexes.has(index)
-      ? 'not-found'
-      : pullRequestResult?.merged
-        ? 'merged'
-        : pullRequestResult?.state === 'OPEN'
-          ? 'open'
-          : 'closed';
-    const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
-    const requestIds = requestIdsByPullRequestKey.get(key) ?? [];
+    uniquePullRequests.forEach((pullRequest, index) => {
+      const pullRequestResult = data?.[`pr${index}`]?.pullRequest;
+      const state = notFoundIndexes.has(index)
+        ? 'not-found'
+        : pullRequestResult?.merged
+          ? 'merged'
+          : pullRequestResult?.state === 'OPEN'
+            ? 'open'
+            : 'closed';
+      const key = `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.pullNumber}`;
+      const requestIds = requestIdsByPullRequestKey.get(key) ?? [];
 
-    requestIds.forEach((id) => {
-      statesById[id] = state;
+      requestIds.forEach((id) => {
+        statesById[id] = state;
+      });
     });
-  });
 
-  return statesById;
+    return statesById;
+  } catch (error) {
+    console.warn('[GitHubPullRequestStates][bg] Falling back to empty state map.', {
+      error: error instanceof Error ? error.message : String(error),
+      requestCount: uniquePullRequests.length
+    });
+    return {};
+  }
 }
 
 function withSharedPromise(map, key, factory) {

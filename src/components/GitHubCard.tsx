@@ -2,29 +2,18 @@ import { ReactNode, useEffect, useState } from 'react';
 import {
   GitHubConnectionStatus,
   GitHubDashboardData,
-  GitHubNotification,
   GitHubPullRequestItem,
-  getGitHubPullRequestStates,
-  type GitHubPullRequestState,
 } from '../lib/githubApi';
 import {
   calculateGitHubSummaryCounts,
-  filterGitHubItems,
   filterGitHubPullRequests,
   getGitHubViewContent,
   getNoFilterResultsMessage,
-  getNotificationIconKind,
-  getNotificationTypeLabel,
-  getNotificationUrl,
-  getPullRequestIdentityFromNotification,
   getPullRequestNewCommentCountByKey,
-  getPullRequestNewNotificationCountByKey,
   getRepositoryLabel,
-  mapNotificationViewItem,
   mapPullRequestToFocusItem,
   sortGitHubItems,
   shouldDisplayNotification,
-  type GitHubViewItem,
 } from '../lib/githubCardDomain';
 import { formatRelativeTime } from '../lib/date';
 import {
@@ -66,13 +55,9 @@ type GitHubCardProps = {
   data: GitHubDashboardData;
   todayFocusItemIds: Set<string>;
   username: string;
-  token: string;
   ownerFilter: string;
   isMockMode?: boolean;
   isLoading: boolean;
-  isCheckingActivity: boolean;
-  lastActivityCheckAt: number | null;
-  onRefresh: () => void;
   onSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
   activeView: ActiveGitHubView;
   prStatusFilter: GitHubPrStatusFilter;
@@ -99,13 +84,9 @@ export function GitHubCard({
   data,
   todayFocusItemIds,
   username,
-  token,
   ownerFilter,
   isMockMode = false,
   isLoading,
-  isCheckingActivity,
-  lastActivityCheckAt,
-  onRefresh,
   onSummaryMetricsChange,
   activeView,
   prStatusFilter,
@@ -133,10 +114,6 @@ export function GitHubCard({
     hasLoadedGitHubPrNotificationSeenAtState,
     setHasLoadedGitHubPrNotificationSeenAtState,
   ] = useState(false);
-  const [isResolvingNotificationStates, setIsResolvingNotificationStates] =
-    useState(false);
-  const [notificationPullRequestStates, setNotificationPullRequestStates] =
-    useState<Record<string, GitHubPullRequestState>>({});
   const organizationFilter = isMockMode ? 'all' : ownerFilter.trim() || 'all';
   const resolvedPullRequests = data.pullRequests;
   const myOpenPRs = resolvedPullRequests.filter(
@@ -145,16 +122,10 @@ export function GitHubCard({
   const reviewRequestedPRs = resolvedPullRequests.filter(
     (pullRequest) => pullRequest.source === 'review-requested',
   );
+  const recentOpenPRs = data.recentPullRequests ?? [];
   const notifications = (data.notifications ?? []).filter(
     shouldDisplayNotification,
   );
-  const pullRequestNewNotificationCountByKey =
-    hasLoadedGitHubPrNotificationSeenAtState
-      ? getPullRequestNewNotificationCountByKey(
-          notifications,
-          gitHubPrNotificationSeenAtState,
-        )
-      : {};
   const pullRequestNewCommentCountByKey =
     hasLoadedGitHubPrNotificationSeenAtState
       ? getPullRequestNewCommentCountByKey(
@@ -162,8 +133,9 @@ export function GitHubCard({
           gitHubPrNotificationSeenAtState,
         )
       : {};
-  const viewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
-  const notificationItems = notifications.map(mapNotificationViewItem);
+  const recentViewQuery = buildRecentOpenPullRequestsQuery(ownerFilter);
+  const myPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
+  const recentPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(recentViewQuery)}`;
   const ownerFilteredMyOpenPRs = filterGitHubPullRequests(
     myOpenPRs,
     organizationFilter,
@@ -172,17 +144,19 @@ export function GitHubCard({
     reviewRequestedPRs,
     organizationFilter,
   );
+  const ownerFilteredRecentOpenPRs = filterGitHubPullRequests(
+    recentOpenPRs,
+    organizationFilter,
+  );
   const filteredMyOpenPRs = filterGitHubPullRequests(
     myOpenPRs,
     organizationFilter,
     prStatusFilter,
   );
   const filteredReviewRequestedPRs = ownerFilteredReviewRequestedPRs;
-  const filteredNotificationCount = filterGitHubItems(
-    notificationItems,
-    organizationFilter,
-  ).length;
+  const filteredRecentOpenPRs = ownerFilteredRecentOpenPRs;
   const filteredMyOpenPrCount = filteredMyOpenPRs.length;
+  const filteredRecentOpenPrCount = filteredRecentOpenPRs.length;
   const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
   const summaryCounts = calculateGitHubSummaryCounts({
     resolvedPullRequests,
@@ -197,48 +171,31 @@ export function GitHubCard({
   const currentView = getGitHubViewContent({
     activeGitHubView: activeView,
     data,
-    notifications,
     myOpenPullRequests: filteredMyOpenPRs,
-    reviewRequestedPullRequests: reviewRequestedPRs,
+    recentOpenPullRequests: filteredRecentOpenPRs,
+    reviewRequestedPullRequests: filteredReviewRequestedPRs,
   });
-  const filteredItems = sortGitHubItems(
-    filterGitHubItems(currentView.items, organizationFilter),
-    sortOrder,
-  );
-  const visiblePullRequestNotifications = filteredItems
-    .filter(
-      (item): item is Extract<GitHubViewItem, { kind: 'notification' }> =>
-        item.kind === 'notification',
-    )
-    .map((item) => item.value)
-    .filter((notification) => notification.subject.type === 'PullRequest')
-    .filter((notification) => !notificationPullRequestStates[notification.id]);
-  const visibleNotificationPullRequestKey = visiblePullRequestNotifications
-    .map((notification) => notification.id)
-    .join('|');
-  const isNotificationViewLoading =
-    activeView === 'notifications' &&
-    (isLoading || isResolvingNotificationStates);
+  const filteredItems = sortGitHubItems(currentView.items, sortOrder);
   const tabItems = [
     {
-      key: 'prs',
-      label: 'PRs',
+      key: 'my-prs',
+      label: 'My PRs',
       value: formatCount(filteredMyOpenPrCount, isLoading),
-      isActive: activeView === 'prs',
+      isActive: activeView === 'my-prs',
       title: isLoading
         ? undefined
         : `${filteredMyOpenPrCount} of ${myOpenPRs.length} PRs`,
-      onClick: () => onViewChange('prs'),
+      onClick: () => onViewChange('my-prs'),
     },
     {
-      key: 'notifications',
-      label: 'Notifications',
-      value: formatCount(
-        filteredNotificationCount,
-        isLoading || isResolvingNotificationStates,
-      ),
-      isActive: activeView === 'notifications',
-      onClick: () => onViewChange('notifications'),
+      key: 'prs',
+      label: 'Team PRs',
+      value: formatCount(filteredRecentOpenPrCount, isLoading),
+      isActive: activeView === 'prs',
+      title: isLoading
+        ? undefined
+        : `${filteredRecentOpenPrCount} of ${recentOpenPRs.length} PRs`,
+      onClick: () => onViewChange('prs'),
     },
     {
       key: 'review',
@@ -372,7 +329,7 @@ export function GitHubCard({
     }
 
     const activePullRequestKeys = new Set(
-      resolvedPullRequests.map((pullRequest) =>
+      [...resolvedPullRequests, ...recentOpenPRs].map((pullRequest) =>
         getGitHubPullRequestAttentionStateKey(pullRequest),
       ),
     );
@@ -392,6 +349,7 @@ export function GitHubCard({
     data.connectionStatus,
     hasLoadedGitHubPrNotificationSeenAtState,
     isLoading,
+    recentOpenPRs,
     resolvedPullRequests,
   ]);
 
@@ -412,26 +370,6 @@ export function GitHubCard({
       };
     });
   }
-
-  useEffect(() => {
-    const activeNotificationIds = new Set(
-      (data.notifications ?? []).map((notification) => notification.id),
-    );
-
-    setIsResolvingNotificationStates(false);
-    setNotificationPullRequestStates((currentEntries) => {
-      const nextEntries = Object.fromEntries(
-        Object.entries(currentEntries).filter(([id]) =>
-          activeNotificationIds.has(id),
-        ),
-      );
-
-      return Object.keys(nextEntries).length ===
-        Object.keys(currentEntries).length
-        ? currentEntries
-        : nextEntries;
-    });
-  }, [data.notifications]);
 
   useEffect(() => {
     onSummaryMetricsChange({
@@ -461,63 +399,6 @@ export function GitHubCard({
     summaryCounts.relevantPrCount,
     onSummaryMetricsChange,
   ]);
-
-  useEffect(() => {
-    if (!token.trim() || visiblePullRequestNotifications.length === 0) {
-      setIsResolvingNotificationStates(false);
-      return;
-    }
-
-    let isCancelled = false;
-    setIsResolvingNotificationStates(true);
-
-    const missingPullRequests = visiblePullRequestNotifications
-      .map((notification) => {
-        const pullRequestIdentity =
-          getPullRequestIdentityFromNotification(notification);
-        if (!pullRequestIdentity) {
-          return null;
-        }
-
-        return {
-          id: notification.id,
-          ...pullRequestIdentity,
-        };
-      })
-      .filter(
-        (
-          pullRequest,
-        ): pullRequest is {
-          id: string;
-          owner: string;
-          repo: string;
-          pullNumber: number;
-        } => Boolean(pullRequest),
-      );
-
-    getGitHubPullRequestStates({
-      token,
-      pullRequests: missingPullRequests,
-    }).then((statesById) => {
-      if (isCancelled) {
-        return;
-      }
-
-      setNotificationPullRequestStates((currentEntries) => {
-        const nextEntries = { ...currentEntries };
-        for (const [id, state] of Object.entries(statesById)) {
-          nextEntries[id] = state;
-        }
-
-        return nextEntries;
-      });
-      setIsResolvingNotificationStates(false);
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [token, visibleNotificationPullRequestKey]);
 
   function handleClearWarningHighlight(pullRequest: GitHubPullRequestItem) {
     const readyStateKey = getGitHubPullRequestAttentionStateKey(pullRequest);
@@ -569,7 +450,7 @@ export function GitHubCard({
               <CardTabMenu items={tabItems} className="border-b-0" />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:max-w-[100%] xl:justify-end">
-              {activeView === 'prs' ? (
+              {activeView === 'my-prs' ? (
                 <label
                   className={`${filterControlClass} min-w-[160px] flex-1 xl:w-[168px] xl:flex-none`}
                 >
@@ -652,7 +533,7 @@ export function GitHubCard({
           </div>
 
           <div className="dashboard-scrollbar min-h-[280px] max-h-[420px] flex-1 overflow-x-hidden overflow-y-auto pr-1">
-            {isNotificationViewLoading || isLoading ? (
+            {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <ListItemSkeleton key={index} />
@@ -664,76 +545,28 @@ export function GitHubCard({
                   ? currentView.emptyMessage
                   : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
-            ) : activeView === 'prs' ? (
-                <PullRequestList
-                  pullRequests={filteredItems
-                    .filter(
-                      (
-                      item,
-                    ): item is Extract<
-                      GitHubViewItem,
-                      { kind: 'pull-request' }
-                    > => item.kind === 'pull-request',
-                  )
-                  .map((item) => item.value)}
-                  todayFocusItemIds={todayFocusItemIds}
-                  gitHubPrReadyState={gitHubPrReadyState}
-                  gitHubPrWarningState={gitHubPrWarningState}
-                  pullRequestNewCommentCountByKey={
-                    pullRequestNewCommentCountByKey
-                  }
-                  onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
-                  onClearWarningHighlight={handleClearWarningHighlight}
-                />
             ) : (
-              <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
-                {filteredItems.map((item) =>
-                  item.kind === 'notification' ? (
-                    <NotificationRow
-                      key={item.key}
-                      notification={item.value}
-                      pullRequestState={
-                        item.value.pullRequestState ??
-                        notificationPullRequestStates[item.value.id]
-                      }
-                    />
-                  ) : (
-                    <PullRequestRow
-                      key={item.key}
-                      pullRequest={item.value}
-                      newNotificationCount={
-                        pullRequestNewCommentCountByKey[
-                          getGitHubPullRequestAttentionStateKey(item.value)
-                        ] ?? 0
-                      }
-                      isInTodayFocus={todayFocusItemIds.has(
-                        mapPullRequestToFocusItem(item.value).id,
-                      )}
-                      isReadyHighlighted={isGitHubPrReadyHighlighted(
-                        gitHubPrReadyState,
-                        item.value,
-                      )}
-                      isWarningHighlighted={isGitHubPrWarningHighlighted(
-                        gitHubPrWarningState,
-                        item.value,
-                      )}
-                      onMarkNotificationsSeen={
-                        handleMarkPullRequestNotificationsSeen
-                      }
-                      onClearWarningHighlight={handleClearWarningHighlight}
-                    />
-                  ),
-                )}
-              </div>
+              <PullRequestList
+                pullRequests={filteredItems.map((item) => item.value)}
+                todayFocusItemIds={todayFocusItemIds}
+                gitHubPrReadyState={gitHubPrReadyState}
+                gitHubPrWarningState={gitHubPrWarningState}
+                pullRequestNewCommentCountByKey={
+                  pullRequestNewCommentCountByKey
+                }
+                onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
+                onClearWarningHighlight={handleClearWarningHighlight}
+              />
             )}
           </div>
           {!isLoading &&
-          activeView === 'prs' &&
-          data.openPrsCount > 0 &&
-          username.trim() ? (
+          ((activeView === 'my-prs' &&
+            data.openPrsCount > 0 &&
+            username.trim()) ||
+            (activeView === 'prs' && data.recentOpenPrsCount > 0)) ? (
             <div className="mt-3 text-right">
               <a
-                href={viewAllUrl}
+                href={activeView === 'my-prs' ? myPrsViewAllUrl : recentPrsViewAllUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-secondary transition hover:text-primary"
@@ -746,6 +579,17 @@ export function GitHubCard({
       </div>
     </CardShell>
   );
+}
+
+function buildRecentOpenPullRequestsQuery(ownerFilter: string) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const normalizedOwnerFilter = ownerFilter.trim();
+  const ownerScope =
+    normalizedOwnerFilter && normalizedOwnerFilter !== 'all'
+      ? ` user:${normalizedOwnerFilter}`
+      : '';
+
+  return `is:pr is:open draft:false created:>=${since}${ownerScope}`;
 }
 
 function PullRequestRow({
@@ -1116,93 +960,11 @@ function PullRequestList({
   );
 }
 
-function NotificationRow({
-  notification,
-  pullRequestState,
-}: {
-  notification: GitHubNotification;
-  pullRequestState?: GitHubPullRequestState;
-}) {
-  const iconKind = getNotificationIconKind(notification.subject.type);
-  const notificationTypeLabel = getNotificationTypeLabel(notification);
-  const authorLogin = notification.authorLogin?.trim() ?? '';
-  const repositoryLabel = getRepositoryLabel(notification.repository.full_name);
-  const rowTextClass = notification.unread ? 'text-primary' : 'text-secondary';
-  const rowMetaClass = notification.unread
-    ? 'text-white/42'
-    : 'text-[var(--text-tertiary)]';
-  const rowMutedClass = notification.unread
-    ? 'text-white/36'
-    : 'text-[var(--text-tertiary)]';
-  const rowTimestampClass = notification.unread
-    ? 'text-white/38'
-    : 'text-[var(--text-tertiary)]';
-
-  return (
-    <a
-      href={getNotificationUrl(notification)}
-      target="_blank"
-      rel="noreferrer"
-      className="group -mx-2 block cursor-pointer px-2 py-1.5 transition hover:bg-white/[0.03]"
-    >
-      <div className="grid grid-cols-[minmax(0,1fr)_9.5rem] grid-rows-2 gap-x-3">
-        <div className="row-span-2 flex min-w-0 items-start gap-1.5">
-          <GitHubItemIcon
-            kind={iconKind}
-            state={iconKind === 'pull-request' ? pullRequestState : undefined}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="inline-flex max-w-full items-center gap-1 align-top">
-              <p
-                className={`truncate text-[0.82rem] font-medium leading-4.25 transition group-hover:text-white ${rowTextClass}`}
-              >
-                {notification.subject.title}
-              </p>
-            </div>
-            <div
-              className={`mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] ${rowMetaClass}`}
-            >
-              <p
-                className="truncate"
-                title={`${notification.repository.full_name}${authorLogin ? ` • by ${authorLogin}` : ''}${notification.unread ? ' • unread' : ''}`}
-              >
-                <span>{repositoryLabel}</span>
-                {authorLogin ? (
-                  <span className="mx-1.5 text-white/22">•</span>
-                ) : null}
-                {authorLogin ? <span>by {authorLogin}</span> : null}
-                {notification.unread ? (
-                  <span className="mx-1.5 text-white/22">•</span>
-                ) : null}
-                {notification.unread ? <span>Unread</span> : null}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="col-start-2 row-start-1 flex items-center justify-end self-start pt-[0.08rem]">
-          <p
-            className={`text-right text-[0.58rem] font-medium uppercase tracking-[0.12em] ${rowMutedClass}`}
-          >
-            {notificationTypeLabel}
-          </p>
-        </div>
-        <p
-          className={`col-start-2 row-start-2 mt-0.25 self-start text-right text-[0.64rem] leading-4 ${rowTimestampClass}`}
-        >
-          updated {formatRelativeTime(notification.updated_at)}
-        </p>
-      </div>
-    </a>
-  );
-}
-
 function GitHubItemIcon({
   kind,
-  state,
   isDraft = false,
 }: {
   kind: 'pull-request' | 'issue' | 'commit' | 'discussion';
-  state?: GitHubPullRequestState;
   isDraft?: boolean;
 }) {
   if (kind === 'issue') {
@@ -1240,32 +1002,6 @@ function GitHubItemIcon({
         fill="currentColor"
       >
         <path d="M1.75 3A2.25 2.25 0 0 1 4 0.75h8A2.25 2.25 0 0 1 14.25 3v5A2.25 2.25 0 0 1 12 10.25H8.56L5.53 13.1A.75.75 0 0 1 4.25 12.55v-2.3H4A2.25 2.25 0 0 1 1.75 8V3ZM4 2.25a.75.75 0 0 0-.75.75v5c0 .414.336.75.75.75H5a.75.75 0 0 1 .75.75v1.32l2.03-1.91a.75.75 0 0 1 .52-.16H12a.75.75 0 0 0 .75-.75V3a.75.75 0 0 0-.75-.75H4Z" />
-      </svg>
-    );
-  }
-
-  if (kind === 'pull-request' && state === 'closed') {
-    return (
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-        className="h-4 w-4 flex-none text-rose-400"
-        fill="currentColor"
-      >
-        <path d="M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 5.5a.75.75 0 0 1 .75.75v3.378a2.251 2.251 0 1 1-1.5 0V7.25a.75.75 0 0 1 .75-.75Zm-2.03-5.273a.75.75 0 0 1 1.06 0l.97.97.97-.97a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.97.97.97.97a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-.97-.97-.97.97a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l.97-.97-.97-.97a.75.75 0 0 1 0-1.06ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z" />
-      </svg>
-    );
-  }
-
-  if (kind === 'pull-request' && state === 'merged') {
-    return (
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-        className="h-4 w-4 flex-none text-violet-400"
-        fill="currentColor"
-      >
-        <path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z" />
       </svg>
     );
   }

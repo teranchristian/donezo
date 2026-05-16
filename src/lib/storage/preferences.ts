@@ -200,9 +200,19 @@ function mergeActiveIntegration(activeIntegration?: string): ActiveIntegration {
 }
 
 function mergeActiveGitHubView(activeGitHubView?: string): ActiveGitHubView {
-  return activeGitHubView === 'notifications' || activeGitHubView === 'review' || activeGitHubView === 'prs'
-    ? activeGitHubView
-    : DEFAULT_ACTIVE_GITHUB_VIEW;
+  if (
+    activeGitHubView === 'my-prs' ||
+    activeGitHubView === 'review' ||
+    activeGitHubView === 'prs'
+  ) {
+    return activeGitHubView;
+  }
+
+  if (activeGitHubView === 'notifications') {
+    return 'prs';
+  }
+
+  return DEFAULT_ACTIVE_GITHUB_VIEW;
 }
 
 function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {

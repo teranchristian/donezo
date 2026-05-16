@@ -330,13 +330,9 @@ function DashboardContent({
               data={gitHubData}
               todayFocusItemIds={todayFocus.todayFocusItemIds}
               username={settings.integrations.github.username}
-              token={settings.integrations.github.token}
               ownerFilter={settings.integrations.github.ownerFilter}
               isMockMode={isGitHubMockMode}
               isLoading={isGitHubLoading}
-              isCheckingActivity={isCheckingGitHubActivity}
-              lastActivityCheckAt={lastGitHubActivityCheckAt}
-              onRefresh={onRefreshGitHub}
               onSummaryMetricsChange={onGitHubSummaryMetricsChange}
               activeView={activeGitHubView}
               prStatusFilter={githubPrStatusFilter}

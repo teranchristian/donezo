@@ -35,7 +35,7 @@ export function useDashboardNavigation({
   const [activeIntegration, setActiveIntegration] =
     useState<ActiveIntegration>('github');
   const [activeGitHubView, setActiveGitHubView] =
-    useState<ActiveGitHubView>('prs');
+    useState<ActiveGitHubView>('my-prs');
   const [githubPrStatusFilter, setGitHubPrStatusFilter] =
     useState<GitHubPrStatusFilter>('all');
   const [activeJiraView, setActiveJiraView] =
@@ -139,7 +139,7 @@ export function useDashboardNavigation({
   function navigateToGitHubPrs(prStatusFilter: GitHubPrStatusFilter) {
     updateDashboardNavigation({
       activeIntegration: 'github',
-      activeGitHubView: 'prs',
+      activeGitHubView: 'my-prs',
       githubPrStatusFilter: prStatusFilter,
       activeJiraView,
     });
@@ -177,7 +177,7 @@ export function useDashboardNavigation({
   ) {
     updateDashboardNavigation({
       activeIntegration: 'github',
-      activeGitHubView: 'prs',
+      activeGitHubView: 'my-prs',
       githubPrStatusFilter: prStatusFilter,
       activeJiraView,
     });

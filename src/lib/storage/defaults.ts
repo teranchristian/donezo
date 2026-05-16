@@ -29,7 +29,7 @@ export const DEFAULT_GITHUB_OWNER_FILTER: GitHubListOrganizationFilter = 'all';
 export const DEFAULT_GITHUB_SORT_ORDER: GitHubListSort = 'recently-updated';
 export const DEFAULT_GITHUB_PR_STATUS_FILTER: GitHubPrStatusFilter = 'all';
 export const DEFAULT_ACTIVE_INTEGRATION: ActiveIntegration = 'github';
-export const DEFAULT_ACTIVE_GITHUB_VIEW: ActiveGitHubView = 'prs';
+export const DEFAULT_ACTIVE_GITHUB_VIEW: ActiveGitHubView = 'my-prs';
 export const DEFAULT_ACTIVE_JIRA_VIEW: ActiveJiraView = 'active';
 
 export function getDefaultSettings() {

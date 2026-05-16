@@ -22,38 +22,15 @@ import type {
 } from './storage';
 
 export type GitHubViewItem =
-  | {
-      kind: 'notification';
-      key: string;
-      owner: string;
-      repositoryName: string;
-      title: string;
-      updatedAt: string;
-      value: GitHubNotification;
-    }
-  | {
-      kind: 'pull-request';
-      key: string;
-      owner: string;
-      repositoryName: string;
-      title: string;
-      updatedAt: string;
-      value: GitHubPullRequestItem;
-    };
-
-export function mapNotificationViewItem(
-  notification: GitHubNotification,
-): GitHubViewItem {
-  return {
-    kind: 'notification',
-    key: notification.id,
-    owner: getOwnerFromRepositoryName(notification.repository.full_name),
-    repositoryName: notification.repository.full_name,
-    title: notification.subject.title,
-    updatedAt: notification.updated_at,
-    value: notification,
+  {
+    kind: 'pull-request';
+    key: string;
+    owner: string;
+    repositoryName: string;
+    title: string;
+    updatedAt: string;
+    value: GitHubPullRequestItem;
   };
-}
 
 export function mapPullRequestViewItem(
   pullRequest: GitHubPullRequestItem,
@@ -82,17 +59,6 @@ export function getOwnerFromRepositoryName(repositoryName: string) {
 export function getRepositoryLabel(repositoryName: string) {
   const segments = repositoryName.split('/');
   return segments[segments.length - 1] ?? repositoryName;
-}
-
-export function filterGitHubItems(
-  items: GitHubViewItem[],
-  organizationFilter: string,
-) {
-  if (organizationFilter === 'all') {
-    return items;
-  }
-
-  return items.filter((item) => item.owner === organizationFilter);
 }
 
 export function filterGitHubPullRequests(
@@ -162,30 +128,17 @@ export function sortGitHubItems(
 export function getGitHubViewContent(options: {
   activeGitHubView: ActiveGitHubView;
   data: GitHubDashboardData;
-  notifications: GitHubNotification[];
   myOpenPullRequests: GitHubPullRequestItem[];
+  recentOpenPullRequests: GitHubPullRequestItem[];
   reviewRequestedPullRequests: GitHubPullRequestItem[];
 }) {
   const {
     activeGitHubView,
     data,
-    notifications,
     myOpenPullRequests,
+    recentOpenPullRequests,
     reviewRequestedPullRequests,
   } = options;
-
-  if (activeGitHubView === 'notifications') {
-    return {
-      count: notifications.length,
-      countLabel: `${notifications.length} notifications`,
-      itemLabel: 'notifications',
-      emptyMessage:
-        data.connectionStatus === 'connected'
-          ? 'No notifications right now.'
-          : getEmptyListMessage(data),
-      items: notifications.map(mapNotificationViewItem),
-    };
-  }
 
   if (activeGitHubView === 'review') {
     return {
@@ -197,6 +150,19 @@ export function getGitHubViewContent(options: {
           ? 'No pull requests need your review.'
           : getEmptyListMessage(data),
       items: reviewRequestedPullRequests.map(mapPullRequestViewItem),
+    };
+  }
+
+  if (activeGitHubView === 'prs') {
+    return {
+      count: data.recentOpenPrsCount,
+      countLabel: `${data.recentOpenPrsCount} open PRs`,
+      itemLabel: 'PRs',
+      emptyMessage:
+        data.connectionStatus === 'connected'
+          ? 'No open pull requests created in the last 24 hours.'
+          : getEmptyListMessage(data),
+      items: recentOpenPullRequests.map(mapPullRequestViewItem),
     };
   }
 
@@ -215,14 +181,6 @@ export function getNoFilterResultsMessage(itemLabel: string) {
 
 export function shouldDisplayNotification(notification: GitHubNotification) {
   return notification.subject.type === 'PullRequest';
-}
-
-export function getNotificationTypeLabel(notification: GitHubNotification) {
-  if (notification.reason === 'review_requested') {
-    return 'Review requested';
-  }
-
-  return formatReason(notification.reason);
 }
 
 export function getPullRequestNewNotificationCountByKey(
@@ -260,24 +218,6 @@ export function getPullRequestNewCommentCountByKey(
   );
 }
 
-export function getNotificationIconKind(
-  subjectType: string,
-): 'pull-request' | 'issue' | 'commit' | 'discussion' {
-  if (subjectType === 'Issue') {
-    return 'issue';
-  }
-
-  if (subjectType === 'Commit') {
-    return 'commit';
-  }
-
-  if (subjectType === 'Discussion') {
-    return 'discussion';
-  }
-
-  return 'pull-request';
-}
-
 export function getPullRequestIdentityFromNotification(
   notification: GitHubNotification,
 ) {
@@ -300,26 +240,6 @@ export function getPullRequestIdentityFromNotification(
     repo,
     pullNumber: Number(pullNumber),
   };
-}
-
-export function getNotificationUrl(notification: GitHubNotification) {
-  if (notification.subject.url) {
-    const apiPath = notification.subject.url.replace(
-      'https://api.github.com/repos/',
-      '',
-    );
-    const [owner, repo, resource, id] = apiPath.split('/');
-
-    if (resource === 'pulls') {
-      return `https://github.com/${owner}/${repo}/pull/${id}`;
-    }
-
-    if (resource === 'issues') {
-      return `https://github.com/${owner}/${repo}/issues/${id}`;
-    }
-  }
-
-  return `https://github.com/${notification.repository.full_name}`;
 }
 
 export function calculateGitHubSummaryCounts(options: {
@@ -403,10 +323,6 @@ export function calculateGitHubSummaryCounts(options: {
     relevantPrCount,
     pullRequestNewCommentCountByKey,
   };
-}
-
-function formatReason(reason: string) {
-  return reason.replace(/-/g, ' ');
 }
 
 function getPullRequestIdentityKey(pullRequestIdentity: {
