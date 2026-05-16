@@ -25,7 +25,9 @@ export type GitHubNotification = {
 export type GitHubPullRequestItem = {
   id: number;
   title: string;
+  repositoryId: number;
   repositoryName: string;
+  repositoryUrl: string;
   owner: string;
   repo: string;
   pullNumber: number;

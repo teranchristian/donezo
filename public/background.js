@@ -63,7 +63,9 @@ const GITHUB_PULL_REQUESTS_QUERY = `
       login
     }
     repository {
+      databaseId
       name
+      url
       owner {
         login
       }
@@ -1053,7 +1055,9 @@ function mapGraphQlPullRequest(pullRequest, source) {
   return {
     id: getPullRequestStableId(owner, repo, pullRequest.number),
     title: pullRequest.title,
+    repositoryId: Number(pullRequest.repository?.databaseId ?? 0),
     repositoryName: `${owner}/${repo}`,
+    repositoryUrl: pullRequest.repository?.url ?? `https://github.com/${owner}/${repo}`,
     owner,
     repo,
     pullNumber: pullRequest.number,

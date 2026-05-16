@@ -533,7 +533,11 @@ function createPullRequest(
   return {
     id: overrides.id,
     title: overrides.title,
+    repositoryId: overrides.repositoryId ?? overrides.id,
     repositoryName: overrides.repositoryName,
+    repositoryUrl:
+      overrides.repositoryUrl ??
+      `https://github.com/${overrides.owner}/${overrides.repo}`,
     owner: overrides.owner,
     repo: overrides.repo,
     pullNumber: overrides.pullNumber,

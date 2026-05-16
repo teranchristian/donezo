@@ -249,6 +249,7 @@ export function DashboardPage({
             onGitHubPrStatusFilterChange={
               navigation.handleGitHubPrStatusFilterChange
             }
+            onHideRepository={handleHideRepository}
             onJiraViewChange={navigation.handleJiraViewChange}
           />
         </section>
@@ -277,6 +278,7 @@ function DashboardContent({
   onGitHubSummaryMetricsChange,
   onGitHubViewChange,
   onGitHubPrStatusFilterChange,
+  onHideRepository,
   onJiraViewChange,
 }: {
   settings: DashboardSettings;
@@ -298,6 +300,7 @@ function DashboardContent({
   onGitHubSummaryMetricsChange: (metrics: GitHubSummaryMetrics) => void;
   onGitHubViewChange: (view: ActiveGitHubView) => void;
   onGitHubPrStatusFilterChange: (filter: GitHubPrStatusFilter) => void;
+  onHideRepository: (repository: GitHubHiddenRepository) => Promise<void>;
   onJiraViewChange: (view: ActiveJiraView) => void;
 }) {
   return (
@@ -333,6 +336,7 @@ function DashboardContent({
               todayFocusItemIds={todayFocus.todayFocusItemIds}
               username={settings.integrations.github.username}
               ownerFilter={settings.integrations.github.ownerFilter}
+              hiddenRepositories={settings.integrations.github.hiddenRepositories}
               isMockMode={isGitHubMockMode}
               isLoading={isGitHubLoading}
               onSummaryMetricsChange={onGitHubSummaryMetricsChange}
@@ -340,6 +344,7 @@ function DashboardContent({
               prStatusFilter={githubPrStatusFilter}
               onViewChange={onGitHubViewChange}
               onPrStatusFilterChange={onGitHubPrStatusFilterChange}
+              onHideRepository={onHideRepository}
             />
           </div>
           <div
