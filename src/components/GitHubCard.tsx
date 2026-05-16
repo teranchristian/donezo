@@ -68,6 +68,7 @@ type GitHubCardProps = {
 export type GitHubSummaryMetrics = {
   connectionStatus: GitHubConnectionStatus;
   missingUsername: boolean;
+  openTeamPrCount: number;
   readyToMergeCount: number;
   failedBuildCount: number;
   failedBuildBadgeCount: number;
@@ -188,14 +189,14 @@ export function GitHubCard({
       onClick: () => onViewChange('my-prs'),
     },
     {
-      key: 'prs',
+      key: 'team-prs',
       label: 'Team PRs',
       value: formatCount(filteredRecentOpenPrCount, isLoading),
-      isActive: activeView === 'prs',
+      isActive: activeView === 'team-prs',
       title: isLoading
         ? undefined
         : `${filteredRecentOpenPrCount} of ${recentOpenPRs.length} PRs`,
-      onClick: () => onViewChange('prs'),
+      onClick: () => onViewChange('team-prs'),
     },
     {
       key: 'review',
@@ -375,6 +376,7 @@ export function GitHubCard({
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
+      openTeamPrCount: data.recentOpenPrsCount,
       readyToMergeCount: summaryCounts.readyToMergeCount,
       failedBuildCount: summaryCounts.failedBuildCount,
       failedBuildBadgeCount: summaryCounts.failedBuildBadgeCount,
@@ -388,6 +390,7 @@ export function GitHubCard({
   }, [
     data.connectionStatus,
     data.missingUsername,
+    data.recentOpenPrsCount,
     summaryCounts.readyToMergeCount,
     summaryCounts.failedBuildCount,
     summaryCounts.failedBuildBadgeCount,
@@ -563,7 +566,7 @@ export function GitHubCard({
           ((activeView === 'my-prs' &&
             data.openPrsCount > 0 &&
             username.trim()) ||
-            (activeView === 'prs' && data.recentOpenPrsCount > 0)) ? (
+            (activeView === 'team-prs' && data.recentOpenPrsCount > 0)) ? (
             <div className="mt-3 text-right">
               <a
                 href={activeView === 'my-prs' ? myPrsViewAllUrl : recentPrsViewAllUrl}

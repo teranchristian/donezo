@@ -80,12 +80,12 @@ function mergeGitHubPrStatusFilter(filter: string | null): GitHubPrStatusFilter 
 }
 
 function mergeActiveGitHubView(activeGitHubView: string | null): ActiveGitHubView {
-  if (activeGitHubView === 'my-prs' || activeGitHubView === 'review' || activeGitHubView === 'prs') {
+  if (
+    activeGitHubView === 'my-prs' ||
+    activeGitHubView === 'review' ||
+    activeGitHubView === 'team-prs'
+  ) {
     return activeGitHubView;
-  }
-
-  if (activeGitHubView === 'notifications') {
-    return 'prs';
   }
 
   return 'my-prs';

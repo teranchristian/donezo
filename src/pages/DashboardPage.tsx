@@ -53,6 +53,7 @@ type DashboardPageProps = {
 const EMPTY_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
   connectionStatus: 'not-connected',
   missingUsername: true,
+  openTeamPrCount: 0,
   readyToMergeCount: 0,
   failedBuildCount: 0,
   failedBuildBadgeCount: 0,
@@ -217,6 +218,7 @@ export function DashboardPage({
             onOpenReadyToMerge={() =>
               navigation.navigateToGitHubPrs('ready-to-merge')
             }
+            onOpenTeamPr={() => navigation.handleGitHubViewChange('team-prs')}
             onOpenJira={() => navigation.navigateToJiraView('blocking')}
             onApplyGitHubMockScenario={onApplyGitHubMockScenario}
             onClearGitHubMockScenario={onClearGitHubMockScenario}

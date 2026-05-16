@@ -153,7 +153,7 @@ export function getGitHubViewContent(options: {
     };
   }
 
-  if (activeGitHubView === 'prs') {
+  if (activeGitHubView === 'team-prs') {
     return {
       count: data.recentOpenPrsCount,
       countLabel: `${data.recentOpenPrsCount} open PRs`,

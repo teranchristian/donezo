@@ -25,6 +25,7 @@ type DashboardHeaderControlsProps = {
   onRefreshJira: () => void;
   onOpenWarnings: () => void;
   onOpenReadyToMerge: () => void;
+  onOpenTeamPr: () => void;
   onOpenJira: () => void;
   onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onClearGitHubMockScenario: () => void;
@@ -49,6 +50,7 @@ export function DashboardHeaderControls({
   onRefreshJira,
   onOpenWarnings,
   onOpenReadyToMerge,
+  onOpenTeamPr,
   onOpenJira,
   onApplyGitHubMockScenario,
   onClearGitHubMockScenario,
@@ -62,9 +64,11 @@ export function DashboardHeaderControls({
         readyToMergeBadgeCount={gitHubSummaryMetrics.highlightedReadyCount}
         failedBuildCount={gitHubSummaryMetrics.failedBuildCount}
         failedBuildBadgeCount={gitHubSummaryMetrics.failedBuildBadgeCount}
+        openTeamPrCount={gitHubSummaryMetrics.openTeamPrCount}
         jiraBlockingCount={jiraBlockingCount}
         onOpenWarnings={onOpenWarnings}
         onOpenReadyToMerge={onOpenReadyToMerge}
+        onOpenTeamPr={onOpenTeamPr}
         onOpenJira={onOpenJira}
       />
       {repoLauncherControl}
@@ -143,9 +147,11 @@ function GitHubHeaderShortcuts({
   readyToMergeBadgeCount,
   failedBuildCount,
   failedBuildBadgeCount,
+  openTeamPrCount,
   jiraBlockingCount,
   onOpenWarnings,
   onOpenReadyToMerge,
+  onOpenTeamPr,
   onOpenJira,
 }: {
   connectionStatus: GitHubConnectionStatus;
@@ -154,9 +160,11 @@ function GitHubHeaderShortcuts({
   readyToMergeBadgeCount: number;
   failedBuildCount: number;
   failedBuildBadgeCount: number;
+  openTeamPrCount: number;
   jiraBlockingCount: number;
   onOpenWarnings: () => void;
   onOpenReadyToMerge: () => void;
+  onOpenTeamPr: () => void;
   onOpenJira: () => void;
 }) {
   const isConnected = connectionStatus === 'connected';
@@ -189,6 +197,14 @@ function GitHubHeaderShortcuts({
       icon: (isDimmed: boolean) => (
         <HeaderFailedBuildPrIcon isDimmed={isDimmed} />
       ),
+    },
+    {
+      key: 'open-team-pr',
+      count: openTeamPrCount,
+      colorClass: 'text-primary',
+      label: 'Open recent team pull requests',
+      onClick: onOpenTeamPr,
+      icon: <HeaderTeamPrsIcon />,
     },
     {
       key: 'jira',
@@ -237,6 +253,19 @@ function GitHubHeaderShortcuts({
         );
       })}
     </div>
+  );
+}
+
+function HeaderTeamPrsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="h-[1.1rem] w-[1.1rem]"
+      fill="currentColor"
+    >
+      <path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4 4 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.012.749.749 0 0 1-.885.954.752.752 0 0 1-.549-.514 3.507 3.507 0 0 0-2.522-2.372.75.75 0 0 1-.574-.73v-.352a.75.75 0 0 1 .416-.672A1.5 1.5 0 0 0 11 5.5.75.75 0 0 1 11 4Zm-5.5-.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 3.5Z" />
+    </svg>
   );
 }
 
