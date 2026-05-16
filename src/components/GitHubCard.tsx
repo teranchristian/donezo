@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   GitHubConnectionStatus,
   GitHubDashboardData,
@@ -645,7 +646,7 @@ export function GitHubCard({
                   ? currentView.emptyMessage
                   : getNoFilterResultsMessage(currentView.itemLabel)}
               </div>
-            ) : (
+          ) : (
               <PullRequestList
                 pullRequests={filteredItems.map((item) => item.value)}
                 todayFocusItemIds={todayFocusItemIds}
@@ -671,7 +672,13 @@ export function GitHubCard({
             data.openPrsCount > 0 &&
             username.trim()) ||
             (activeView === 'team-prs' && data.recentOpenPrsCount > 0)) ? (
-            <div className="mt-3 text-right">
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Link
+                to="/settings#hidden-repositories"
+                className="text-sm text-secondary transition hover:text-primary"
+              >
+                Hidden repos
+              </Link>
               <a
                 href={activeView === 'my-prs' ? myPrsViewAllUrl : recentPrsViewAllUrl}
                 target="_blank"
@@ -1148,11 +1155,18 @@ function mapPullRequestToHiddenRepository(
   pullRequest: GitHubPullRequestItem,
 ): GitHubHiddenRepository {
   return {
-    id: pullRequest.repositoryId,
+    id:
+      Number.isFinite(pullRequest.repositoryId) && pullRequest.repositoryId > 0
+        ? pullRequest.repositoryId
+        : pullRequest.id,
     name: pullRequest.repo,
     fullName: pullRequest.repositoryName,
     owner: pullRequest.owner,
-    url: pullRequest.repositoryUrl,
+    url:
+      typeof pullRequest.repositoryUrl === 'string' &&
+      pullRequest.repositoryUrl.trim()
+        ? pullRequest.repositoryUrl.trim()
+        : `https://github.com/${pullRequest.owner}/${pullRequest.repo}`,
   };
 }
 

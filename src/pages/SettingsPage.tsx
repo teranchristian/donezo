@@ -375,7 +375,10 @@ export function SettingsPage({
                 {saveMessage ? <p className="mt-2 text-stone-400">{saveMessage}</p> : null}
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div
+                id="hidden-repositories"
+                className="rounded-3xl border border-white/10 bg-black/20 p-4 scroll-mt-6"
+              >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-stone-100">Hidden repositories</h3>

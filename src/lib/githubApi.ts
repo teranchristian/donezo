@@ -165,13 +165,28 @@ function normalizeGitHubDashboardData(
     return null;
   }
 
+  const normalizePullRequestItem = (pullRequest: GitHubPullRequestItem) => ({
+    ...pullRequest,
+    repositoryId:
+      Number.isFinite(pullRequest.repositoryId) && pullRequest.repositoryId > 0
+        ? pullRequest.repositoryId
+        : pullRequest.id,
+    repositoryUrl:
+      typeof pullRequest.repositoryUrl === 'string' &&
+      pullRequest.repositoryUrl.trim()
+        ? pullRequest.repositoryUrl.trim()
+        : `https://github.com/${pullRequest.owner}/${pullRequest.repo}`,
+  });
+
   return {
     ...getEmptyGitHubDashboardData(data.connectionStatus),
     ...data,
     notifications: Array.isArray(data.notifications) ? data.notifications : [],
-    pullRequests: Array.isArray(data.pullRequests) ? data.pullRequests : [],
+    pullRequests: Array.isArray(data.pullRequests)
+      ? data.pullRequests.map(normalizePullRequestItem)
+      : [],
     recentPullRequests: Array.isArray(data.recentPullRequests)
-      ? data.recentPullRequests
+      ? data.recentPullRequests.map(normalizePullRequestItem)
       : [],
     recentOpenPrsCount: Number.isFinite(data.recentOpenPrsCount)
       ? data.recentOpenPrsCount
