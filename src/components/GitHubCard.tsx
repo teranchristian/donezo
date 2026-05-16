@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { type KeyboardEvent, type MouseEvent, ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   GitHubConnectionStatus,
@@ -856,10 +856,9 @@ function PullRequestRow({
             />
           ) : null}
           {activeView === 'team-prs' ? (
-            <button
-              type="button"
-              className="team-pr-hide-button"
-              aria-label={`Hide repository ${pullRequest.repositoryName} from Team PRs and repo search`}
+            <HideRepositoryIcon
+              className="team-pr-hide-button__icon team-pr-hide-button__icon--interactive"
+              ariaLabel={`Hide repository ${pullRequest.repositoryName} from Team PRs and repo search`}
               title={`Hide ${pullRequest.repositoryName} from Team PRs and repo search`}
               onClick={(event) => {
                 event.preventDefault();
@@ -868,9 +867,7 @@ function PullRequestRow({
                   mapPullRequestToHiddenRepository(pullRequest),
                 );
               }}
-            >
-              <HideRepositoryIcon className="team-pr-hide-button__icon" />
-            </button>
+            />
           ) : null}
           <StatusBadge
             label={status.label}
@@ -1170,9 +1167,39 @@ function mapPullRequestToHiddenRepository(
   };
 }
 
-function HideRepositoryIcon({ className }: { className: string }) {
+function HideRepositoryIcon({
+  className,
+  ariaLabel,
+  title,
+  onClick,
+}: {
+  className: string;
+  ariaLabel?: string;
+  title?: string;
+  onClick?: (event: MouseEvent<SVGSVGElement>) => void;
+}) {
+  function handleKeyDown(event: KeyboardEvent<SVGSVGElement>) {
+    if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) {
+      return;
+    }
+
+    event.preventDefault();
+    onClick(event as unknown as MouseEvent<SVGSVGElement>);
+  }
+
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden={onClick ? undefined : 'true'}
+      aria-label={ariaLabel}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+    >
+      {title ? <title>{title}</title> : null}
       <path
         fillRule="evenodd"
         clipRule="evenodd"
