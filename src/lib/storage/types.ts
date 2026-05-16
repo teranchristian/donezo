@@ -84,3 +84,7 @@ export type GitHubPrReadyStateEntry = {
 
 export type GitHubPrReadyState = Record<string, GitHubPrReadyStateEntry>;
 export type GitHubPrNotificationSeenAtState = Record<string, number>;
+export type GitHubTeamPrTrackerState = {
+  snapshotKeys: string[];
+  pendingNewKeys: string[];
+};

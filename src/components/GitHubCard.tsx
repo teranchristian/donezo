@@ -31,15 +31,18 @@ import {
 import {
   getStoredGitHubPrNotificationSeenAtState,
   getStoredGitHubPrReadyState,
+  getStoredGitHubTeamPrTrackerState,
   getStoredGitHubPrWarningState,
   getStoredGitHubSortOrder,
   saveStoredGitHubPrNotificationSeenAtState,
   saveStoredGitHubPrReadyState,
+  saveStoredGitHubTeamPrTrackerState,
   saveStoredGitHubPrWarningState,
   saveStoredGitHubSortOrder,
   type ActiveGitHubView,
   type GitHubPrReadyState,
   type GitHubPrNotificationSeenAtState,
+  type GitHubTeamPrTrackerState,
   type GitHubPrWarningState,
   type GitHubPrStatusFilter,
   type GitHubListSort,
@@ -115,6 +118,13 @@ export function GitHubCard({
     hasLoadedGitHubPrNotificationSeenAtState,
     setHasLoadedGitHubPrNotificationSeenAtState,
   ] = useState(false);
+  const [gitHubTeamPrTrackerState, setGitHubTeamPrTrackerState] =
+    useState<GitHubTeamPrTrackerState>({
+      snapshotKeys: [],
+      pendingNewKeys: [],
+    });
+  const [hasLoadedGitHubTeamPrTrackerState, setHasLoadedGitHubTeamPrTrackerState] =
+    useState(false);
   const organizationFilter = isMockMode ? 'all' : ownerFilter.trim() || 'all';
   const resolvedPullRequests = data.pullRequests;
   const myOpenPRs = resolvedPullRequests.filter(
@@ -246,6 +256,15 @@ export function GitHubCard({
       setHasLoadedGitHubPrNotificationSeenAtState(true);
     });
 
+    getStoredGitHubTeamPrTrackerState().then((storedTrackerState) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setGitHubTeamPrTrackerState(storedTrackerState);
+      setHasLoadedGitHubTeamPrTrackerState(true);
+    });
+
     return () => {
       isMounted = false;
     };
@@ -287,6 +306,14 @@ export function GitHubCard({
     gitHubPrNotificationSeenAtState,
     hasLoadedGitHubPrNotificationSeenAtState,
   ]);
+
+  useEffect(() => {
+    if (!hasLoadedGitHubTeamPrTrackerState) {
+      return;
+    }
+
+    void saveStoredGitHubTeamPrTrackerState(gitHubTeamPrTrackerState);
+  }, [gitHubTeamPrTrackerState, hasLoadedGitHubTeamPrTrackerState]);
 
   useEffect(() => {
     if (!hasLoadedGitHubPrReadyState) {
@@ -354,6 +381,52 @@ export function GitHubCard({
     resolvedPullRequests,
   ]);
 
+  useEffect(() => {
+    if (
+      !hasLoadedGitHubTeamPrTrackerState ||
+      data.connectionStatus !== 'connected' ||
+      isLoading
+    ) {
+      return;
+    }
+
+    const currentTeamPrKeys = recentOpenPRs.map((pullRequest) =>
+      getGitHubPullRequestAttentionStateKey(pullRequest),
+    );
+    const currentTeamPrKeySet = new Set(
+      recentOpenPRs.map((pullRequest) =>
+        getGitHubPullRequestAttentionStateKey(pullRequest),
+      ),
+    );
+
+    setGitHubTeamPrTrackerState((currentState) => {
+      const hasExistingSnapshot = currentState.snapshotKeys.length > 0;
+      const currentSnapshotKeySet = new Set(currentState.snapshotKeys);
+      const nextPendingNewKeys = hasExistingSnapshot
+        ? currentTeamPrKeys.filter((key) => !currentSnapshotKeySet.has(key))
+        : [];
+
+      if (
+        arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
+        arraysEqual(currentState.pendingNewKeys, nextPendingNewKeys)
+      ) {
+        return currentState;
+      }
+
+      return {
+        snapshotKeys: currentTeamPrKeys,
+        pendingNewKeys: nextPendingNewKeys.filter((key) =>
+          currentTeamPrKeySet.has(key),
+        ),
+      };
+    });
+  }, [
+    data.connectionStatus,
+    hasLoadedGitHubTeamPrTrackerState,
+    isLoading,
+    recentOpenPRs,
+  ]);
+
   function handleMarkPullRequestNotificationsSeen(
     pullRequest: GitHubPullRequestItem,
   ) {
@@ -372,11 +445,28 @@ export function GitHubCard({
     });
   }
 
+  function handleMarkTeamPrSeen(pullRequest: GitHubPullRequestItem) {
+    const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
+
+    setGitHubTeamPrTrackerState((currentState) => {
+      if (!currentState.pendingNewKeys.includes(pullRequestKey)) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        pendingNewKeys: currentState.pendingNewKeys.filter(
+          (key) => key !== pullRequestKey,
+        ),
+      };
+    });
+  }
+
   useEffect(() => {
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
-      openTeamPrCount: data.recentOpenPrsCount,
+      openTeamPrCount: gitHubTeamPrTrackerState.pendingNewKeys.length,
       readyToMergeCount: summaryCounts.readyToMergeCount,
       failedBuildCount: summaryCounts.failedBuildCount,
       failedBuildBadgeCount: summaryCounts.failedBuildBadgeCount,
@@ -390,7 +480,7 @@ export function GitHubCard({
   }, [
     data.connectionStatus,
     data.missingUsername,
-    data.recentOpenPrsCount,
+    gitHubTeamPrTrackerState.pendingNewKeys.length,
     summaryCounts.readyToMergeCount,
     summaryCounts.failedBuildCount,
     summaryCounts.failedBuildBadgeCount,
@@ -552,12 +642,18 @@ export function GitHubCard({
               <PullRequestList
                 pullRequests={filteredItems.map((item) => item.value)}
                 todayFocusItemIds={todayFocusItemIds}
+                activeView={activeView}
                 gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}
+                gitHubTeamPrTrackerState={gitHubTeamPrTrackerState}
+                hasLoadedGitHubTeamPrTrackerState={
+                  hasLoadedGitHubTeamPrTrackerState
+                }
                 pullRequestNewCommentCountByKey={
                   pullRequestNewCommentCountByKey
                 }
                 onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
+                onMarkTeamPrSeen={handleMarkTeamPrSeen}
                 onClearWarningHighlight={handleClearWarningHighlight}
               />
             )}
@@ -597,19 +693,25 @@ function buildRecentOpenPullRequestsQuery(ownerFilter: string) {
 
 function PullRequestRow({
   pullRequest,
+  activeView,
   newNotificationCount,
+  isNewTeamPr = false,
   isInTodayFocus,
   isReadyHighlighted = false,
   isWarningHighlighted = false,
   onMarkNotificationsSeen,
+  onMarkTeamPrSeen,
   onClearWarningHighlight,
 }: {
   pullRequest: GitHubPullRequestItem;
+  activeView: ActiveGitHubView;
   newNotificationCount: number;
+  isNewTeamPr?: boolean;
   isInTodayFocus: boolean;
   isReadyHighlighted?: boolean;
   isWarningHighlighted?: boolean;
   onMarkNotificationsSeen?: (pullRequest: GitHubPullRequestItem) => void;
+  onMarkTeamPrSeen?: (pullRequest: GitHubPullRequestItem) => void;
   onClearWarningHighlight?: (pullRequest: GitHubPullRequestItem) => void;
 }) {
   const isOutOfDate = isPullRequestOutOfDate(pullRequest);
@@ -640,6 +742,9 @@ function PullRequestRow({
       }}
       onClick={() => {
         onMarkNotificationsSeen?.(pullRequest);
+        if (activeView === 'team-prs') {
+          onMarkTeamPrSeen?.(pullRequest);
+        }
         onClearWarningHighlight?.(pullRequest);
       }}
       className={`group -mx-2 block cursor-pointer px-2 py-1.5 transition ${
@@ -712,6 +817,15 @@ function PullRequestRow({
                   <span className="mr-1.5 text-white/22">•</span>
                   <span aria-hidden="true">⚠</span>
                   <span className="ml-1">Out of date</span>
+                </span>
+              ) : null}
+              {activeView === 'team-prs' && isNewTeamPr ? (
+                <span
+                  className="ml-1.5 shrink-0 whitespace-nowrap text-[#1f6feb]"
+                  title="New team pull request"
+                >
+                  <span className="mr-1.5 text-white/22">•</span>
+                  <span className="text-[0.66rem]">New</span>
                 </span>
               ) : null}
             </div>
@@ -855,18 +969,26 @@ function PullRequestReadyToMergeIcon() {
 function PullRequestList({
   pullRequests,
   todayFocusItemIds,
+  activeView,
   gitHubPrReadyState,
   gitHubPrWarningState,
+  gitHubTeamPrTrackerState,
+  hasLoadedGitHubTeamPrTrackerState,
   pullRequestNewCommentCountByKey,
   onMarkNotificationsSeen,
+  onMarkTeamPrSeen,
   onClearWarningHighlight,
 }: {
   pullRequests: GitHubPullRequestItem[];
   todayFocusItemIds: Set<string>;
+  activeView: ActiveGitHubView;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
+  gitHubTeamPrTrackerState: GitHubTeamPrTrackerState;
+  hasLoadedGitHubTeamPrTrackerState: boolean;
   pullRequestNewCommentCountByKey: Record<string, number>;
   onMarkNotificationsSeen: (pullRequest: GitHubPullRequestItem) => void;
+  onMarkTeamPrSeen: (pullRequest: GitHubPullRequestItem) => void;
   onClearWarningHighlight: (pullRequest: GitHubPullRequestItem) => void;
 }) {
   const readyToClose = pullRequests.filter((pullRequest) =>
@@ -883,10 +1005,18 @@ function PullRequestList({
           <PullRequestRow
             key={pullRequest.url}
             pullRequest={pullRequest}
+            activeView={activeView}
             newNotificationCount={
               pullRequestNewCommentCountByKey[
                 getGitHubPullRequestAttentionStateKey(pullRequest)
               ] ?? 0
+            }
+            isNewTeamPr={
+              activeView === 'team-prs' &&
+              hasLoadedGitHubTeamPrTrackerState &&
+              gitHubTeamPrTrackerState.pendingNewKeys.includes(
+                getGitHubPullRequestAttentionStateKey(pullRequest),
+              )
             }
             isInTodayFocus={todayFocusItemIds.has(
               mapPullRequestToFocusItem(pullRequest).id,
@@ -900,6 +1030,7 @@ function PullRequestList({
               pullRequest,
             )}
             onMarkNotificationsSeen={onMarkNotificationsSeen}
+            onMarkTeamPrSeen={onMarkTeamPrSeen}
             onClearWarningHighlight={onClearWarningHighlight}
           />
         ))}
@@ -913,10 +1044,18 @@ function PullRequestList({
         <PullRequestRow
           key={pullRequest.url}
           pullRequest={pullRequest}
+          activeView={activeView}
           newNotificationCount={
             pullRequestNewCommentCountByKey[
               getGitHubPullRequestAttentionStateKey(pullRequest)
             ] ?? 0
+          }
+          isNewTeamPr={
+            activeView === 'team-prs' &&
+            hasLoadedGitHubTeamPrTrackerState &&
+            gitHubTeamPrTrackerState.pendingNewKeys.includes(
+              getGitHubPullRequestAttentionStateKey(pullRequest),
+            )
           }
           isInTodayFocus={todayFocusItemIds.has(
             mapPullRequestToFocusItem(pullRequest).id,
@@ -930,6 +1069,7 @@ function PullRequestList({
             pullRequest,
           )}
           onMarkNotificationsSeen={onMarkNotificationsSeen}
+          onMarkTeamPrSeen={onMarkTeamPrSeen}
           onClearWarningHighlight={onClearWarningHighlight}
         />
       ))}
@@ -938,10 +1078,18 @@ function PullRequestList({
             <PullRequestRow
               key={pullRequest.url}
               pullRequest={pullRequest}
+              activeView={activeView}
               newNotificationCount={
                 pullRequestNewCommentCountByKey[
                   getGitHubPullRequestAttentionStateKey(pullRequest)
                 ] ?? 0
+              }
+              isNewTeamPr={
+                activeView === 'team-prs' &&
+                hasLoadedGitHubTeamPrTrackerState &&
+                gitHubTeamPrTrackerState.pendingNewKeys.includes(
+                  getGitHubPullRequestAttentionStateKey(pullRequest),
+                )
               }
               isInTodayFocus={todayFocusItemIds.has(
                 mapPullRequestToFocusItem(pullRequest).id,
@@ -955,6 +1103,7 @@ function PullRequestList({
                 pullRequest,
               )}
               onMarkNotificationsSeen={onMarkNotificationsSeen}
+              onMarkTeamPrSeen={onMarkTeamPrSeen}
               onClearWarningHighlight={onClearWarningHighlight}
             />
           ))
@@ -1079,6 +1228,13 @@ function formatCount(value: number, isLoading: boolean) {
   }
 
   return String(value);
+}
+
+function arraysEqual(left: string[], right: string[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 }
 
 function areGitHubPrReadyStatesEqual(
