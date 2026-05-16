@@ -24,6 +24,11 @@ const PR_READY_FAVICON_PATHS: FaviconPaths = {
   '32x32': '/icons/icon-32-pr-ready.png'
 };
 
+const TEAM_PR_FAVICON_PATHS: FaviconPaths = {
+  '16x16': '/icons/icon-16-team-pr.png',
+  '32x32': '/icons/icon-32-team-pr.png'
+};
+
 const PR_WARNING_FAVICON_PATHS: FaviconPaths = {
   '16x16': '/icons/icon-16-pr-warning.png',
   '32x32': '/icons/icon-32-pr-warning.png'
@@ -63,6 +68,12 @@ const FAVICON_VARIANTS: FaviconVariant[] = [
     matches: (metrics) => metrics.highlightedReadyCount > 0,
     count: (metrics) => metrics.highlightedReadyCount,
     paths: PR_READY_FAVICON_PATHS
+  },
+  {
+    key: 'team-pr',
+    matches: (metrics) => metrics.openTeamPrCount > 0,
+    count: (metrics) => metrics.openTeamPrCount,
+    paths: TEAM_PR_FAVICON_PATHS
   }
 ];
 
