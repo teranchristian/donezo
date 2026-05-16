@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
 import { InfoBanner } from '../components/InfoBanner';
 import { GitHubConnectionStatus } from '../lib/githubApi';
@@ -60,6 +60,7 @@ export function SettingsPage({
   isTestingGitHub,
   isTestingJira
 }: SettingsPageProps) {
+  const location = useLocation();
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -78,6 +79,27 @@ export function SettingsPage({
       gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
     );
   }, [gitHubTestStatus, settings.integrations.github.token]);
+
+  useEffect(() => {
+    const hash = location.hash.replace(/^#/, '').trim();
+    if (!hash) {
+      return;
+    }
+
+    const scrollToTarget = () => {
+      const element = document.getElementById(hash);
+      if (!element) {
+        return;
+      }
+
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    };
+
+    window.requestAnimationFrame(scrollToTarget);
+  }, [location.hash]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
