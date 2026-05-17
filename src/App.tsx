@@ -165,27 +165,33 @@ function DashboardLoadingScreen() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10 text-stone-100">
       <div className="flex max-w-md flex-col items-center text-center">
-        <div className="flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/10 bg-white/[0.04] shadow-[var(--shadow-card)]">
-          <svg
-            viewBox="0 0 24 24"
-            className="h-10 w-10 text-white/72"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="relative flex h-32 w-32 items-center justify-center rounded-[34px] bg-[linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.02))] shadow-[0_22px_55px_rgba(0,0,0,0.36),inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="absolute inset-[1px] rounded-[33px] border border-white/[0.05] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.025),rgba(255,255,255,0.01)_45%,rgba(255,255,255,0.012)_100%)]" />
+          <img
+            src="/logo-cropped.png"
+            alt=""
             aria-hidden="true"
-          >
-            <path d="M12 16V6" />
-            <path d="m8.5 9.5 3.5-3.5 3.5 3.5" />
-            <path d="M5 18.5h14" />
-          </svg>
+            className="relative h-16 w-16 object-contain drop-shadow-[0_6px_24px_rgba(44,108,255,0.22)]"
+          />
         </div>
-        <h1 className="mt-6 text-[1.5rem] font-semibold tracking-[-0.03em] text-primary">
+        <h1 className="mt-8 text-[1.5rem] font-semibold tracking-[-0.04em] text-primary sm:text-[1.7rem]">
           Updating dashboard
         </h1>
-        <p className="mt-2 max-w-sm text-sm leading-6 text-secondary">
-          Loading the latest GitHub and Jira data for this dashboard view.
+        <div
+          className="mt-4 flex items-center justify-center gap-2"
+          aria-label="Loading"
+          role="status"
+        >
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className="h-2 w-2 animate-pulse rounded-full bg-white/50"
+              style={{ animationDelay: `${index * 180}ms` }}
+            />
+          ))}
+        </div>
+        <p className="mt-5 max-w-[34rem] text-base leading-8 text-secondary/90">
+          Loading the latest data for this dashboard view.
         </p>
       </div>
     </main>
