@@ -87,4 +87,5 @@ export type GitHubPrNotificationSeenAtState = Record<string, number>;
 export type GitHubTeamPrTrackerState = {
   snapshotKeys: string[];
   pendingNewKeys: string[];
+  lastProcessedUpdatedAt: number | null;
 };

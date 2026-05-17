@@ -331,6 +331,7 @@ function mergeGitHubTeamPrTrackerState(
     return {
       snapshotKeys: [],
       pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
     };
   }
 
@@ -344,10 +345,17 @@ function mergeGitHubTeamPrTrackerState(
         (key): key is string => typeof key === 'string' && key.trim().length > 0,
       )
     : [];
+  const lastProcessedUpdatedAt =
+    typeof state.lastProcessedUpdatedAt === 'number' &&
+    Number.isFinite(state.lastProcessedUpdatedAt) &&
+    state.lastProcessedUpdatedAt > 0
+      ? state.lastProcessedUpdatedAt
+      : null;
 
   return {
     snapshotKeys: [...new Set(snapshotKeys)],
     pendingNewKeys: [...new Set(pendingNewKeys)],
+    lastProcessedUpdatedAt,
   };
 }
 

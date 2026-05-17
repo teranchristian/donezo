@@ -143,9 +143,10 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     warningState: {},
     notificationSeenAtState: {},
     teamPrTrackerState: {
-      snapshotKeys: [],
-      pendingNewKeys: [],
-    }
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
   },
   'jira-auto-group': (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
@@ -216,6 +217,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
       }
     };
   })(),
@@ -237,9 +239,10 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     warningState: {},
     notificationSeenAtState: {},
     teamPrTrackerState: {
-      snapshotKeys: [],
-      pendingNewKeys: [],
-    }
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
   },
   'warning-conflict-new': createWarningScenario('warning-conflict-new', 'DIRTY', 'has-conflicts'),
   'warning-build-failed-new': createWarningScenario('warning-build-failed-new', 'CLEAN', 'failed-checks'),
@@ -271,6 +274,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
       }
     };
   })(),
@@ -345,6 +349,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
       }
     };
   })(),
@@ -411,6 +416,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       teamPrTrackerState: {
         snapshotKeys: previousSnapshotKeys,
         pendingNewKeys,
+        lastProcessedUpdatedAt: Date.now() - 60_000,
       }
     };
   })(),
@@ -459,6 +465,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
       }
     };
   })()
@@ -508,9 +515,10 @@ function createWarningScenario(
     },
     notificationSeenAtState: {},
     teamPrTrackerState: {
-      snapshotKeys: [],
-      pendingNewKeys: [],
-    }
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
   };
 }
 

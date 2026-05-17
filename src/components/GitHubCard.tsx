@@ -128,6 +128,7 @@ export function GitHubCard({
     useState<GitHubTeamPrTrackerState>({
       snapshotKeys: [],
       pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
     });
   const [hasLoadedGitHubTeamPrTrackerState, setHasLoadedGitHubTeamPrTrackerState] =
     useState(false);
@@ -406,30 +407,70 @@ export function GitHubCard({
       getGitHubPullRequestAttentionStateKey(pullRequest),
     );
     const currentTeamPrKeySet = new Set(currentTeamPrKeys);
+    const refreshUpdatedAt =
+      typeof data.lastUpdatedAt === 'number' && Number.isFinite(data.lastUpdatedAt)
+        ? data.lastUpdatedAt
+        : null;
 
     setGitHubTeamPrTrackerState((currentState) => {
+      const existingPendingNewKeys = currentState.pendingNewKeys.filter((key) =>
+        currentTeamPrKeySet.has(key),
+      );
+
+      if (refreshUpdatedAt === null) {
+        if (
+          arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
+          arraysEqual(currentState.pendingNewKeys, existingPendingNewKeys)
+        ) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          snapshotKeys: currentTeamPrKeys,
+          pendingNewKeys: existingPendingNewKeys,
+        };
+      }
+
+      if (currentState.lastProcessedUpdatedAt === refreshUpdatedAt) {
+        if (
+          arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
+          arraysEqual(currentState.pendingNewKeys, existingPendingNewKeys)
+        ) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          snapshotKeys: currentTeamPrKeys,
+          pendingNewKeys: existingPendingNewKeys,
+        };
+      }
+
       const hasExistingSnapshot = currentState.snapshotKeys.length > 0;
       const currentSnapshotKeySet = new Set(currentState.snapshotKeys);
-      const nextPendingNewKeys = hasExistingSnapshot
+      const newlyDiscoveredKeys = hasExistingSnapshot
         ? currentTeamPrKeys.filter((key) => !currentSnapshotKeySet.has(key))
         : [];
+      const nextPendingNewKeys = [...new Set([...existingPendingNewKeys, ...newlyDiscoveredKeys])];
 
       if (
         arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
-        arraysEqual(currentState.pendingNewKeys, nextPendingNewKeys)
+        arraysEqual(currentState.pendingNewKeys, nextPendingNewKeys) &&
+        currentState.lastProcessedUpdatedAt === refreshUpdatedAt
       ) {
         return currentState;
       }
 
       return {
         snapshotKeys: currentTeamPrKeys,
-        pendingNewKeys: nextPendingNewKeys.filter((key) =>
-          currentTeamPrKeySet.has(key),
-        ),
+        pendingNewKeys: nextPendingNewKeys,
+        lastProcessedUpdatedAt: refreshUpdatedAt,
       };
     });
   }, [
     data.connectionStatus,
+    data.lastUpdatedAt,
     hasLoadedGitHubTeamPrTrackerState,
     isLoading,
     visibleRecentOpenPRs,
