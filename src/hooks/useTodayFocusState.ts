@@ -48,7 +48,7 @@ export function useTodayFocusState({
         return;
       }
 
-      const nextItems = storedItems ?? getDefaultTodayFocusItems();
+      const nextItems = storedItems ?? [];
       todayFocusItemsRef.current = nextItems;
       setTodayFocusItems(nextItems);
       hasLoadedTodayFocusItemsRef.current = true;
@@ -220,34 +220,6 @@ function collectTodayFocusItemIds(items: FocusItem[]) {
   }
 
   return itemIds;
-}
-
-function getDefaultTodayFocusItems(): FocusItem[] {
-  return [
-    {
-      id: 'jira:CLK-112',
-      source: 'jira',
-      sourceLabel: 'Jira',
-      reference: 'CLK-112',
-      jiraKey: 'CLK-112',
-      title: 'Fix lead status bug in dashboard',
-      statusLabel: 'In Progress',
-      statusTone: 'violet',
-      children: [
-        {
-          id: 'github:dashboard#142',
-          source: 'github',
-          sourceLabel: 'GitHub',
-          reference: '#142',
-          title: 'CLK-112 Fix venue provision defaults',
-          statusLabel: 'Approved',
-          statusTone: 'emerald',
-          jiraKey: 'CLK-112',
-          repositoryName: 'dashboard',
-        },
-      ],
-    },
-  ];
 }
 
 function addTodayFocusItem(
