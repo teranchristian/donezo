@@ -152,6 +152,7 @@ export function GitHubCard({
         )
       : {};
   const recentViewQuery = buildRecentOpenPullRequestsQuery(ownerFilter);
+  const normalizedUsername = username.trim().toLowerCase();
   const myPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
   const recentPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(recentViewQuery)}`;
   const hiddenRepositoryFullNames = new Set(
@@ -169,7 +170,12 @@ export function GitHubCard({
     recentOpenPRs,
     organizationFilter,
   );
-  const visibleRecentOpenPRs = ownerFilteredRecentOpenPRs.filter(
+  const nonAuthoredRecentOpenPRs = ownerFilteredRecentOpenPRs.filter(
+    (pullRequest) =>
+      !normalizedUsername ||
+      pullRequest.authorLogin.trim().toLowerCase() !== normalizedUsername,
+  );
+  const visibleRecentOpenPRs = nonAuthoredRecentOpenPRs.filter(
     (pullRequest) => !hiddenRepositoryFullNames.has(pullRequest.repositoryName),
   );
   const filteredMyOpenPRs = filterGitHubPullRequests(
