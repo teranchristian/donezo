@@ -709,24 +709,26 @@ export function GitHubCard({
             )}
           </div>
           {!isLoading &&
-          ((activeView === 'my-prs' &&
-            data.openPrsCount > 0 &&
-            username.trim()) ||
-            (activeView === 'team-prs' && data.recentOpenPrsCount > 0)) ? (
+          ((activeView === 'my-prs' && username.trim()) ||
+            activeView === 'team-prs') ? (
             <div className="mt-3 flex items-center justify-between gap-3">
-              <Link
-                to="/settings#hidden-repositories"
-                className="text-sm text-secondary transition hover:text-primary"
-              >
-                Hidden repos
-              </Link>
+              {activeView === 'team-prs' ? (
+                <Link
+                  to="/settings#hidden-repositories"
+                  className="text-sm text-secondary transition hover:text-primary"
+                >
+                  Hidden repos
+                </Link>
+              ) : (
+                <span />
+              )}
               <a
                 href={activeView === 'my-prs' ? myPrsViewAllUrl : recentPrsViewAllUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-secondary transition hover:text-primary"
               >
-                View all PRs →
+                {activeView === 'my-prs' ? 'View my PRs →' : 'View team PRs →'}
               </a>
             </div>
           ) : null}
