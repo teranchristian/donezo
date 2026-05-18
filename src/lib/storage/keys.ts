@@ -13,5 +13,6 @@ export const ACTIVE_JIRA_VIEW_STORAGE_KEY = 'activeJiraView';
 export const GITHUB_PR_WARNING_STATE_STORAGE_KEY = 'github-pr-warning-state';
 export const GITHUB_PR_READY_STATE_STORAGE_KEY = 'github-pr-ready-state';
 export const GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY = 'github-pr-notification-seen-at';
+export const GITHUB_TEAM_PR_TRACKER_STORAGE_KEY = 'github-team-pr-tracker';
 export const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
 export const GITHUB_DEV_MODE_STORAGE_KEY = 'github-dev-mode';

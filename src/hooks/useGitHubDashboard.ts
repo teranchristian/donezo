@@ -12,6 +12,7 @@ import {
 import {
   saveStoredGitHubPrNotificationSeenAtState,
   saveStoredGitHubPrReadyState,
+  saveStoredGitHubTeamPrTrackerState,
   saveStoredGitHubPrWarningState
 } from '../lib/storage';
 import type { GitHubMockScenario } from '../mocks/github/scenarios';
@@ -69,6 +70,7 @@ export function useGitHubDashboard({
     await saveStoredGitHubPrReadyState(scenario.readyState);
     await saveStoredGitHubPrWarningState(scenario.warningState);
     await saveStoredGitHubPrNotificationSeenAtState(scenario.notificationSeenAtState);
+    await saveStoredGitHubTeamPrTrackerState(scenario.teamPrTrackerState);
 
     if (!isMountedRef.current) {
       return;

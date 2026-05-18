@@ -18,6 +18,7 @@ import { useJiraDashboard } from './hooks/useJiraDashboard';
 const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
   connectionStatus: 'not-connected',
   missingUsername: true,
+  openTeamPrCount: 0,
   readyToMergeCount: 0,
   failedBuildCount: 0,
   failedBuildBadgeCount: 0,

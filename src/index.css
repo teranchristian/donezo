@@ -659,6 +659,23 @@ input {
   height: 18px;
 }
 
+.team-pr-hide-button__icon {
+  width: 14px;
+  height: 14px;
+}
+
+.team-pr-hide-button__icon--interactive {
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.16s ease;
+}
+
+.team-pr-hide-button__icon--interactive:hover,
+.team-pr-hide-button__icon--interactive:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
 ::selection {
   background: rgba(214, 195, 161, 0.25);
 }

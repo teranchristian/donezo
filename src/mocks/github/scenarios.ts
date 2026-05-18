@@ -7,6 +7,7 @@ import {
 import type {
   GitHubPrNotificationSeenAtState,
   GitHubPrReadyState,
+  GitHubTeamPrTrackerState,
   GitHubPrWarningState
 } from '../../lib/storage';
 
@@ -16,6 +17,7 @@ export type GitHubMockScenario = {
   readyState: GitHubPrReadyState;
   warningState: GitHubPrWarningState;
   notificationSeenAtState: GitHubPrNotificationSeenAtState;
+  teamPrTrackerState: GitHubTeamPrTrackerState;
 };
 
 export type GitHubMockScenarioOption = {
@@ -31,6 +33,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
   connectionStatus: 'connected',
   notificationsCount: 4,
   openPrsCount: 4,
+  recentOpenPrsCount: 2,
   reviewRequestedCount: 1,
   missingUsername: false,
   lastUpdatedAt: Date.now(),
@@ -86,6 +89,36 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       updatedAt: '2026-05-06T08:20:00.000Z'
     })
   ],
+  recentPullRequests: [
+    createPullRequest({
+      id: 301,
+      title: 'Ship operator quick filters for dashboards',
+      repositoryName: 'acme/platform-web',
+      owner: 'acme',
+      repo: 'platform-web',
+      pullNumber: 1548,
+      reviewStatus: 'open',
+      ciStatus: 'pending',
+      mergeStateStatus: 'CLEAN',
+      source: 'recent',
+      authorLogin: 'ava',
+      updatedAt: '2026-05-06T09:44:00.000Z'
+    }),
+    createPullRequest({
+      id: 302,
+      title: 'Stabilize launch metrics export formatting',
+      repositoryName: 'acme/chrome-home-page',
+      owner: 'acme',
+      repo: 'chrome-home-page',
+      pullNumber: 94,
+      reviewStatus: 'open',
+      ciStatus: 'passing',
+      mergeStateStatus: 'CLEAN',
+      source: 'recent',
+      authorLogin: 'noah',
+      updatedAt: '2026-05-06T09:15:00.000Z'
+    })
+  ],
   notifications: []
 };
 
@@ -98,6 +131,8 @@ const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
   { key: 'warning-out-of-date-new', label: 'Warning: out of date' },
   { key: 'warning-already-seen', label: 'Warning: already seen' },
   { key: 'comment-badges', label: 'Comment badges' },
+  { key: 'queued-prs', label: 'Queued PRs' },
+  { key: 'team-prs-new', label: 'Team PRs: new' },
   { key: 'mixed', label: 'Mixed' }
 ];
 
@@ -107,7 +142,12 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),
     readyState: {},
     warningState: {},
-    notificationSeenAtState: {}
+    notificationSeenAtState: {},
+    teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
   },
   'jira-auto-group': (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
@@ -164,6 +204,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     dashboardData.openPrsCount = dashboardData.pullRequests.filter(
       (pullRequest) => pullRequest.source === 'authored'
     ).length;
+    dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
     dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
       (pullRequest) => pullRequest.source === 'review-requested'
     ).length;
@@ -173,7 +214,12 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       dashboardData,
       readyState: {},
       warningState: {},
-      notificationSeenAtState: {}
+      notificationSeenAtState: {},
+      teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
     };
   })(),
   'ready-to-merge': {
@@ -192,7 +238,12 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       }
     },
     warningState: {},
-    notificationSeenAtState: {}
+    notificationSeenAtState: {},
+    teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
   },
   'warning-conflict-new': createWarningScenario('warning-conflict-new', 'DIRTY', 'has-conflicts'),
   'warning-build-failed-new': createWarningScenario('warning-build-failed-new', 'CLEAN', 'failed-checks'),
@@ -220,7 +271,64 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           updatedAt: Date.now() - 10_000
         }
       },
-      notificationSeenAtState: {}
+      notificationSeenAtState: {},
+      teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
+    };
+  })(),
+  'queued-prs': (() => {
+    const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
+    dashboardData.pullRequests = [
+      createPullRequest({
+        id: 301,
+        title: 'EAP-48: Use provision endpoints and gate Create Group by permission',
+        repositoryName: 'qsic-hq-admin/qsic-hq-admin',
+        owner: 'qsic-hq-admin',
+        repo: 'qsic-hq-admin',
+        pullNumber: 412,
+        reviewStatus: 'approved',
+        ciStatus: 'passing',
+        mergeStateStatus: 'CLEAN',
+        mergeQueueEntry: {
+          position: 1,
+          state: 'QUEUED',
+        },
+        updatedAt: '2026-05-06T09:48:00.000Z'
+      }),
+      createPullRequest({
+        id: 302,
+        title: 'Refine access policy validation for venue sync',
+        repositoryName: 'qsic-hq-admin/qsic-hq-admin',
+        owner: 'qsic-hq-admin',
+        repo: 'qsic-hq-admin',
+        pullNumber: 413,
+        reviewStatus: 'open',
+        ciStatus: 'pending',
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-05-06T09:20:00.000Z'
+      }),
+    ];
+    dashboardData.openPrsCount = dashboardData.pullRequests.filter(
+      (pullRequest) => pullRequest.source === 'authored'
+    ).length;
+    dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
+      (pullRequest) => pullRequest.source === 'review-requested'
+    ).length;
+
+    return {
+      key: 'queued-prs',
+      dashboardData,
+      readyState: {},
+      warningState: {},
+      notificationSeenAtState: {},
+      teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
     };
   })(),
   'comment-badges': (() => {
@@ -281,6 +389,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       })
     ];
     dashboardData.notificationsCount = dashboardData.notifications.length;
+    dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
 
     return {
       key: 'comment-badges',
@@ -289,6 +398,78 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       warningState: {},
       notificationSeenAtState: {
         [getStateKey('acme/platform-web', 1534)]: Date.parse('2026-05-06T09:30:00.000Z')
+      },
+      teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
+    };
+  })(),
+  'team-prs-new': (() => {
+    const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
+    dashboardData.recentPullRequests = [
+      createPullRequest({
+        id: 401,
+        title: 'Add product attributes to campaign data',
+        repositoryName: 'qsic-data/qsic-data',
+        owner: 'qsic-data',
+        repo: 'qsic-data',
+        pullNumber: 287,
+        reviewStatus: 'open',
+        ciStatus: 'pending',
+        mergeStateStatus: 'DIRTY',
+        source: 'recent',
+        authorLogin: 'noah-antoun',
+        updatedAt: '2026-05-06T09:52:00.000Z'
+      }),
+      createPullRequest({
+        id: 402,
+        title: 'Normalize campaign export date handling',
+        repositoryName: 'qsic-data/qsic-data',
+        owner: 'qsic-data',
+        repo: 'qsic-data',
+        pullNumber: 286,
+        reviewStatus: 'open',
+        ciStatus: 'passing',
+        mergeStateStatus: 'CLEAN',
+        source: 'recent',
+        authorLogin: 'ava',
+        updatedAt: '2026-05-06T09:18:00.000Z'
+      }),
+      createPullRequest({
+        id: 403,
+        title: 'Refactor warehouse feed adapter',
+        repositoryName: 'qsic-data/ingestion',
+        owner: 'qsic-data',
+        repo: 'ingestion',
+        pullNumber: 143,
+        reviewStatus: 'open',
+        ciStatus: 'no-checks',
+        mergeStateStatus: 'CLEAN',
+        source: 'recent',
+        authorLogin: 'leo',
+        updatedAt: '2026-05-06T08:56:00.000Z'
+      })
+    ];
+    dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
+
+    const previousSnapshotKeys = [
+      getStateKey('qsic-data/qsic-data', 286),
+      getStateKey('qsic-data/ingestion', 143),
+    ];
+    const pendingNewKeys = [getStateKey('qsic-data/qsic-data', 287)];
+
+    return {
+      key: 'team-prs-new',
+      dashboardData,
+      readyState: {},
+      warningState: {},
+      notificationSeenAtState: {},
+      teamPrTrackerState: {
+        snapshotKeys: previousSnapshotKeys,
+        pendingNewKeys,
+        lastProcessedUpdatedAt: Date.now() - 60_000,
       }
     };
   })(),
@@ -333,7 +514,12 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           updatedAt: Date.now() - 10_000
         }
       },
-      notificationSeenAtState: {}
+      notificationSeenAtState: {},
+      teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
     };
   })()
 };
@@ -380,7 +566,12 @@ function createWarningScenario(
         updatedAt: Date.now() - 10_000
       }
     },
-    notificationSeenAtState: {}
+    notificationSeenAtState: {},
+    teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
   };
 }
 
@@ -403,13 +594,18 @@ function createPullRequest(
   return {
     id: overrides.id,
     title: overrides.title,
+    repositoryId: overrides.repositoryId ?? overrides.id,
     repositoryName: overrides.repositoryName,
+    repositoryUrl:
+      overrides.repositoryUrl ??
+      `https://github.com/${overrides.owner}/${overrides.repo}`,
     owner: overrides.owner,
     repo: overrides.repo,
     pullNumber: overrides.pullNumber,
     totalCommentCount: overrides.totalCommentCount ?? 0,
     authorLogin: overrides.authorLogin ?? 'xtian',
     isDraft: overrides.reviewStatus === 'draft',
+    createdAt: overrides.createdAt ?? overrides.updatedAt,
     updatedAt: overrides.updatedAt,
     url: overrides.url ?? `https://github.com/${overrides.owner}/${overrides.repo}/pull/${overrides.pullNumber}`,
     source: overrides.source ?? 'authored',
@@ -427,7 +623,8 @@ function cloneScenario(scenario: GitHubMockScenario): GitHubMockScenario {
     dashboardData: cloneDashboardData(scenario.dashboardData),
     readyState: structuredClone(scenario.readyState),
     warningState: structuredClone(scenario.warningState),
-    notificationSeenAtState: structuredClone(scenario.notificationSeenAtState)
+    notificationSeenAtState: structuredClone(scenario.notificationSeenAtState),
+    teamPrTrackerState: structuredClone(scenario.teamPrTrackerState)
   };
 }
 

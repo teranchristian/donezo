@@ -21,6 +21,7 @@ import {
   GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY,
   GITHUB_PR_READY_STATE_STORAGE_KEY,
   GITHUB_PR_STATUS_FILTER_STORAGE_KEY,
+  GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
   GITHUB_PR_WARNING_STATE_STORAGE_KEY,
   GITHUB_SORT_ORDER_STORAGE_KEY
 } from './keys';
@@ -33,6 +34,7 @@ import type {
   GitHubPrReadyState,
   GitHubPrReadyStateEntry,
   GitHubPrStatusFilter,
+  GitHubTeamPrTrackerState,
   GitHubPrWarningState,
   GitHubPrWarningStateEntry
 } from './types';
@@ -174,6 +176,25 @@ export async function saveStoredGitHubPrNotificationSeenAtState(state: GitHubPrN
   );
 }
 
+export async function getStoredGitHubTeamPrTrackerState() {
+  return mergeGitHubTeamPrTrackerState(
+    (await getStoredJsonValue<GitHubTeamPrTrackerState>(
+      GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
+    )) ?? undefined
+  );
+}
+
+export async function saveStoredGitHubTeamPrTrackerState(
+  state: GitHubTeamPrTrackerState,
+) {
+  const normalizedState = mergeGitHubTeamPrTrackerState(state);
+
+  await setStoredJsonValue(
+    GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
+    normalizedState,
+  );
+}
+
 function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
   if (
     sortOrder === 'oldest-updated' ||
@@ -200,9 +221,15 @@ function mergeActiveIntegration(activeIntegration?: string): ActiveIntegration {
 }
 
 function mergeActiveGitHubView(activeGitHubView?: string): ActiveGitHubView {
-  return activeGitHubView === 'notifications' || activeGitHubView === 'review' || activeGitHubView === 'prs'
-    ? activeGitHubView
-    : DEFAULT_ACTIVE_GITHUB_VIEW;
+  if (
+    activeGitHubView === 'my-prs' ||
+    activeGitHubView === 'review' ||
+    activeGitHubView === 'team-prs'
+  ) {
+    return activeGitHubView;
+  }
+
+  return DEFAULT_ACTIVE_GITHUB_VIEW;
 }
 
 function mergeActiveJiraView(activeJiraView?: string): ActiveJiraView {
@@ -295,6 +322,41 @@ function mergeGitHubPrNotificationSeenAtState(state?: GitHubPrNotificationSeenAt
       })
       .filter((entry): entry is [string, number] => entry !== null)
   );
+}
+
+function mergeGitHubTeamPrTrackerState(
+  state?: GitHubTeamPrTrackerState | null,
+): GitHubTeamPrTrackerState {
+  if (!state || typeof state !== 'object') {
+    return {
+      snapshotKeys: [],
+      pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
+    };
+  }
+
+  const snapshotKeys = Array.isArray(state.snapshotKeys)
+    ? state.snapshotKeys.filter(
+        (key): key is string => typeof key === 'string' && key.trim().length > 0,
+      )
+    : [];
+  const pendingNewKeys = Array.isArray(state.pendingNewKeys)
+    ? state.pendingNewKeys.filter(
+        (key): key is string => typeof key === 'string' && key.trim().length > 0,
+      )
+    : [];
+  const lastProcessedUpdatedAt =
+    typeof state.lastProcessedUpdatedAt === 'number' &&
+    Number.isFinite(state.lastProcessedUpdatedAt) &&
+    state.lastProcessedUpdatedAt > 0
+      ? state.lastProcessedUpdatedAt
+      : null;
+
+  return {
+    snapshotKeys: [...new Set(snapshotKeys)],
+    pendingNewKeys: [...new Set(pendingNewKeys)],
+    lastProcessedUpdatedAt,
+  };
 }
 
 function mergeGitHubMockScenarioKey(mockScenarioKey?: string | null) {

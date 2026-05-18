@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
 import { InfoBanner } from '../components/InfoBanner';
 import { GitHubConnectionStatus } from '../lib/githubApi';
@@ -60,6 +60,7 @@ export function SettingsPage({
   isTestingGitHub,
   isTestingJira
 }: SettingsPageProps) {
+  const location = useLocation();
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -78,6 +79,27 @@ export function SettingsPage({
       gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
     );
   }, [gitHubTestStatus, settings.integrations.github.token]);
+
+  useEffect(() => {
+    const hash = location.hash.replace(/^#/, '').trim();
+    if (!hash) {
+      return;
+    }
+
+    const scrollToTarget = () => {
+      const element = document.getElementById(hash);
+      if (!element) {
+        return;
+      }
+
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    };
+
+    window.requestAnimationFrame(scrollToTarget);
+  }, [location.hash]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -375,7 +397,10 @@ export function SettingsPage({
                 {saveMessage ? <p className="mt-2 text-stone-400">{saveMessage}</p> : null}
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div
+                id="hidden-repositories"
+                className="rounded-3xl border border-white/10 bg-black/20 p-4 scroll-mt-6"
+              >
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-stone-100">Hidden repositories</h3>

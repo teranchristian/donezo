@@ -76,7 +76,7 @@ export type GitHubListSort =
   | 'title-asc';
 export type GitHubPrStatusFilter = 'all' | 'approved' | 'ready-to-merge' | 'waiting-review';
 export type ActiveIntegration = 'github' | 'jira';
-export type ActiveGitHubView = 'prs' | 'notifications' | 'review';
+export type ActiveGitHubView = 'my-prs' | 'team-prs' | 'review';
 export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-priority';
 
 export type GitHubPrWarningStateEntry = {
@@ -95,3 +95,8 @@ export type GitHubPrReadyStateEntry = {
 
 export type GitHubPrReadyState = Record<string, GitHubPrReadyStateEntry>;
 export type GitHubPrNotificationSeenAtState = Record<string, number>;
+export type GitHubTeamPrTrackerState = {
+  snapshotKeys: string[];
+  pendingNewKeys: string[];
+  lastProcessedUpdatedAt: number | null;
+};
