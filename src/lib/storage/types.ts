@@ -30,7 +30,18 @@ export type FocusJiraItem = FocusItemBase & {
   isPlaceholder?: boolean;
 };
 
-export type FocusItem = FocusJiraItem | FocusPullRequestItem;
+export type ManualFocusTaskItem = FocusItemBase & {
+  source: 'manual';
+  note: string;
+  completedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type FocusItem =
+  | FocusJiraItem
+  | FocusPullRequestItem
+  | ManualFocusTaskItem;
 
 export type DashboardSettings = {
   name: string;

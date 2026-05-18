@@ -17,7 +17,7 @@ import {
 import type { GitHubMockScenario } from '../mocks/github/scenarios';
 
 const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
-const GITHUB_REFRESH_DEBUG = true;
+const GITHUB_REFRESH_DEBUG = false;
 
 let gitHubRefreshRequestSequence = 0;
 

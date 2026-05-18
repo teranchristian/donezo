@@ -17,7 +17,7 @@ const GITHUB_POLL_ALARM_NAME = 'github-dashboard-poll';
 const JIRA_POLL_ALARM_NAME = 'jira-dashboard-poll';
 const BACKGROUND_POLL_PERIOD_MINUTES = 1;
 const GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql';
-const GITHUB_REFRESH_DEBUG = true;
+const GITHUB_REFRESH_DEBUG = false;
 const GITHUB_PULL_REQUESTS_QUERY = `
   query DashboardPullRequests(
     $authoredQuery: String!

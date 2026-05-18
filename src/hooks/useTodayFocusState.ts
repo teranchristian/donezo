@@ -8,14 +8,21 @@ import {
 import type { JiraIssue } from '../lib/jiraApi';
 import {
   getStoredTodayFocusItems,
+  getStoredTodayFocusItemsSnapshot,
+  MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH,
+  MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH,
   saveStoredTodayFocusItems,
+  saveStoredTodayFocusItemsSnapshot,
   type FocusItem,
   type FocusPullRequestItem,
+  type ManualFocusTaskItem,
 } from '../lib/storage';
 import {
   reconcileTodayFocusGitHubItems,
   reconcileTodayFocusJiraItems,
 } from '../lib/todayFocusSync';
+
+const TODAY_FOCUS_DEBUG = false;
 
 type UseTodayFocusStateOptions = {
   jiraIssues: JiraIssue[];
@@ -27,13 +34,16 @@ export function useTodayFocusState({
   gitHubPullRequests,
 }: UseTodayFocusStateOptions) {
   const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
+  const [isSavingTodayFocusItems, setIsSavingTodayFocusItems] = useState(false);
   const [hasLoadedTodayFocusItems, setHasLoadedTodayFocusItems] =
     useState(false);
   const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(
     null,
   );
   const hasLoadedTodayFocusItemsRef = useRef(false);
+  const pendingTodayFocusSaveCountRef = useRef(0);
   const todayFocusItemsRef = useRef<FocusItem[]>([]);
+  const todayFocusStorageVersionRef = useRef(0);
   const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
 
   useEffect(() => {
@@ -43,17 +53,24 @@ export function useTodayFocusState({
   useEffect(() => {
     let isMounted = true;
 
-    getStoredTodayFocusItems().then((storedItems) => {
+    getStoredTodayFocusItemsSnapshot().then((storedSnapshot) => {
       if (!isMounted) {
         return;
       }
 
-      const nextItems = storedItems ?? [];
+      const nextItems = storedSnapshot?.items ?? [];
+      logTodayFocusDebug('load-stored-items', {
+        storedCount: storedSnapshot?.items.length ?? null,
+        storedVersion: storedSnapshot?.version ?? null,
+        nextCount: nextItems.length,
+        nextItems,
+      });
       todayFocusItemsRef.current = nextItems;
+      todayFocusStorageVersionRef.current = storedSnapshot?.version ?? 0;
       setTodayFocusItems(nextItems);
       hasLoadedTodayFocusItemsRef.current = true;
       setHasLoadedTodayFocusItems(true);
-      if (storedItems === null) {
+      if (storedSnapshot === null) {
         void saveStoredTodayFocusItems(nextItems);
       }
     });
@@ -72,11 +89,19 @@ export function useTodayFocusState({
       todayFocusItemsRef.current,
       jiraIssues,
     );
+    logTodayFocusDebug('jira-sync-result', {
+      currentCount: todayFocusItemsRef.current.length,
+      nextCount: syncResult.items.length,
+      missingKeys: syncResult.missingKeys,
+      changed: syncResult.items !== todayFocusItemsRef.current,
+      currentItems: todayFocusItemsRef.current,
+      nextItems: syncResult.items,
+    });
     if (syncResult.items === todayFocusItemsRef.current) {
       return;
     }
 
-    commitTodayFocusItems(syncResult.items);
+    void commitTodayFocusItems(syncResult.items, 'sync');
   }, [hasLoadedTodayFocusItems, jiraIssues]);
 
   useEffect(() => {
@@ -92,15 +117,86 @@ export function useTodayFocusState({
       groupedItems,
       gitHubPullRequests,
     );
+    logTodayFocusDebug('github-sync-result', {
+      currentCount: todayFocusItemsRef.current.length,
+      groupedCount: groupedItems.length,
+      nextCount: syncResult.items.length,
+      missingPullRequests: syncResult.missingPullRequests,
+      changed: syncResult.items !== todayFocusItemsRef.current,
+      currentItems: todayFocusItemsRef.current,
+      groupedItems,
+      nextItems: syncResult.items,
+    });
     if (syncResult.items !== todayFocusItemsRef.current) {
-      commitTodayFocusItems(syncResult.items);
+      void commitTodayFocusItems(syncResult.items, 'sync');
     }
   }, [gitHubPullRequests, hasLoadedTodayFocusItems]);
 
-  function commitTodayFocusItems(nextItems: FocusItem[]) {
+  useEffect(() => {
+    if (!isSavingTodayFocusItems) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isSavingTodayFocusItems]);
+
+  async function commitTodayFocusItems(
+    nextItems: FocusItem[],
+    reason: 'user' | 'sync' = 'user',
+  ) {
+    logTodayFocusDebug('commit-items', {
+      reason,
+      previousVersion: todayFocusStorageVersionRef.current,
+      previousCount: todayFocusItemsRef.current.length,
+      nextCount: nextItems.length,
+      previousItems: todayFocusItemsRef.current,
+      nextItems,
+    });
+    if (reason === 'sync') {
+      const latestSnapshot = await getStoredTodayFocusItemsSnapshot();
+      const latestVersion = latestSnapshot?.version ?? 0;
+      if (latestVersion !== todayFocusStorageVersionRef.current) {
+        logTodayFocusDebug('skip-sync-save-version-mismatch', {
+          expectedVersion: todayFocusStorageVersionRef.current,
+          latestVersion,
+          nextItems,
+        });
+        return;
+      }
+    }
+
     todayFocusItemsRef.current = nextItems;
     setTodayFocusItems(nextItems);
-    void saveStoredTodayFocusItems(nextItems);
+
+    if (reason === 'sync') {
+      return;
+    }
+
+    const nextVersion = Date.now();
+    pendingTodayFocusSaveCountRef.current += 1;
+    setIsSavingTodayFocusItems(true);
+
+    try {
+      await saveStoredTodayFocusItemsSnapshot({
+        items: nextItems,
+        version: nextVersion,
+      });
+      todayFocusStorageVersionRef.current = nextVersion;
+    } finally {
+      pendingTodayFocusSaveCountRef.current = Math.max(
+        0,
+        pendingTodayFocusSaveCountRef.current - 1,
+      );
+      setIsSavingTodayFocusItems(pendingTodayFocusSaveCountRef.current > 0);
+    }
   }
 
   function handleAddTodayFocusItem(item: FocusItem) {
@@ -116,13 +212,65 @@ export function useTodayFocusState({
       return;
     }
 
-    commitTodayFocusItems(addResult.items);
+    void commitTodayFocusItems(addResult.items, 'user');
   }
 
   function handleRemoveTodayFocusItem(itemId: string) {
     setTodayFocusWarning(null);
-    commitTodayFocusItems(
+    void commitTodayFocusItems(
       removeTodayFocusItem(todayFocusItemsRef.current, itemId),
+      'user',
+    );
+  }
+
+  function handleCreateManualTodayFocusTask(title: string, note: string) {
+    setTodayFocusWarning(null);
+
+    const task = createManualTodayFocusTask(title, note);
+    if (!task) {
+      setTodayFocusWarning('Manual tasks need a title.');
+      return false;
+    }
+
+    const addResult = addTodayFocusItem(
+      todayFocusItemsRef.current,
+      task,
+      gitHubPullRequests,
+    );
+    if (addResult.warning) {
+      setTodayFocusWarning(addResult.warning);
+      return false;
+    }
+
+    void commitTodayFocusItems(addResult.items, 'user');
+    return true;
+  }
+
+  function handleUpdateManualTodayFocusTask(
+    itemId: string,
+    title: string,
+    note: string,
+  ) {
+    setTodayFocusWarning(null);
+    const nextItems = updateManualTodayFocusTask(
+      todayFocusItemsRef.current,
+      itemId,
+      title,
+      note,
+    );
+    if (nextItems === todayFocusItemsRef.current) {
+      return true;
+    }
+
+    void commitTodayFocusItems(nextItems, 'user');
+    return true;
+  }
+
+  function handleToggleManualTodayFocusTask(itemId: string) {
+    setTodayFocusWarning(null);
+    void commitTodayFocusItems(
+      toggleManualTodayFocusTask(todayFocusItemsRef.current, itemId),
+      'user',
     );
   }
 
@@ -142,7 +290,7 @@ export function useTodayFocusState({
       return;
     }
 
-    commitTodayFocusItems(nextState.items);
+    void commitTodayFocusItems(nextState.items, 'user');
   }
 
   function handleNestExistingTodayFocusPullRequest(
@@ -150,26 +298,29 @@ export function useTodayFocusState({
     itemId: string,
   ) {
     setTodayFocusWarning(null);
-    commitTodayFocusItems(
+    void commitTodayFocusItems(
       moveStandalonePullRequestUnderJira(
         todayFocusItemsRef.current,
         parentId,
         itemId,
       ),
+      'user',
     );
   }
 
   function handleReorderTopLevelTodayFocusItem(itemId: string, targetId: string) {
     setTodayFocusWarning(null);
-    commitTodayFocusItems(
+    void commitTodayFocusItems(
       reorderTopLevelTodayFocusItems(todayFocusItemsRef.current, itemId, targetId),
+      'user',
     );
   }
 
   function handleMoveTopLevelTodayFocusItemToEnd(itemId: string) {
     setTodayFocusWarning(null);
-    commitTodayFocusItems(
+    void commitTodayFocusItems(
       moveTopLevelTodayFocusItemToEnd(todayFocusItemsRef.current, itemId),
+      'user',
     );
   }
 
@@ -179,13 +330,14 @@ export function useTodayFocusState({
     targetId: string,
   ) {
     setTodayFocusWarning(null);
-    commitTodayFocusItems(
+    void commitTodayFocusItems(
       reorderNestedPullRequests(
         todayFocusItemsRef.current,
         parentId,
         itemId,
         targetId,
       ),
+      'user',
     );
   }
 
@@ -197,6 +349,9 @@ export function useTodayFocusState({
     hasLoadedTodayFocusItems,
     commitTodayFocusItems,
     handleAddTodayFocusItem,
+    handleCreateManualTodayFocusTask,
+    handleUpdateManualTodayFocusTask,
+    handleToggleManualTodayFocusTask,
     handleRemoveTodayFocusItem,
     handleNestNewTodayFocusPullRequest,
     handleNestExistingTodayFocusPullRequest,
@@ -288,6 +443,31 @@ function addTodayFocusItem(
   };
 }
 
+function createManualTodayFocusTask(
+  title: string,
+  note: string,
+): ManualFocusTaskItem | null {
+  const normalized = normalizeManualTaskInput(title, note);
+  if (!normalized) {
+    return null;
+  }
+
+  const timestamp = Date.now();
+  return {
+    id: `manual:${crypto.randomUUID()}`,
+    source: 'manual',
+    sourceLabel: 'Task',
+    reference: 'Manual',
+    title: normalized.title,
+    note: normalized.note,
+    completedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    statusLabel: 'Task',
+    statusTone: 'violet',
+  };
+}
+
 function syncTodayFocusJiraLinkedPullRequests(
   items: FocusItem[],
   pullRequests: GitHubPullRequestItem[],
@@ -359,7 +539,7 @@ function syncTodayFocusJiraLinkedPullRequests(
       continue;
     }
 
-    if (item.jiraKey && jiraKeys.has(item.jiraKey)) {
+    if (item.source === 'github' && item.jiraKey && jiraKeys.has(item.jiraKey)) {
       hasChanges = true;
       continue;
     }
@@ -395,6 +575,62 @@ function removeTodayFocusItem(items: FocusItem[], itemId: string) {
   }
 
   return nextItems;
+}
+
+function updateManualTodayFocusTask(
+  items: FocusItem[],
+  itemId: string,
+  title: string,
+  note: string,
+) {
+  const normalized = normalizeManualTaskInput(title, note);
+  if (!normalized) {
+    return items;
+  }
+
+  let hasChanges = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== itemId || item.source !== 'manual') {
+      return item;
+    }
+
+    if (item.title === normalized.title && item.note === normalized.note) {
+      return item;
+    }
+
+    hasChanges = true;
+    return {
+      ...item,
+      title: normalized.title,
+      note: normalized.note,
+      updatedAt: Date.now(),
+    };
+  });
+
+  return hasChanges ? nextItems : items;
+}
+
+function toggleManualTodayFocusTask(items: FocusItem[], itemId: string) {
+  let hasChanges = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== itemId || item.source !== 'manual') {
+      return item;
+    }
+
+    hasChanges = true;
+    const nextCompletedAt = item.completedAt === null ? Date.now() : null;
+    const nextStatusTone: ManualFocusTaskItem['statusTone'] =
+      nextCompletedAt === null ? 'violet' : 'emerald';
+    return {
+      ...item,
+      completedAt: nextCompletedAt,
+      updatedAt: Date.now(),
+      statusLabel: nextCompletedAt === null ? 'Task' : 'Done',
+      statusTone: nextStatusTone,
+    };
+  });
+
+  return hasChanges ? nextItems : items;
 }
 
 function hasTodayFocusItem(items: FocusItem[], itemId: string) {
@@ -548,6 +784,28 @@ function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
         children: item.children ?? [],
       }
     : item;
+}
+
+function normalizeManualTaskInput(title: string, note: string) {
+  const normalizedTitle = title
+    .trim()
+    .slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH);
+  if (!normalizedTitle) {
+    return null;
+  }
+
+  return {
+    title: normalizedTitle,
+    note: note.trim().slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH),
+  };
+}
+
+function logTodayFocusDebug(event: string, details: Record<string, unknown>) {
+  if (!TODAY_FOCUS_DEBUG) {
+    return;
+  }
+
+  console.debug(`[TodayFocus] ${event}`, details);
 }
 
 function getNestedPullRequestEndTargetId(parentId: string) {
