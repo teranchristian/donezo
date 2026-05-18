@@ -1,6 +1,14 @@
 import { FocusEvent, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CardShell } from './CardShell';
-import { type FocusItem, type FocusJiraItem, type FocusPullRequestItem } from '../lib/storage';
+import {
+  MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH,
+  MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH,
+  type FocusItem,
+  type FocusJiraItem,
+  type FocusPullRequestItem,
+  type ManualFocusTaskItem,
+} from '../lib/storage';
 import { FocusTargetIcon } from './TodayFocusIndicator';
 import { getRepositoryLabel } from '../lib/githubCardDomain';
 import { getJiraBrowseUrl, normalizeJiraBaseUrl } from '../lib/jiraApi';
@@ -21,6 +29,19 @@ type TopLevelDropIndicator = {
   position: 'before' | 'after';
 };
 
+type ManualTaskEditorState =
+  | {
+      mode: 'create';
+      title: string;
+      note: string;
+    }
+  | {
+      mode: 'edit';
+      itemId: string;
+      title: string;
+      note: string;
+    };
+
 type SummaryCardProps = {
   items: FocusItem[];
   jiraBaseUrl?: string;
@@ -28,6 +49,9 @@ type SummaryCardProps = {
   warning?: string | null;
   onRemoveItem: (itemId: string) => void;
   onAddItem: (item: FocusItem) => void;
+  onCreateManualTask: (title: string, note: string) => boolean;
+  onUpdateManualTask: (itemId: string, title: string, note: string) => boolean;
+  onToggleManualTask: (itemId: string) => void;
   onNestNewPullRequest: (parentId: string, item: FocusPullRequestItem) => void;
   onNestExistingPullRequest: (parentId: string, itemId: string) => void;
   onReorderTopLevelItem: (itemId: string, targetId: string) => void;
@@ -42,6 +66,9 @@ export function SummaryCard({
   warning,
   onRemoveItem,
   onAddItem,
+  onCreateManualTask,
+  onUpdateManualTask,
+  onToggleManualTask,
   onNestNewPullRequest,
   onNestExistingPullRequest,
   onReorderTopLevelItem,
@@ -51,6 +78,7 @@ export function SummaryCard({
   const [isDropTargetActive, setIsDropTargetActive] = useState(false);
   const [activeInternalDrag, setActiveInternalDrag] = useState<FocusInternalDragPayload | null>(null);
   const [activeTopLevelDropIndicator, setActiveTopLevelDropIndicator] = useState<TopLevelDropIndicator | null>(null);
+  const [manualTaskEditorState, setManualTaskEditorState] = useState<ManualTaskEditorState | null>(null);
   const visibleItems = items.slice(0, limit);
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
@@ -212,6 +240,15 @@ export function SummaryCard({
               item={item}
               jiraBaseUrl={jiraBaseUrl}
               onRemove={onRemoveItem}
+              onEditManualTask={(task) => {
+                setManualTaskEditorState({
+                  mode: 'edit',
+                  itemId: task.id,
+                  title: task.title,
+                  note: task.note,
+                });
+              }}
+              onToggleManualTask={onToggleManualTask}
               activeInternalDrag={activeInternalDrag}
               onInternalDragEnd={handleInternalDragEnd}
               onInternalDragStart={setActiveInternalDrag}
@@ -243,21 +280,37 @@ export function SummaryCard({
               : 'border-violet-500/18 bg-violet-500/[0.05]'
           }`}
         >
-          <div className="flex items-center gap-2.5">
-            <span
-              className={`flex shrink-0 items-center justify-center rounded-[11px] bg-violet-500/14 text-violet-200 ${
-                visibleItems.length > 0 ? 'h-8 w-8' : 'h-9 w-9'
-              }`}
-              aria-hidden="true"
-            >
-              <FocusDropZoneIcon />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[0.84rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
-              {visibleItems.length === 0 ? (
-                <p className="text-[0.75rem] leading-4.5 text-violet-200/50">to focus on them today</p>
-              ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span
+                className={`flex shrink-0 items-center justify-center rounded-[11px] bg-violet-500/14 text-violet-200 ${
+                  visibleItems.length > 0 ? 'h-8 w-8' : 'h-9 w-9'
+                }`}
+                aria-hidden="true"
+              >
+                <FocusDropZoneIcon />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[0.84rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
+                {visibleItems.length === 0 ? (
+                  <p className="text-[0.75rem] leading-4.5 text-violet-200/50">to focus on them today</p>
+                ) : null}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() =>
+                setManualTaskEditorState({
+                  mode: 'create',
+                  title: '',
+                  note: '',
+                })
+              }
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-3 py-1.5 text-[0.74rem] font-semibold text-violet-100 transition hover:border-violet-300/35 hover:bg-violet-400/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+            >
+              <PlusIcon />
+              <span>Add task</span>
+            </button>
           </div>
         </div>
       </div>
@@ -271,6 +324,21 @@ export function SummaryCard({
         </div>
         {warning ? <p className="text-right text-xs font-medium text-amber-200">{warning}</p> : null}
       </div>
+
+      <ManualTaskEditorModal
+        state={manualTaskEditorState}
+        onClose={() => setManualTaskEditorState(null)}
+        onCreate={(title, note) => {
+          if (onCreateManualTask(title, note)) {
+            setManualTaskEditorState(null);
+          }
+        }}
+        onUpdate={(itemId, title, note) => {
+          if (onUpdateManualTask(itemId, title, note)) {
+            setManualTaskEditorState(null);
+          }
+        }}
+      />
     </CardShell>
   );
 }
@@ -279,6 +347,8 @@ function FocusItemCard({
   item,
   jiraBaseUrl,
   onRemove,
+  onEditManualTask,
+  onToggleManualTask,
   activeInternalDrag,
   onInternalDragEnd,
   onInternalDragStart,
@@ -289,6 +359,8 @@ function FocusItemCard({
   item: FocusItem;
   jiraBaseUrl?: string;
   onRemove: (itemId: string) => void;
+  onEditManualTask: (task: ManualFocusTaskItem) => void;
+  onToggleManualTask: (itemId: string) => void;
   activeInternalDrag: FocusInternalDragPayload | null;
   onInternalDragEnd: () => void;
   onInternalDragStart: (payload: FocusInternalDragPayload) => void;
@@ -312,6 +384,19 @@ function FocusItemCard({
     );
   }
 
+  if (item.source === 'manual') {
+    return (
+      <ManualFocusTaskCard
+        item={item}
+        onEdit={() => onEditManualTask(item)}
+        onRemove={() => onRemove(item.id)}
+        onToggleComplete={() => onToggleManualTask(item.id)}
+        onInternalDragEnd={onInternalDragEnd}
+        onInternalDragStart={onInternalDragStart}
+      />
+    );
+  }
+
   return (
     <FocusPullRequestCard
       item={item}
@@ -321,6 +406,132 @@ function FocusItemCard({
       onInternalDragEnd={onInternalDragEnd}
       onInternalDragStart={onInternalDragStart}
     />
+  );
+}
+
+function ManualFocusTaskCard({
+  item,
+  onEdit,
+  onRemove,
+  onToggleComplete,
+  onInternalDragEnd,
+  onInternalDragStart,
+}: {
+  item: ManualFocusTaskItem;
+  onEdit: () => void;
+  onRemove: () => void;
+  onToggleComplete: () => void;
+  onInternalDragEnd: () => void;
+  onInternalDragStart: (payload: FocusInternalDragPayload) => void;
+}) {
+  const isCompleted = item.completedAt !== null;
+  const notePreview = getManualTaskPreview(item.note);
+
+  function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
+    const payload = {
+      itemId: item.id,
+      source: 'top-level',
+      itemSource: item.source,
+    } satisfies FocusInternalDragPayload;
+    onInternalDragStart(payload);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(
+      TODAY_FOCUS_INTERNAL_DRAG_MIME,
+      JSON.stringify(payload),
+    );
+    event.dataTransfer.setData('text/plain', item.title);
+    setCustomDragImage(event.dataTransfer, event.currentTarget);
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={onInternalDragEnd}
+      title="Drag to reorder"
+      className={`cursor-grab rounded-[16px] border px-3 py-2.5 shadow-[var(--shadow-card-soft)] transition duration-200 active:cursor-grabbing ${
+        isCompleted
+          ? 'border-emerald-300/10 bg-emerald-500/[0.05]'
+          : 'border-white/[0.05] bg-[var(--card-bg-soft)] hover:border-white/10'
+      }`}
+    >
+      <div className="relative">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+          className="absolute right-0 top-0 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/70 shadow-[0_1px_8px_rgba(0,0,0,0.22)] transition hover:border-white/20 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+          aria-label={`Remove task ${item.title} from Today focus`}
+        >
+          <CloseIcon />
+        </button>
+
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onEdit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onEdit();
+            }
+          }}
+          className="flex w-full items-start gap-2.5 pr-8 text-left"
+        >
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleComplete();
+              }}
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-[8px] border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50 ${
+                isCompleted
+                  ? 'border-emerald-300/30 bg-emerald-400/[0.18] text-emerald-50'
+                  : 'border-white/14 bg-white/[0.04] text-white/42 hover:border-violet-300/35 hover:bg-violet-400/[0.08] hover:text-violet-100'
+              }`}
+              aria-label={`${isCompleted ? 'Mark task as incomplete' : 'Mark task as complete'}: ${item.title}`}
+            >
+              <TaskCheckboxIcon checked={isCompleted} />
+            </button>
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-start gap-2 pr-1">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="shrink-0 text-white/28" aria-hidden="true">
+                    <DragHandleIcon />
+                  </span>
+                  <span className="shrink-0 text-[0.63rem] font-medium uppercase tracking-[0.12em] text-white/34">
+                    Manual task
+                  </span>
+                  {isCompleted ? (
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-500/14 px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] text-emerald-100">
+                      Done
+                    </span>
+                  ) : null}
+                </div>
+                <p
+                  className={`mt-1 line-clamp-2 text-[0.82rem] font-medium leading-4.5 ${
+                    isCompleted ? 'text-white/52 line-through' : 'text-primary'
+                  }`}
+                >
+                  {item.title}
+                </p>
+                {notePreview ? (
+                  <p className="mt-1 line-clamp-2 text-[0.72rem] leading-4 text-secondary">
+                    {notePreview}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -840,6 +1051,192 @@ function TopLevelInsertionIndicator({
   );
 }
 
+function ManualTaskEditorModal({
+  state,
+  onClose,
+  onCreate,
+  onUpdate,
+}: {
+  state: ManualTaskEditorState | null;
+  onClose: () => void;
+  onCreate: (title: string, note: string) => void;
+  onUpdate: (itemId: string, title: string, note: string) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (!state) {
+      return;
+    }
+
+    setTitle(state.title);
+    setNote(state.note);
+  }, [state]);
+
+  useEffect(() => {
+    if (!state) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state, onClose]);
+
+  useEffect(() => {
+    if (!state) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [state]);
+
+  if (!state) {
+    return null;
+  }
+
+  const normalizedTitle = title.trim().slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH);
+  const normalizedNote = note.slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH);
+  const canSubmit = normalizedTitle.length > 0;
+  const previewBlocks = parseMarkdownBlocks(normalizedNote.trim());
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[#06080d]/78 backdrop-blur-[2px]"
+        aria-label="Close task editor"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex max-h-[min(88vh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#10151d] shadow-[0_32px_90px_rgba(0,0,0,0.5)]">
+        <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-violet-200/68">
+              {state.mode === 'create' ? 'New manual task' : 'Manual task'}
+            </p>
+            <h3 className="mt-1 text-[1.05rem] font-semibold text-primary">
+              {state.mode === 'create' ? 'Add focus task' : 'Task details'}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+            aria-label="Close task editor"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+          <div className="space-y-5 px-5 py-5 sm:px-6">
+            <label className="block">
+              <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                Title
+              </span>
+              <input
+                type="text"
+                value={title}
+                onChange={(event) =>
+                  setTitle(event.target.value.slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH))
+                }
+                placeholder="Check how xyz works"
+                className="w-full rounded-[14px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.92rem] text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05]"
+              />
+              <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
+                {title.length} / {MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH}
+              </span>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                Note
+              </span>
+              <textarea
+                value={note}
+                onChange={(event) =>
+                  setNote(event.target.value.slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH))
+                }
+                placeholder={'## Context\n- Investigate how this works\n- Capture links or next steps'}
+                rows={14}
+                className="min-h-[320px] w-full rounded-[16px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.86rem] leading-6 text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05]"
+              />
+              <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
+                {note.length} / {MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH}
+              </span>
+            </label>
+          </div>
+
+          <div className="border-t border-white/8 bg-black/10 px-5 py-5 lg:border-l lg:border-t-0 sm:px-6">
+            <div className="flex h-full min-h-[260px] flex-col">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <span className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                  Preview
+                </span>
+                <span className="text-[0.68rem] text-white/30">Markdown</span>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3">
+                {previewBlocks.length === 0 ? (
+                  <p className="text-[0.8rem] leading-6 text-white/28">
+                    Add notes to preview headings, lists, code, and links.
+                  </p>
+                ) : (
+                  <MarkdownPreview blocks={previewBlocks} />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-start justify-between gap-3 border-t border-white/8 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+          <p className="max-w-[34rem] text-[0.74rem] text-white/34">
+            Notes support basic Markdown like headings, bullets, checkboxes, links, and inline code.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!canSubmit}
+              onClick={() => {
+                if (!canSubmit) {
+                  return;
+                }
+
+                if (state.mode === 'create') {
+                  onCreate(normalizedTitle, normalizedNote);
+                  return;
+                }
+
+                onUpdate(state.itemId, normalizedTitle, normalizedNote);
+              }}
+              className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
+            >
+              {state.mode === 'create' ? 'Add task' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function setCustomDragImage(dataTransfer: DataTransfer, sourceElement: HTMLDivElement) {
   const dragPreview = sourceElement.cloneNode(true);
   if (!(dragPreview instanceof HTMLDivElement)) {
@@ -864,6 +1261,315 @@ function setCustomDragImage(dataTransfer: DataTransfer, sourceElement: HTMLDivEl
   requestAnimationFrame(() => {
     dragPreview.remove();
   });
+}
+
+type MarkdownBlock =
+  | { type: 'heading'; level: 1 | 2 | 3; text: string }
+  | { type: 'list'; items: string[] }
+  | { type: 'task-list'; items: Array<{ text: string; checked: boolean }> }
+  | { type: 'paragraph'; lines: string[] }
+  | { type: 'code'; text: string };
+
+type InlineToken =
+  | { type: 'text'; value: string }
+  | { type: 'code'; value: string }
+  | { type: 'strong'; value: string }
+  | { type: 'em'; value: string }
+  | { type: 'link'; value: string; href: string };
+
+function MarkdownPreview({ blocks }: { blocks: MarkdownBlock[] }) {
+  return (
+    <div className="space-y-3 text-[0.82rem] leading-6 text-secondary">
+      {blocks.map((block, index) => {
+        if (block.type === 'heading') {
+          const headingClassName =
+            block.level === 1
+              ? 'text-[1.02rem] font-semibold text-primary'
+              : block.level === 2
+                ? 'text-[0.92rem] font-semibold text-primary'
+                : 'text-[0.84rem] font-semibold uppercase tracking-[0.08em] text-white/78';
+          return (
+            <p key={`${block.type}-${index}`} className={headingClassName}>
+              {renderInlineMarkdown(block.text)}
+            </p>
+          );
+        }
+
+        if (block.type === 'list') {
+          return (
+            <ul key={`${block.type}-${index}`} className="space-y-1.5 pl-4 text-secondary">
+              {block.items.map((item, itemIndex) => (
+                <li key={`${item}-${itemIndex}`} className="list-disc">
+                  {renderInlineMarkdown(item)}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        if (block.type === 'task-list') {
+          return (
+            <div key={`${block.type}-${index}`} className="space-y-1.5">
+              {block.items.map((item, itemIndex) => (
+                <div key={`${item.text}-${itemIndex}`} className="flex items-start gap-2 text-secondary">
+                  <span
+                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border ${
+                      item.checked
+                        ? 'border-emerald-300/30 bg-emerald-400/[0.16] text-emerald-100'
+                        : 'border-white/14 bg-white/[0.04] text-white/34'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <TaskCheckboxIcon checked={item.checked} />
+                  </span>
+                  <span className={item.checked ? 'text-white/52 line-through' : ''}>
+                    {renderInlineMarkdown(item.text)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        if (block.type === 'code') {
+          return (
+            <pre
+              key={`${block.type}-${index}`}
+              className="overflow-x-auto rounded-[12px] border border-white/8 bg-black/20 px-3 py-2 text-[0.75rem] leading-5 text-white/80"
+            >
+              <code>{block.text}</code>
+            </pre>
+          );
+        }
+
+        return (
+          <p key={`${block.type}-${index}`} className="text-secondary">
+            {renderInlineMarkdownLines(block.lines)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
+  if (!markdown) {
+    return [];
+  }
+
+  const lines = markdown.split(/\r?\n/);
+  const blocks: MarkdownBlock[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const rawLine = lines[index];
+    const line = rawLine.trim();
+    if (!line) {
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith('```')) {
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push({ type: 'code', text: codeLines.join('\n') });
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)$/);
+    if (headingMatch) {
+      blocks.push({
+        type: 'heading',
+        level: headingMatch[1].length as 1 | 2 | 3,
+        text: headingMatch[2].trim(),
+      });
+      index += 1;
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      const taskItems: Array<{ text: string; checked: boolean }> = [];
+      const listItems: string[] = [];
+      while (index < lines.length) {
+        const listLine = lines[index].trim();
+        if (!/^[-*]\s+/.test(listLine)) {
+          break;
+        }
+        const content = listLine.replace(/^[-*]\s+/, '').trim();
+        const taskMatch = content.match(/^\[([ xX])\]\s+(.*)$/);
+        if (taskMatch) {
+          taskItems.push({
+            checked: taskMatch[1].toLowerCase() === 'x',
+            text: taskMatch[2].trim(),
+          });
+        } else {
+          listItems.push(content);
+        }
+        index += 1;
+      }
+      if (taskItems.length > 0 && listItems.length === 0) {
+        blocks.push({ type: 'task-list', items: taskItems });
+      } else if (listItems.length > 0 && taskItems.length === 0) {
+        blocks.push({ type: 'list', items: listItems });
+      } else {
+        if (taskItems.length > 0) {
+          blocks.push({
+            type: 'task-list',
+            items: taskItems,
+          });
+        }
+        if (listItems.length > 0) {
+          blocks.push({ type: 'list', items: listItems });
+        }
+      }
+      continue;
+    }
+
+    const paragraphLines = [line];
+    index += 1;
+    while (index < lines.length) {
+      const nextLine = lines[index].trim();
+      if (
+        !nextLine ||
+        nextLine.startsWith('```') ||
+        /^#{1,3}\s+/.test(nextLine) ||
+        /^[-*]\s+/.test(nextLine)
+      ) {
+        break;
+      }
+      paragraphLines.push(nextLine);
+      index += 1;
+    }
+    blocks.push({ type: 'paragraph', lines: paragraphLines });
+  }
+
+  return blocks;
+}
+
+function renderInlineMarkdown(text: string) {
+  return parseInlineMarkdown(text).map((token, index) => {
+    if (token.type === 'code') {
+      return (
+        <code
+          key={`${token.type}-${index}`}
+          className="rounded bg-white/[0.08] px-1.5 py-0.5 text-[0.74rem] text-white/86"
+        >
+          {token.value}
+        </code>
+      );
+    }
+
+    if (token.type === 'strong') {
+      return (
+        <strong key={`${token.type}-${index}`} className="font-semibold text-primary">
+          {token.value}
+        </strong>
+      );
+    }
+
+    if (token.type === 'em') {
+      return (
+        <em key={`${token.type}-${index}`} className="italic text-white/84">
+          {token.value}
+        </em>
+      );
+    }
+
+    if (token.type === 'link') {
+      return (
+        <a
+          key={`${token.type}-${index}`}
+          href={token.href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-violet-100 underline decoration-violet-300/30 underline-offset-4 transition hover:decoration-violet-200/60"
+        >
+          {token.value}
+        </a>
+      );
+    }
+
+    return <span key={`${token.type}-${index}`}>{token.value}</span>;
+  });
+}
+
+function renderInlineMarkdownLines(lines: string[]) {
+  return lines.flatMap((line, index) => {
+    const parts = renderInlineMarkdown(line);
+    if (index === 0) {
+      return parts;
+    }
+
+    return [<br key={`br-${index}`} />, ...parts];
+  });
+}
+
+function parseInlineMarkdown(text: string): InlineToken[] {
+  const tokens: InlineToken[] = [];
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|__[^_]+__|\[[^\]]+\]\([^)]+\)|\*[^*]+\*|_[^_]+_)/g;
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    const value = match[0];
+    const matchIndex = match.index ?? 0;
+
+    if (matchIndex > lastIndex) {
+      tokens.push({ type: 'text', value: text.slice(lastIndex, matchIndex) });
+    }
+
+    if (value.startsWith('`') && value.endsWith('`')) {
+      tokens.push({ type: 'code', value: value.slice(1, -1) });
+    } else if (
+      (value.startsWith('**') && value.endsWith('**')) ||
+      (value.startsWith('__') && value.endsWith('__'))
+    ) {
+      tokens.push({ type: 'strong', value: value.slice(2, -2) });
+    } else if (value.startsWith('[')) {
+      const linkMatch = value.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        tokens.push({
+          type: 'link',
+          value: linkMatch[1],
+          href: linkMatch[2],
+        });
+      } else {
+        tokens.push({ type: 'text', value });
+      }
+    } else if (
+      (value.startsWith('*') && value.endsWith('*')) ||
+      (value.startsWith('_') && value.endsWith('_'))
+    ) {
+      tokens.push({ type: 'em', value: value.slice(1, -1) });
+    } else {
+      tokens.push({ type: 'text', value });
+    }
+
+    lastIndex = matchIndex + value.length;
+  }
+
+  if (lastIndex < text.length) {
+    tokens.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+
+  return tokens.length > 0 ? tokens : [{ type: 'text', value: text }];
+}
+
+function getManualTaskPreview(note: string) {
+  return note
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*]\s+/gm, '')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function getJiraPrAlignmentWarning(item: FocusJiraItem) {
@@ -1108,6 +1814,26 @@ function InfoIcon() {
       <circle cx="12" cy="12" r="8" />
       <path d="M12 10v5" strokeLinecap="round" />
       <circle cx="12" cy="7.2" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TaskCheckboxIcon({ checked }: { checked: boolean }) {
+  return checked ? (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2">
+      <path d="m6.5 12.5 3.4 3.4 7.6-8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="5" y="5" width="14" height="14" rx="3" />
     </svg>
   );
 }

@@ -8,9 +8,12 @@ import {
 import type { JiraIssue } from '../lib/jiraApi';
 import {
   getStoredTodayFocusItems,
+  MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH,
+  MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH,
   saveStoredTodayFocusItems,
   type FocusItem,
   type FocusPullRequestItem,
+  type ManualFocusTaskItem,
 } from '../lib/storage';
 import {
   reconcileTodayFocusGitHubItems,
@@ -126,6 +129,56 @@ export function useTodayFocusState({
     );
   }
 
+  function handleCreateManualTodayFocusTask(title: string, note: string) {
+    setTodayFocusWarning(null);
+
+    const task = createManualTodayFocusTask(title, note);
+    if (!task) {
+      setTodayFocusWarning('Manual tasks need a title.');
+      return false;
+    }
+
+    const addResult = addTodayFocusItem(
+      todayFocusItemsRef.current,
+      task,
+      gitHubPullRequests,
+    );
+    if (addResult.warning) {
+      setTodayFocusWarning(addResult.warning);
+      return false;
+    }
+
+    commitTodayFocusItems(addResult.items);
+    return true;
+  }
+
+  function handleUpdateManualTodayFocusTask(
+    itemId: string,
+    title: string,
+    note: string,
+  ) {
+    setTodayFocusWarning(null);
+    const nextItems = updateManualTodayFocusTask(
+      todayFocusItemsRef.current,
+      itemId,
+      title,
+      note,
+    );
+    if (nextItems === todayFocusItemsRef.current) {
+      return true;
+    }
+
+    commitTodayFocusItems(nextItems);
+    return true;
+  }
+
+  function handleToggleManualTodayFocusTask(itemId: string) {
+    setTodayFocusWarning(null);
+    commitTodayFocusItems(
+      toggleManualTodayFocusTask(todayFocusItemsRef.current, itemId),
+    );
+  }
+
   function handleNestNewTodayFocusPullRequest(
     parentId: string,
     item: FocusPullRequestItem,
@@ -197,6 +250,9 @@ export function useTodayFocusState({
     hasLoadedTodayFocusItems,
     commitTodayFocusItems,
     handleAddTodayFocusItem,
+    handleCreateManualTodayFocusTask,
+    handleUpdateManualTodayFocusTask,
+    handleToggleManualTodayFocusTask,
     handleRemoveTodayFocusItem,
     handleNestNewTodayFocusPullRequest,
     handleNestExistingTodayFocusPullRequest,
@@ -288,6 +344,31 @@ function addTodayFocusItem(
   };
 }
 
+function createManualTodayFocusTask(
+  title: string,
+  note: string,
+): ManualFocusTaskItem | null {
+  const normalized = normalizeManualTaskInput(title, note);
+  if (!normalized) {
+    return null;
+  }
+
+  const timestamp = Date.now();
+  return {
+    id: `manual:${crypto.randomUUID()}`,
+    source: 'manual',
+    sourceLabel: 'Task',
+    reference: 'Manual',
+    title: normalized.title,
+    note: normalized.note,
+    completedAt: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    statusLabel: 'Task',
+    statusTone: 'violet',
+  };
+}
+
 function syncTodayFocusJiraLinkedPullRequests(
   items: FocusItem[],
   pullRequests: GitHubPullRequestItem[],
@@ -359,7 +440,7 @@ function syncTodayFocusJiraLinkedPullRequests(
       continue;
     }
 
-    if (item.jiraKey && jiraKeys.has(item.jiraKey)) {
+    if (item.source === 'github' && item.jiraKey && jiraKeys.has(item.jiraKey)) {
       hasChanges = true;
       continue;
     }
@@ -395,6 +476,62 @@ function removeTodayFocusItem(items: FocusItem[], itemId: string) {
   }
 
   return nextItems;
+}
+
+function updateManualTodayFocusTask(
+  items: FocusItem[],
+  itemId: string,
+  title: string,
+  note: string,
+) {
+  const normalized = normalizeManualTaskInput(title, note);
+  if (!normalized) {
+    return items;
+  }
+
+  let hasChanges = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== itemId || item.source !== 'manual') {
+      return item;
+    }
+
+    if (item.title === normalized.title && item.note === normalized.note) {
+      return item;
+    }
+
+    hasChanges = true;
+    return {
+      ...item,
+      title: normalized.title,
+      note: normalized.note,
+      updatedAt: Date.now(),
+    };
+  });
+
+  return hasChanges ? nextItems : items;
+}
+
+function toggleManualTodayFocusTask(items: FocusItem[], itemId: string) {
+  let hasChanges = false;
+  const nextItems = items.map((item) => {
+    if (item.id !== itemId || item.source !== 'manual') {
+      return item;
+    }
+
+    hasChanges = true;
+    const nextCompletedAt = item.completedAt === null ? Date.now() : null;
+    const nextStatusTone: ManualFocusTaskItem['statusTone'] =
+      nextCompletedAt === null ? 'violet' : 'emerald';
+    return {
+      ...item,
+      completedAt: nextCompletedAt,
+      updatedAt: Date.now(),
+      statusLabel: nextCompletedAt === null ? 'Task' : 'Done',
+      statusTone: nextStatusTone,
+    };
+  });
+
+  return hasChanges ? nextItems : items;
 }
 
 function hasTodayFocusItem(items: FocusItem[], itemId: string) {
@@ -548,6 +685,20 @@ function normalizeTopLevelTodayFocusItem(item: FocusItem): FocusItem {
         children: item.children ?? [],
       }
     : item;
+}
+
+function normalizeManualTaskInput(title: string, note: string) {
+  const normalizedTitle = title
+    .trim()
+    .slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH);
+  if (!normalizedTitle) {
+    return null;
+  }
+
+  return {
+    title: normalizedTitle,
+    note: note.trim().slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH),
+  };
 }
 
 function getNestedPullRequestEndTargetId(parentId: string) {

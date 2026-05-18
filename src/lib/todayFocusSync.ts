@@ -127,6 +127,10 @@ export function reconcileTodayFocusGitHubItems(
         : item;
     }
 
+    if (item.source !== 'github') {
+      return item;
+    }
+
     const nextItem = reconcileGitHubFocusPullRequestItem(item, pullRequestsById, missingPullRequests);
     if (nextItem !== item) {
       hasChanges = true;
@@ -163,6 +167,10 @@ export function applyGitHubPullRequestStatesToTodayFocusItems(
             children: nextChildren
           }
         : item;
+    }
+
+    if (item.source !== 'github') {
+      return item;
     }
 
     const nextItem = applyGitHubPullRequestStateToFocusItem(item, pullRequestStates);

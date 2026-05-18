@@ -306,6 +306,9 @@ function DashboardContent({
           jiraBaseUrl={settings.integrations.jira.baseUrl}
           warning={todayFocus.todayFocusWarning}
           onAddItem={todayFocus.handleAddTodayFocusItem}
+          onCreateManualTask={todayFocus.handleCreateManualTodayFocusTask}
+          onUpdateManualTask={todayFocus.handleUpdateManualTodayFocusTask}
+          onToggleManualTask={todayFocus.handleToggleManualTodayFocusTask}
           onNestNewPullRequest={todayFocus.handleNestNewTodayFocusPullRequest}
           onNestExistingPullRequest={
             todayFocus.handleNestExistingTodayFocusPullRequest

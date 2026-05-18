@@ -3,7 +3,15 @@ import {
   setStoredJsonValue,
 } from './backend';
 import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from './keys';
-import type { FocusItem, FocusJiraItem, FocusPullRequestItem } from './types';
+import type {
+  FocusItem,
+  FocusJiraItem,
+  FocusPullRequestItem,
+  ManualFocusTaskItem,
+} from './types';
+
+export const MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH = 140;
+export const MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH = 3000;
 
 type LegacyFocusItem = {
   id: string;
@@ -44,10 +52,19 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
   if (
     !item ||
     typeof item.id !== 'string' ||
-    (item.source !== 'jira' && item.source !== 'github') ||
+    (item.source !== 'jira' && item.source !== 'github' && item.source !== 'manual') ||
+    typeof item.title !== 'string'
+  ) {
+    return null;
+  }
+
+  if (item.source === 'manual') {
+    return normalizeManualFocusTaskItem(item);
+  }
+
+  if (
     typeof item.sourceLabel !== 'string' ||
     typeof item.reference !== 'string' ||
-    typeof item.title !== 'string' ||
     typeof item.statusLabel !== 'string' ||
     (item.statusTone !== 'violet' && item.statusTone !== 'emerald' && item.statusTone !== 'amber')
   ) {
@@ -93,6 +110,47 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
     children,
     isPlaceholder: 'isPlaceholder' in item ? Boolean(item.isPlaceholder) : false
   } satisfies FocusJiraItem;
+}
+
+function normalizeManualFocusTaskItem(
+  item: Extract<FocusItem, { source: 'manual' }>,
+): ManualFocusTaskItem | null {
+  const title = item.title.trim().slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH);
+  if (!title) {
+    return null;
+  }
+
+  const note = normalizeManualFocusTaskNote(item.note);
+  const createdAt = normalizeTimestamp(item.createdAt) ?? Date.now();
+  const updatedAt = normalizeTimestamp(item.updatedAt) ?? createdAt;
+  const completedAt = normalizeTimestamp(item.completedAt);
+  const isCompleted = completedAt !== null;
+
+  return {
+    id: item.id,
+    source: 'manual',
+    sourceLabel: 'Task',
+    reference: 'Manual',
+    title,
+    note,
+    completedAt,
+    createdAt,
+    updatedAt: Math.max(updatedAt, createdAt),
+    statusLabel: isCompleted ? 'Done' : 'Task',
+    statusTone: isCompleted ? 'emerald' : 'violet',
+  };
+}
+
+function normalizeManualFocusTaskNote(value: unknown) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim().slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH);
+}
+
+function normalizeTimestamp(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function normalizeJiraKey(value: unknown) {
