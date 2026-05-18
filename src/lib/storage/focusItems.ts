@@ -1,10 +1,14 @@
 import {
   getLocalStorageJsonValue,
   getStoredJsonValue,
+  removeLocalStorageValue,
   setLocalStorageJsonValue,
   setStoredJsonValue,
 } from './backend';
-import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from './keys';
+import {
+  TODAY_FOCUS_ITEMS_PENDING_STORAGE_KEY,
+  TODAY_FOCUS_ITEMS_STORAGE_KEY,
+} from './keys';
 import type {
   FocusItem,
   FocusJiraItem,
@@ -44,15 +48,25 @@ export async function getStoredTodayFocusItems() {
 }
 
 export async function getStoredTodayFocusItemsSnapshot() {
-  const [storedItems, localStoredItems] = await Promise.all([
+  const [storedItems, pendingLocalStoredItems, legacyLocalStoredItems] =
+    await Promise.all([
     getStoredJsonValue<StoredTodayFocusItemsValue>(TODAY_FOCUS_ITEMS_STORAGE_KEY),
+    Promise.resolve(
+      getLocalStorageJsonValue<StoredTodayFocusItemsValue>(
+        TODAY_FOCUS_ITEMS_PENDING_STORAGE_KEY,
+      ),
+    ),
     Promise.resolve(
       getLocalStorageJsonValue<StoredTodayFocusItemsValue>(
         TODAY_FOCUS_ITEMS_STORAGE_KEY,
       ),
     ),
   ]);
-  if (storedItems === null && localStoredItems === null) {
+  if (
+    storedItems === null &&
+    pendingLocalStoredItems === null &&
+    legacyLocalStoredItems === null
+  ) {
     return null;
   }
 
@@ -60,22 +74,18 @@ export async function getStoredTodayFocusItemsSnapshot() {
     storedItems === null
       ? null
       : normalizeStoredTodayFocusItemsSnapshot(storedItems);
-  const localSnapshot =
-    localStoredItems === null
+  const pendingLocalSnapshot =
+    pendingLocalStoredItems === null
       ? null
-      : normalizeStoredTodayFocusItemsSnapshot(localStoredItems);
+      : normalizeStoredTodayFocusItemsSnapshot(pendingLocalStoredItems);
+  const legacyLocalSnapshot =
+    legacyLocalStoredItems === null
+      ? null
+      : normalizeStoredTodayFocusItemsSnapshot(legacyLocalStoredItems);
 
-  if (chromeSnapshot === null) {
-    return localSnapshot;
-  }
-
-  if (localSnapshot === null) {
-    return chromeSnapshot;
-  }
-
-  return localSnapshot.version > chromeSnapshot.version
-    ? localSnapshot
-    : chromeSnapshot;
+  return [chromeSnapshot, pendingLocalSnapshot, legacyLocalSnapshot]
+    .filter((snapshot): snapshot is StoredTodayFocusItemsSnapshot => snapshot !== null)
+    .sort((left, right) => right.version - left.version)[0] ?? null;
 }
 
 export async function saveStoredTodayFocusItems(items: FocusItem[]) {
@@ -94,9 +104,14 @@ export async function saveStoredTodayFocusItemsSnapshot(
     items: normalizedItems,
   };
 
-  // Keep a synchronous page-local copy so rapid refreshes do not lose the latest user ordering.
-  setLocalStorageJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedSnapshot);
+  // Keep a synchronous pending copy so rapid refreshes do not lose the latest user ordering.
+  setLocalStorageJsonValue(
+    TODAY_FOCUS_ITEMS_PENDING_STORAGE_KEY,
+    normalizedSnapshot,
+  );
   await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedSnapshot);
+  removeLocalStorageValue(TODAY_FOCUS_ITEMS_PENDING_STORAGE_KEY);
+  removeLocalStorageValue(TODAY_FOCUS_ITEMS_STORAGE_KEY);
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
