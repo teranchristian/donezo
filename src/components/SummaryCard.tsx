@@ -336,50 +336,64 @@ export function SummaryCard({
         ))}
 
         <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onBlur={handleBlur}
+          onDrop={visibleItems.length < limit ? handleDrop : undefined}
+          onDragOver={visibleItems.length < limit ? handleDragOver : undefined}
+          onDragEnter={visibleItems.length < limit ? handleDragEnter : undefined}
+          onDragLeave={visibleItems.length < limit ? handleDragLeave : undefined}
+          onBlur={visibleItems.length < limit ? handleBlur : undefined}
           className={`rounded-[16px] border px-3 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
             visibleItems.length > 0 ? 'py-2.5' : 'py-3'
           } ${
-            isDropTargetActive
-              ? 'border-violet-400/40 bg-violet-500/[0.09]'
-              : 'border-violet-500/18 bg-violet-500/[0.05]'
+            visibleItems.length >= limit
+              ? 'border-dashed border-white/[0.08] bg-black/[0.12] shadow-none'
+              : isDropTargetActive
+                ? 'border-violet-400/40 bg-violet-500/[0.09]'
+                : 'border-violet-500/18 bg-violet-500/[0.05]'
           }`}
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <span
-                className={`flex shrink-0 items-center justify-center rounded-[11px] bg-violet-500/14 text-violet-200 ${
-                  visibleItems.length > 0 ? 'h-8 w-8' : 'h-9 w-9'
-                }`}
+                className={`flex shrink-0 items-center justify-center rounded-[11px] ${
+                  visibleItems.length >= limit
+                    ? 'bg-white/[0.03] text-white/24'
+                    : 'bg-violet-500/14 text-violet-200'
+                } ${visibleItems.length > 0 ? 'h-8 w-8' : 'h-9 w-9'}`}
                 aria-hidden="true"
               >
                 <FocusDropZoneIcon />
               </span>
               <div className="min-w-0">
-                <p className="text-[0.84rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
-                {visibleItems.length === 0 ? (
-                  <p className="text-[0.75rem] leading-4.5 text-violet-200/50">to focus on them today</p>
-                ) : null}
+                {visibleItems.length >= limit ? (
+                  <p className="text-[0.84rem] font-medium text-white/46">
+                    Max 3 items reached
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[0.84rem] font-medium text-violet-100/92">Drag Jira tickets or PRs here</p>
+                    {visibleItems.length === 0 ? (
+                      <p className="text-[0.75rem] leading-4.5 text-violet-200/50">to focus on them today</p>
+                    ) : null}
+                  </>
+                )}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                setManualTaskEditorState({
-                  mode: 'create',
-                  title: '',
-                  note: '',
-                })
-              }
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-3 py-1.5 text-[0.74rem] font-semibold text-violet-100 transition hover:border-violet-300/35 hover:bg-violet-400/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
-            >
-              <PlusIcon />
-              <span>Add task</span>
-            </button>
+            {visibleItems.length < limit ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setManualTaskEditorState({
+                    mode: 'create',
+                    title: '',
+                    note: '',
+                  })
+                }
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-3 py-1.5 text-[0.74rem] font-semibold text-violet-100 transition hover:border-violet-300/35 hover:bg-violet-400/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/50"
+              >
+                <PlusIcon />
+                <span>Add task</span>
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
