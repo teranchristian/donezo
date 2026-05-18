@@ -34,12 +34,14 @@ export function useTodayFocusState({
   gitHubPullRequests,
 }: UseTodayFocusStateOptions) {
   const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
+  const [isSavingTodayFocusItems, setIsSavingTodayFocusItems] = useState(false);
   const [hasLoadedTodayFocusItems, setHasLoadedTodayFocusItems] =
     useState(false);
   const [todayFocusWarning, setTodayFocusWarning] = useState<string | null>(
     null,
   );
   const hasLoadedTodayFocusItemsRef = useRef(false);
+  const pendingTodayFocusSaveCountRef = useRef(0);
   const todayFocusItemsRef = useRef<FocusItem[]>([]);
   const todayFocusStorageVersionRef = useRef(0);
   const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
@@ -130,6 +132,22 @@ export function useTodayFocusState({
     }
   }, [gitHubPullRequests, hasLoadedTodayFocusItems]);
 
+  useEffect(() => {
+    if (!isSavingTodayFocusItems) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isSavingTodayFocusItems]);
+
   async function commitTodayFocusItems(
     nextItems: FocusItem[],
     reason: 'user' | 'sync' = 'user',
@@ -163,11 +181,22 @@ export function useTodayFocusState({
     }
 
     const nextVersion = Date.now();
-    await saveStoredTodayFocusItemsSnapshot({
-      items: nextItems,
-      version: nextVersion,
-    });
-    todayFocusStorageVersionRef.current = nextVersion;
+    pendingTodayFocusSaveCountRef.current += 1;
+    setIsSavingTodayFocusItems(true);
+
+    try {
+      await saveStoredTodayFocusItemsSnapshot({
+        items: nextItems,
+        version: nextVersion,
+      });
+      todayFocusStorageVersionRef.current = nextVersion;
+    } finally {
+      pendingTodayFocusSaveCountRef.current = Math.max(
+        0,
+        pendingTodayFocusSaveCountRef.current - 1,
+      );
+      setIsSavingTodayFocusItems(pendingTodayFocusSaveCountRef.current > 0);
+    }
   }
 
   function handleAddTodayFocusItem(item: FocusItem) {
