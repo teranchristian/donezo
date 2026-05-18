@@ -131,6 +131,7 @@ const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
   { key: 'warning-out-of-date-new', label: 'Warning: out of date' },
   { key: 'warning-already-seen', label: 'Warning: already seen' },
   { key: 'comment-badges', label: 'Comment badges' },
+  { key: 'queued-prs', label: 'Queued PRs' },
   { key: 'team-prs-new', label: 'Team PRs: new' },
   { key: 'mixed', label: 'Mixed' }
 ];
@@ -270,6 +271,58 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           updatedAt: Date.now() - 10_000
         }
       },
+      notificationSeenAtState: {},
+      teamPrTrackerState: {
+        snapshotKeys: [],
+        pendingNewKeys: [],
+        lastProcessedUpdatedAt: null,
+      }
+    };
+  })(),
+  'queued-prs': (() => {
+    const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
+    dashboardData.pullRequests = [
+      createPullRequest({
+        id: 301,
+        title: 'EAP-48: Use provision endpoints and gate Create Group by permission',
+        repositoryName: 'qsic-hq-admin/qsic-hq-admin',
+        owner: 'qsic-hq-admin',
+        repo: 'qsic-hq-admin',
+        pullNumber: 412,
+        reviewStatus: 'approved',
+        ciStatus: 'passing',
+        mergeStateStatus: 'CLEAN',
+        mergeQueueEntry: {
+          position: 1,
+          state: 'QUEUED',
+        },
+        updatedAt: '2026-05-06T09:48:00.000Z'
+      }),
+      createPullRequest({
+        id: 302,
+        title: 'Refine access policy validation for venue sync',
+        repositoryName: 'qsic-hq-admin/qsic-hq-admin',
+        owner: 'qsic-hq-admin',
+        repo: 'qsic-hq-admin',
+        pullNumber: 413,
+        reviewStatus: 'open',
+        ciStatus: 'pending',
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-05-06T09:20:00.000Z'
+      }),
+    ];
+    dashboardData.openPrsCount = dashboardData.pullRequests.filter(
+      (pullRequest) => pullRequest.source === 'authored'
+    ).length;
+    dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
+      (pullRequest) => pullRequest.source === 'review-requested'
+    ).length;
+
+    return {
+      key: 'queued-prs',
+      dashboardData,
+      readyState: {},
+      warningState: {},
       notificationSeenAtState: {},
       teamPrTrackerState: {
         snapshotKeys: [],
