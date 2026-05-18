@@ -104,11 +104,17 @@ export function SummaryCard({
         return;
       }
 
-      setManualTaskEditorState({
-        mode: 'edit',
-        itemId: task.id,
-        title: task.title,
-        note: task.note,
+      setManualTaskEditorState((current) => {
+        if (current?.mode === 'edit' && current.itemId === task.id) {
+          return current;
+        }
+
+        return {
+          mode: 'edit',
+          itemId: task.id,
+          title: task.title,
+          note: task.note,
+        };
       });
     }
 
