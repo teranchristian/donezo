@@ -415,6 +415,14 @@ export function SummaryCard({
             note,
           });
         }}
+        onBackToPreview={(itemId, title, note) => {
+          setManualTaskEditorState({
+            mode: 'preview',
+            itemId,
+            title,
+            note,
+          });
+        }}
         onCreate={(title, note) => {
           if (onCreateManualTask(title, note)) {
             setManualTaskEditorState(null);
@@ -1220,6 +1228,7 @@ function ManualTaskEditorModal({
   state,
   onClose,
   onStartEdit,
+  onBackToPreview,
   onCreate,
   onToggleChecklist,
   onUpdate,
@@ -1227,6 +1236,7 @@ function ManualTaskEditorModal({
   state: ManualTaskEditorState | null;
   onClose: () => void;
   onStartEdit: (itemId: string, title: string, note: string) => void;
+  onBackToPreview: (itemId: string, title: string, note: string) => void;
   onCreate: (title: string, note: string) => void;
   onToggleChecklist: (itemId: string, lineIndex: number) => void;
   onUpdate: (itemId: string, title: string, note: string) => void;
@@ -1479,13 +1489,17 @@ function ManualTaskEditorModal({
                     : 'Edit'}
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-            >
-              {isCreateMode ? 'Cancel' : 'Close'}
-            </button>
+            {state.mode === 'edit' ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onBackToPreview(state.itemId, normalizedTitle, normalizedNote)
+                }
+                className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              >
+                Back
+              </button>
+            ) : null}
             {isPreviewMode ? (
               <button
                 type="button"
@@ -1494,7 +1508,7 @@ function ManualTaskEditorModal({
               >
                 Edit
               </button>
-            ) : (
+            ) : state.mode === 'create' ? (
               <button
                 type="button"
                 disabled={!canSubmit}
@@ -1503,18 +1517,30 @@ function ManualTaskEditorModal({
                     return;
                   }
 
-                  if (state.mode === 'create') {
-                    onCreate(normalizedTitle, normalizedNote);
-                    return;
-                  }
-
-                  onUpdate(state.itemId, normalizedTitle, normalizedNote);
+                  onCreate(normalizedTitle, normalizedNote);
                 }}
                 className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
               >
-                {state.mode === 'create' ? 'Add task' : 'Save'}
+                Add task
               </button>
-            )}
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+            >
+              {isCreateMode ? 'Cancel' : isPreviewMode ? 'OK' : 'Close'}
+            </button>
+            {state.mode === 'edit' ? (
+              <button
+                type="button"
+                disabled={!canSubmit}
+                onClick={() => onUpdate(state.itemId, normalizedTitle, normalizedNote)}
+                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
+              >
+                Save
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
