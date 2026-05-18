@@ -1064,6 +1064,10 @@ function ManualTaskEditorModal({
 }) {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
+  const [isCompactLayout, setIsCompactLayout] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 1025 : false,
+  );
+  const [compactMode, setCompactMode] = useState<'edit' | 'preview'>('edit');
 
   useEffect(() => {
     if (!state) {
@@ -1072,7 +1076,22 @@ function ManualTaskEditorModal({
 
     setTitle(state.title);
     setNote(state.note);
+    setCompactMode('edit');
   }, [state]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    function updateLayoutMode() {
+      setIsCompactLayout(window.innerWidth < 1025);
+    }
+
+    updateLayoutMode();
+    window.addEventListener('resize', updateLayoutMode);
+    return () => window.removeEventListener('resize', updateLayoutMode);
+  }, []);
 
   useEffect(() => {
     if (!state) {
@@ -1111,14 +1130,14 @@ function ManualTaskEditorModal({
   const previewBlocks = parseMarkdownBlocks(normalizedNote.trim());
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 lg:p-6" role="dialog" aria-modal="true">
       <button
         type="button"
         className="absolute inset-0 bg-[#06080d]/78 backdrop-blur-[2px]"
         aria-label="Close task editor"
         onClick={onClose}
       />
-      <div className="relative z-10 flex max-h-[min(88vh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#10151d] shadow-[0_32px_90px_rgba(0,0,0,0.5)]">
+      <div className="relative z-10 flex h-[min(88vh,860px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#10151d] shadow-[0_32px_90px_rgba(0,0,0,0.5)] sm:h-[min(86vh,880px)]">
         <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4 sm:px-6">
           <div>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-violet-200/68">
@@ -1128,18 +1147,28 @@ function ManualTaskEditorModal({
               {state.mode === 'create' ? 'Add focus task' : 'Task details'}
             </h3>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-            aria-label="Close task editor"
-          >
-            <CloseIcon />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              aria-label="Close task editor"
+            >
+              <CloseIcon />
+            </button>
+          </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-          <div className="space-y-5 px-5 py-5 sm:px-6">
+        <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+          <div
+            className={`min-h-0 px-5 py-5 sm:px-6 ${
+              isCompactLayout
+                ? compactMode === 'edit'
+                  ? 'flex flex-col'
+                  : 'hidden'
+                : 'flex flex-col'
+            }`}
+          >
             <label className="block">
               <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
                 Title
@@ -1158,7 +1187,7 @@ function ManualTaskEditorModal({
               </span>
             </label>
 
-            <label className="block">
+            <label className="mt-5 flex min-h-0 flex-1 flex-col">
               <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
                 Note
               </span>
@@ -1168,8 +1197,8 @@ function ManualTaskEditorModal({
                   setNote(event.target.value.slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH))
                 }
                 placeholder={'## Context\n- Investigate how this works\n- Capture links or next steps'}
-                rows={14}
-                className="min-h-[320px] w-full rounded-[16px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.86rem] leading-6 text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05]"
+                rows={10}
+                className="min-h-[180px] flex-1 resize-none rounded-[16px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.86rem] leading-6 text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05] lg:min-h-0"
               />
               <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
                 {note.length} / {MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH}
@@ -1177,15 +1206,23 @@ function ManualTaskEditorModal({
             </label>
           </div>
 
-          <div className="border-t border-white/8 bg-black/10 px-5 py-5 lg:border-l lg:border-t-0 sm:px-6">
-            <div className="flex h-full min-h-[260px] flex-col">
+          <div
+            className={`min-h-0 border-t border-white/8 bg-black/10 px-5 py-5 sm:px-6 ${
+              isCompactLayout
+                ? compactMode === 'preview'
+                  ? 'flex flex-col'
+                  : 'hidden'
+                : 'flex flex-col lg:border-l lg:border-t-0'
+            }`}
+          >
+            <div className="flex min-h-0 flex-1 flex-col">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
                   Preview
                 </span>
                 <span className="text-[0.68rem] text-white/30">Markdown</span>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3">
+              <div className="min-h-[180px] flex-1 overflow-y-auto rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3 lg:min-h-0">
                 {previewBlocks.length === 0 ? (
                   <p className="text-[0.8rem] leading-6 text-white/28">
                     Add notes to preview headings, lists, code, and links.
@@ -1203,6 +1240,19 @@ function ManualTaskEditorModal({
             Notes support basic Markdown like headings, bullets, checkboxes, links, and inline code.
           </p>
           <div className="flex items-center gap-2">
+            {isCompactLayout ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setCompactMode((current) =>
+                    current === 'edit' ? 'preview' : 'edit',
+                  )
+                }
+                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-4 py-2 text-[0.8rem] font-semibold text-violet-100 transition hover:border-violet-300/35 hover:bg-violet-400/[0.12]"
+              >
+                {compactMode === 'edit' ? 'Preview' : 'Edit'}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onClose}
@@ -1227,7 +1277,7 @@ function ManualTaskEditorModal({
               }}
               className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
             >
-              {state.mode === 'create' ? 'Add task' : 'Save changes'}
+              {state.mode === 'create' ? 'Add task' : 'Save'}
             </button>
           </div>
         </div>
