@@ -1452,37 +1452,56 @@ function ManualTaskEditorModal({
                 Back
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-            >
-              {isCreateMode ? 'Cancel' : isPreviewMode ? 'OK' : 'Close'}
-            </button>
             {isPreviewMode ? (
-              <button
-                type="button"
-                onClick={() => onStartEdit(state.itemId, state.title, state.note)}
-                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18]"
-              >
-                Edit
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => onStartEdit(state.itemId, state.title, state.note)}
+                  className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18]"
+                >
+                  OK
+                </button>
+              </>
             ) : state.mode === 'create' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={() => {
+                    if (!canSubmit) {
+                      return;
+                    }
+
+                    onCreate(normalizedTitle, normalizedNote);
+                  }}
+                  className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
+                >
+                  Add task
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
-                disabled={!canSubmit}
-                onClick={() => {
-                  if (!canSubmit) {
-                    return;
-                  }
-
-                  onCreate(normalizedTitle, normalizedNote);
-                }}
-                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
+                onClick={onClose}
+                className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
               >
-                Add task
+                Close
               </button>
-            ) : null}
+            )}
             {state.mode === 'edit' ? (
               <button
                 type="button"
