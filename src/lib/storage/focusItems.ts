@@ -1,5 +1,7 @@
 import {
+  getLocalStorageJsonValue,
   getStoredJsonValue,
+  setLocalStorageJsonValue,
   setStoredJsonValue,
 } from './backend';
 import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from './keys';
@@ -42,14 +44,38 @@ export async function getStoredTodayFocusItems() {
 }
 
 export async function getStoredTodayFocusItemsSnapshot() {
-  const storedItems = await getStoredJsonValue<StoredTodayFocusItemsValue>(
-    TODAY_FOCUS_ITEMS_STORAGE_KEY,
-  );
-  if (storedItems === null) {
+  const [storedItems, localStoredItems] = await Promise.all([
+    getStoredJsonValue<StoredTodayFocusItemsValue>(TODAY_FOCUS_ITEMS_STORAGE_KEY),
+    Promise.resolve(
+      getLocalStorageJsonValue<StoredTodayFocusItemsValue>(
+        TODAY_FOCUS_ITEMS_STORAGE_KEY,
+      ),
+    ),
+  ]);
+  if (storedItems === null && localStoredItems === null) {
     return null;
   }
 
-  return normalizeStoredTodayFocusItemsSnapshot(storedItems);
+  const chromeSnapshot =
+    storedItems === null
+      ? null
+      : normalizeStoredTodayFocusItemsSnapshot(storedItems);
+  const localSnapshot =
+    localStoredItems === null
+      ? null
+      : normalizeStoredTodayFocusItemsSnapshot(localStoredItems);
+
+  if (chromeSnapshot === null) {
+    return localSnapshot;
+  }
+
+  if (localSnapshot === null) {
+    return chromeSnapshot;
+  }
+
+  return localSnapshot.version > chromeSnapshot.version
+    ? localSnapshot
+    : chromeSnapshot;
 }
 
 export async function saveStoredTodayFocusItems(items: FocusItem[]) {
@@ -63,10 +89,14 @@ export async function saveStoredTodayFocusItemsSnapshot(
   snapshot: StoredTodayFocusItemsSnapshot,
 ) {
   const normalizedItems = mergeFocusItems(snapshot.items) ?? [];
-  await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, {
+  const normalizedSnapshot = {
     version: normalizeStoredTodayFocusVersion(snapshot.version),
     items: normalizedItems,
-  });
+  };
+
+  // Keep a synchronous page-local copy so rapid refreshes do not lose the latest user ordering.
+  setLocalStorageJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedSnapshot);
+  await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedSnapshot);
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {

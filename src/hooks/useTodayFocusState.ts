@@ -158,6 +158,10 @@ export function useTodayFocusState({
     todayFocusItemsRef.current = nextItems;
     setTodayFocusItems(nextItems);
 
+    if (reason === 'sync') {
+      return;
+    }
+
     const nextVersion = Date.now();
     await saveStoredTodayFocusItemsSnapshot({
       items: nextItems,
