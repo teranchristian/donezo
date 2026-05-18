@@ -638,11 +638,6 @@ function ManualFocusTaskCard({
                   <span className="shrink-0 text-[0.63rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     Manual task
                   </span>
-                  {isCompleted ? (
-                    <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-500/14 px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] text-emerald-100">
-                      Done
-                    </span>
-                  ) : null}
                 </div>
                 <p
                   className={`mt-1 line-clamp-2 text-[0.82rem] font-medium leading-4.5 ${
@@ -651,6 +646,14 @@ function ManualFocusTaskCard({
                 >
                   {item.title}
                 </p>
+              </div>
+
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                {isCompleted ? (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-emerald-500/14 px-2 py-0.5 text-[0.55rem] font-medium uppercase tracking-[0.1em] text-emerald-100">
+                    Done
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
