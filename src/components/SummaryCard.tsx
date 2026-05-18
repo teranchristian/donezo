@@ -16,6 +16,7 @@ import { getJiraBrowseUrl, normalizeJiraBaseUrl } from '../lib/jiraApi';
 export const TODAY_FOCUS_MAX_ITEMS = 3;
 export const TODAY_FOCUS_DRAG_MIME = 'application/x-dashboard-today-focus-item';
 export const TODAY_FOCUS_INTERNAL_DRAG_MIME = 'application/x-dashboard-today-focus-move';
+const MANUAL_TASK_ROUTE_PARAM = 'manualTask';
 
 type FocusInternalDragPayload = {
   itemId: string;
@@ -80,6 +81,43 @@ export function SummaryCard({
   const [activeTopLevelDropIndicator, setActiveTopLevelDropIndicator] = useState<TopLevelDropIndicator | null>(null);
   const [manualTaskEditorState, setManualTaskEditorState] = useState<ManualTaskEditorState | null>(null);
   const visibleItems = items.slice(0, limit);
+  const manualTasks = items.filter(
+    (item): item is ManualFocusTaskItem => item.source === 'manual',
+  );
+
+  useEffect(() => {
+    function syncManualTaskEditorFromRoute() {
+      const manualTaskId = getManualTaskRouteId();
+      if (!manualTaskId) {
+        setManualTaskEditorState((current) =>
+          current?.mode === 'edit' ? null : current,
+        );
+        return;
+      }
+
+      const task = manualTasks.find((item) => item.id === manualTaskId);
+      if (!task) {
+        clearManualTaskRoute();
+        setManualTaskEditorState((current) =>
+          current?.mode === 'edit' ? null : current,
+        );
+        return;
+      }
+
+      setManualTaskEditorState({
+        mode: 'edit',
+        itemId: task.id,
+        title: task.title,
+        note: task.note,
+      });
+    }
+
+    syncManualTaskEditorFromRoute();
+    window.addEventListener('hashchange', syncManualTaskEditorFromRoute);
+    return () => {
+      window.removeEventListener('hashchange', syncManualTaskEditorFromRoute);
+    };
+  }, [manualTasks]);
 
   function handleDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -241,12 +279,7 @@ export function SummaryCard({
               jiraBaseUrl={jiraBaseUrl}
               onRemove={onRemoveItem}
               onEditManualTask={(task) => {
-                setManualTaskEditorState({
-                  mode: 'edit',
-                  itemId: task.id,
-                  title: task.title,
-                  note: task.note,
-                });
+                setManualTaskRoute(task.id);
               }}
               onToggleManualTask={onToggleManualTask}
               activeInternalDrag={activeInternalDrag}
@@ -327,7 +360,14 @@ export function SummaryCard({
 
       <ManualTaskEditorModal
         state={manualTaskEditorState}
-        onClose={() => setManualTaskEditorState(null)}
+        onClose={() => {
+          if (manualTaskEditorState?.mode === 'edit') {
+            clearManualTaskRoute();
+            return;
+          }
+
+          setManualTaskEditorState(null);
+        }}
         onCreate={(title, note) => {
           if (onCreateManualTask(title, note)) {
             setManualTaskEditorState(null);
@@ -335,7 +375,7 @@ export function SummaryCard({
         }}
         onUpdate={(itemId, title, note) => {
           if (onUpdateManualTask(itemId, title, note)) {
-            setManualTaskEditorState(null);
+            clearManualTaskRoute();
           }
         }}
       />
@@ -1701,6 +1741,44 @@ function readInternalDragPayload(dataTransfer: DataTransfer): FocusInternalDragP
   } catch {
     return null;
   }
+}
+
+function getManualTaskRouteId() {
+  return getHashSearchParams().get(MANUAL_TASK_ROUTE_PARAM);
+}
+
+function setManualTaskRoute(taskId: string) {
+  const searchParams = getHashSearchParams();
+  searchParams.set(MANUAL_TASK_ROUTE_PARAM, taskId);
+  updateHashSearchParams(searchParams);
+}
+
+function clearManualTaskRoute() {
+  const searchParams = getHashSearchParams();
+  if (!searchParams.has(MANUAL_TASK_ROUTE_PARAM)) {
+    return;
+  }
+
+  searchParams.delete(MANUAL_TASK_ROUTE_PARAM);
+  updateHashSearchParams(searchParams);
+}
+
+function getHashSearchParams() {
+  const hash = window.location.hash.replace(/^#/, '');
+  const [, rawSearch = ''] = hash.split('?');
+  return new URLSearchParams(rawSearch);
+}
+
+function updateHashSearchParams(searchParams: URLSearchParams) {
+  const hash = window.location.hash.replace(/^#/, '');
+  const [rawPath = '/'] = hash.split('?');
+  const nextSearch = searchParams.toString();
+  const nextHash = nextSearch ? `#${rawPath}?${nextSearch}` : `#${rawPath}`;
+  if (window.location.hash === nextHash) {
+    return;
+  }
+
+  window.location.hash = nextHash;
 }
 
 function normalizeDroppedItem(item: FocusItem): FocusItem {

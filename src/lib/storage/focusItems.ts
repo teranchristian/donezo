@@ -13,6 +13,11 @@ import type {
 export const MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH = 140;
 export const MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH = 3000;
 
+type StoredTodayFocusItemsSnapshot = {
+  items: FocusItem[];
+  version: number;
+};
+
 type LegacyFocusItem = {
   id: string;
   source: 'jira' | 'github';
@@ -24,20 +29,44 @@ type LegacyFocusItem = {
   statusTone: 'violet' | 'emerald' | 'amber';
 };
 
+type StoredTodayFocusItemsValue =
+  | FocusItem[]
+  | {
+      version?: unknown;
+      items?: unknown;
+    };
+
 export async function getStoredTodayFocusItems() {
-  const storedItems = await getStoredJsonValue<FocusItem[]>(
+  const snapshot = await getStoredTodayFocusItemsSnapshot();
+  return snapshot?.items ?? null;
+}
+
+export async function getStoredTodayFocusItemsSnapshot() {
+  const storedItems = await getStoredJsonValue<StoredTodayFocusItemsValue>(
     TODAY_FOCUS_ITEMS_STORAGE_KEY,
   );
   if (storedItems === null) {
     return null;
   }
 
-  return mergeFocusItems(storedItems) ?? [];
+  return normalizeStoredTodayFocusItemsSnapshot(storedItems);
 }
 
 export async function saveStoredTodayFocusItems(items: FocusItem[]) {
-  const normalizedItems = mergeFocusItems(items) ?? [];
-  await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedItems);
+  await saveStoredTodayFocusItemsSnapshot({
+    items,
+    version: Date.now(),
+  });
+}
+
+export async function saveStoredTodayFocusItemsSnapshot(
+  snapshot: StoredTodayFocusItemsSnapshot,
+) {
+  const normalizedItems = mergeFocusItems(snapshot.items) ?? [];
+  await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, {
+    version: normalizeStoredTodayFocusVersion(snapshot.version),
+    items: normalizedItems,
+  });
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {
@@ -110,6 +139,34 @@ function normalizeFocusItem(item: FocusItem | LegacyFocusItem | null | undefined
     children,
     isPlaceholder: 'isPlaceholder' in item ? Boolean(item.isPlaceholder) : false
   } satisfies FocusJiraItem;
+}
+
+function normalizeStoredTodayFocusItemsSnapshot(
+  value: StoredTodayFocusItemsValue,
+): StoredTodayFocusItemsSnapshot {
+  if (Array.isArray(value)) {
+    return {
+      items: mergeFocusItems(value) ?? [],
+      version: 0,
+    };
+  }
+
+  const items =
+    value && typeof value === 'object' && 'items' in value
+      ? mergeFocusItems(value.items as FocusItem[] | LegacyFocusItem[] | null)
+      : null;
+
+  return {
+    items: items ?? [],
+    version:
+      value && typeof value === 'object' && 'version' in value
+        ? normalizeStoredTodayFocusVersion(value.version)
+        : 0,
+  };
+}
+
+function normalizeStoredTodayFocusVersion(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function normalizeManualFocusTaskItem(
