@@ -1,4 +1,4 @@
-import { FocusEvent, useEffect, useState } from 'react';
+import { FocusEvent, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CardShell } from './CardShell';
 import {
@@ -701,6 +701,7 @@ function FocusJiraCard({
   const statusToneClass = getStatusToneClass(item.statusTone);
   const [isNestTargetActive, setIsNestTargetActive] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const expandedByDragHoverRef = useRef(false);
   const hasLinkedPrs = item.children.length > 0;
   const jiraPrWarning = getJiraPrAlignmentWarning(item);
   const shouldExpandList = hasLinkedPrs && (isExpanded || isNestTargetActive);
@@ -708,6 +709,7 @@ function FocusJiraCard({
 
   useEffect(() => {
     if (!hasLinkedPrs) {
+      expandedByDragHoverRef.current = false;
       setIsExpanded(false);
     }
   }, [hasLinkedPrs]);
@@ -744,7 +746,8 @@ function FocusJiraCard({
 
     event.preventDefault();
     setIsNestTargetActive(true);
-    if (item.children.length > 0) {
+    if (item.children.length > 0 && !isExpanded) {
+      expandedByDragHoverRef.current = true;
       setIsExpanded(true);
     }
   }
@@ -752,12 +755,17 @@ function FocusJiraCard({
   function handleNestDragLeave(event: React.DragEvent<HTMLDivElement>) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setIsNestTargetActive(false);
+      if (expandedByDragHoverRef.current) {
+        expandedByDragHoverRef.current = false;
+        setIsExpanded(false);
+      }
     }
   }
 
   function handleNestDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsNestTargetActive(false);
+    expandedByDragHoverRef.current = false;
 
     const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
     if (internalDrag && internalDrag.source === 'top-level' && internalDrag.itemSource === 'github') {
@@ -855,6 +863,7 @@ function FocusJiraCard({
               type="button"
               onClick={() => {
                 if (hasLinkedPrs) {
+                  expandedByDragHoverRef.current = false;
                   setIsExpanded((value) => !value);
                 }
               }}
