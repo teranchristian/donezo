@@ -1402,7 +1402,7 @@ function ManualTaskEditorModal({
               </>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-4">
+                <div className="px-1 py-1">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
                     Title
                   </p>
@@ -1410,11 +1410,11 @@ function ManualTaskEditorModal({
                     {normalizedTitle || 'Untitled task'}
                   </p>
                 </div>
-                <div className="mt-4 rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-4">
+                <div className="mt-5 px-1 py-1">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
                     Note
                   </p>
-                  <div className="mt-3 min-h-[220px] overflow-y-auto rounded-[16px] border border-white/8 bg-[#10151d] px-4 py-3">
+                  <div className="mt-3 min-h-[220px] overflow-y-auto rounded-[18px] border border-white/8 bg-[#10151d] px-5 py-4">
                     {previewBlocks.length === 0 ? (
                       <p className="text-[0.8rem] leading-6 text-white/28">
                         No notes yet.
