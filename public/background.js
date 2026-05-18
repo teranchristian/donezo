@@ -1458,10 +1458,12 @@ async function getGitHubPullRequestStates(payload) {
 
     return statesById;
   } catch (error) {
-    console.warn('[GitHubPullRequestStates][bg] Falling back to empty state map.', {
-      error: error instanceof Error ? error.message : String(error),
-      requestCount: uniquePullRequests.length
-    });
+    if (GITHUB_REFRESH_DEBUG) {
+      console.warn('[GitHubPullRequestStates][bg] Falling back to empty state map.', {
+        error: error instanceof Error ? error.message : String(error),
+        requestCount: uniquePullRequests.length
+      });
+    }
     return {};
   }
 }
