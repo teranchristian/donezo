@@ -1680,7 +1680,7 @@ function MarkdownPreview({
           return (
             <pre
               key={`${block.type}-${index}`}
-              className="overflow-x-auto rounded-[12px] border border-white/8 bg-black/20 px-3 py-2 text-[0.75rem] leading-5 text-white/80"
+              className="overflow-x-auto rounded-[14px] bg-white/[0.08] px-4 py-3 text-[0.74rem] leading-6 text-white/86"
             >
               <code>{block.text}</code>
             </pre>
