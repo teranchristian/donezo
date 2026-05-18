@@ -37,6 +37,12 @@ type ManualTaskEditorState =
       note: string;
     }
   | {
+      mode: 'preview';
+      itemId: string;
+      title: string;
+      note: string;
+    }
+  | {
       mode: 'edit';
       itemId: string;
       title: string;
@@ -90,7 +96,7 @@ export function SummaryCard({
       const manualTaskId = getManualTaskRouteId();
       if (!manualTaskId) {
         setManualTaskEditorState((current) =>
-          current?.mode === 'edit' ? null : current,
+          current && current.mode !== 'create' ? null : current,
         );
         return;
       }
@@ -99,18 +105,22 @@ export function SummaryCard({
       if (!task) {
         clearManualTaskRoute();
         setManualTaskEditorState((current) =>
-          current?.mode === 'edit' ? null : current,
+          current && current.mode !== 'create' ? null : current,
         );
         return;
       }
 
       setManualTaskEditorState((current) => {
-        if (current?.mode === 'edit' && current.itemId === task.id) {
+        if (
+          current &&
+          current.mode !== 'create' &&
+          current.itemId === task.id
+        ) {
           return current;
         }
 
         return {
-          mode: 'edit',
+          mode: 'preview',
           itemId: task.id,
           title: task.title,
           note: task.note,
@@ -233,6 +243,20 @@ export function SummaryCard({
     setActiveInternalDrag(null);
   }
 
+  function handleToggleManualTaskNoteCheckbox(itemId: string, lineIndex: number) {
+    const task = manualTasks.find((item) => item.id === itemId);
+    if (!task) {
+      return;
+    }
+
+    const nextNote = toggleMarkdownTaskListLine(task.note, lineIndex);
+    if (nextNote === null || nextNote === task.note) {
+      return;
+    }
+
+    onUpdateManualTask(itemId, task.title, nextNote);
+  }
+
   return (
     <CardShell>
       <div className="flex items-start justify-between gap-3">
@@ -288,6 +312,12 @@ export function SummaryCard({
                 setManualTaskRoute(task.id);
               }}
               onToggleManualTask={onToggleManualTask}
+              onToggleManualTaskNoteCheckbox={handleToggleManualTaskNoteCheckbox}
+              activeManualTaskEditorId={
+                manualTaskEditorState?.mode === 'edit'
+                  ? manualTaskEditorState.itemId
+                  : null
+              }
               activeInternalDrag={activeInternalDrag}
               onInternalDragEnd={handleInternalDragEnd}
               onInternalDragStart={setActiveInternalDrag}
@@ -367,16 +397,51 @@ export function SummaryCard({
       <ManualTaskEditorModal
         state={manualTaskEditorState}
         onClose={() => {
-          if (manualTaskEditorState?.mode === 'edit') {
+          if (
+            manualTaskEditorState &&
+            manualTaskEditorState.mode !== 'create'
+          ) {
             clearManualTaskRoute();
             return;
           }
 
           setManualTaskEditorState(null);
         }}
+        onStartEdit={(itemId, title, note) => {
+          setManualTaskEditorState({
+            mode: 'edit',
+            itemId,
+            title,
+            note,
+          });
+        }}
         onCreate={(title, note) => {
           if (onCreateManualTask(title, note)) {
             setManualTaskEditorState(null);
+          }
+        }}
+        onToggleChecklist={(itemId, lineIndex) => {
+          const task = manualTasks.find((item) => item.id === itemId);
+          if (!task) {
+            return;
+          }
+
+          const nextNote = toggleMarkdownTaskListLine(task.note, lineIndex);
+          if (nextNote === null || nextNote === task.note) {
+            return;
+          }
+
+          if (onUpdateManualTask(itemId, task.title, nextNote)) {
+            setManualTaskEditorState((current) =>
+              current &&
+              current.mode === 'preview' &&
+              current.itemId === itemId
+                ? {
+                    ...current,
+                    note: nextNote,
+                  }
+                : current,
+            );
           }
         }}
         onUpdate={(itemId, title, note) => {
@@ -395,6 +460,8 @@ function FocusItemCard({
   onRemove,
   onEditManualTask,
   onToggleManualTask,
+  onToggleManualTaskNoteCheckbox,
+  activeManualTaskEditorId,
   activeInternalDrag,
   onInternalDragEnd,
   onInternalDragStart,
@@ -407,6 +474,8 @@ function FocusItemCard({
   onRemove: (itemId: string) => void;
   onEditManualTask: (task: ManualFocusTaskItem) => void;
   onToggleManualTask: (itemId: string) => void;
+  onToggleManualTaskNoteCheckbox: (itemId: string, lineIndex: number) => void;
+  activeManualTaskEditorId: string | null;
   activeInternalDrag: FocusInternalDragPayload | null;
   onInternalDragEnd: () => void;
   onInternalDragStart: (payload: FocusInternalDragPayload) => void;
@@ -437,6 +506,10 @@ function FocusItemCard({
         onEdit={() => onEditManualTask(item)}
         onRemove={() => onRemove(item.id)}
         onToggleComplete={() => onToggleManualTask(item.id)}
+        onToggleNoteCheckbox={(lineIndex) =>
+          onToggleManualTaskNoteCheckbox(item.id, lineIndex)
+        }
+        isNoteChecklistDisabled={activeManualTaskEditorId === item.id}
         onInternalDragEnd={onInternalDragEnd}
         onInternalDragStart={onInternalDragStart}
       />
@@ -460,6 +533,8 @@ function ManualFocusTaskCard({
   onEdit,
   onRemove,
   onToggleComplete,
+  onToggleNoteCheckbox,
+  isNoteChecklistDisabled,
   onInternalDragEnd,
   onInternalDragStart,
 }: {
@@ -467,11 +542,17 @@ function ManualFocusTaskCard({
   onEdit: () => void;
   onRemove: () => void;
   onToggleComplete: () => void;
+  onToggleNoteCheckbox: (lineIndex: number) => void;
+  isNoteChecklistDisabled: boolean;
   onInternalDragEnd: () => void;
   onInternalDragStart: (payload: FocusInternalDragPayload) => void;
 }) {
   const isCompleted = item.completedAt !== null;
   const notePreview = getManualTaskPreview(item.note);
+  const previewBlocks = parseMarkdownBlocks(item.note);
+  const checklistItems = previewBlocks
+    .flatMap((block) => (block.type === 'task-list' ? block.items : []))
+    .slice(0, 4);
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     const payload = {
@@ -567,6 +648,44 @@ function ManualFocusTaskCard({
                 >
                   {item.title}
                 </p>
+                {checklistItems.length > 0 ? (
+                  <div className="mt-1.5 space-y-1">
+                    {checklistItems.map((checklistItem, index) => (
+                      <button
+                        key={`${checklistItem.lineIndex}-${index}`}
+                        type="button"
+                        disabled={isNoteChecklistDisabled}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleNoteCheckbox(checklistItem.lineIndex);
+                        }}
+                        className={`flex w-full items-start gap-2 text-left text-[0.72rem] leading-4 transition ${
+                          isNoteChecklistDisabled
+                            ? 'cursor-not-allowed text-white/32'
+                            : 'text-secondary hover:text-white/84'
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border ${
+                            checklistItem.checked
+                              ? 'border-emerald-300/30 bg-emerald-400/[0.16] text-emerald-100'
+                              : 'border-white/14 bg-white/[0.04] text-white/34'
+                          }`}
+                          aria-hidden="true"
+                        >
+                          <TaskCheckboxIcon checked={checklistItem.checked} />
+                        </span>
+                        <span
+                          className={
+                            checklistItem.checked ? 'text-white/52 line-through' : ''
+                          }
+                        >
+                          {checklistItem.text}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 {notePreview ? (
                   <p className="mt-1 line-clamp-2 text-[0.72rem] leading-4 text-secondary">
                     {notePreview}
@@ -1100,12 +1219,16 @@ function TopLevelInsertionIndicator({
 function ManualTaskEditorModal({
   state,
   onClose,
+  onStartEdit,
   onCreate,
+  onToggleChecklist,
   onUpdate,
 }: {
   state: ManualTaskEditorState | null;
   onClose: () => void;
+  onStartEdit: (itemId: string, title: string, note: string) => void;
   onCreate: (title: string, note: string) => void;
+  onToggleChecklist: (itemId: string, lineIndex: number) => void;
   onUpdate: (itemId: string, title: string, note: string) => void;
 }) {
   const [title, setTitle] = useState('');
@@ -1114,6 +1237,9 @@ function ManualTaskEditorModal({
     typeof window !== 'undefined' ? window.innerWidth < 1025 : false,
   );
   const [compactMode, setCompactMode] = useState<'edit' | 'preview'>('edit');
+  const isPreviewMode = state?.mode === 'preview';
+  const isCreateMode = state?.mode === 'create';
+  const isEditableMode = state?.mode === 'create' || state?.mode === 'edit';
 
   useEffect(() => {
     if (!state) {
@@ -1122,7 +1248,7 @@ function ManualTaskEditorModal({
 
     setTitle(state.title);
     setNote(state.note);
-    setCompactMode('edit');
+    setCompactMode(state.mode === 'preview' ? 'preview' : 'edit');
   }, [state]);
 
   useEffect(() => {
@@ -1174,6 +1300,7 @@ function ManualTaskEditorModal({
   const normalizedNote = note.slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH);
   const canSubmit = normalizedTitle.length > 0;
   const previewBlocks = parseMarkdownBlocks(normalizedNote.trim());
+  const showSplitEditor = isEditableMode;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 lg:p-6" role="dialog" aria-modal="true">
@@ -1187,10 +1314,14 @@ function ManualTaskEditorModal({
         <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-4 sm:px-6">
           <div>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-violet-200/68">
-              {state.mode === 'create' ? 'New manual task' : 'Manual task'}
+              {isCreateMode ? 'New manual task' : 'Manual task'}
             </p>
             <h3 className="mt-1 text-[1.05rem] font-semibold text-primary">
-              {state.mode === 'create' ? 'Add focus task' : 'Task details'}
+              {isCreateMode
+                ? 'Add focus task'
+                : isPreviewMode
+                  ? 'Task preview'
+                  : 'Task details'}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -1205,80 +1336,125 @@ function ManualTaskEditorModal({
           </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+        <div
+          className={`min-h-0 flex-1 ${
+            showSplitEditor
+              ? 'grid gap-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]'
+              : 'flex flex-col'
+          }`}
+        >
           <div
             className={`min-h-0 px-5 py-5 sm:px-6 ${
-              isCompactLayout
+              showSplitEditor && isCompactLayout
                 ? compactMode === 'edit'
                   ? 'flex flex-col'
                   : 'hidden'
                 : 'flex flex-col'
             }`}
           >
-            <label className="block">
-              <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
-                Title
-              </span>
-              <input
-                type="text"
-                value={title}
-                onChange={(event) =>
-                  setTitle(event.target.value.slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH))
-                }
-                placeholder="Check how xyz works"
-                className="w-full rounded-[14px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.92rem] text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05]"
-              />
-              <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
-                {title.length} / {MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH}
-              </span>
-            </label>
+            {isEditableMode ? (
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                    Title
+                  </span>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(event) =>
+                      setTitle(event.target.value.slice(0, MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH))
+                    }
+                    placeholder="Check how xyz works"
+                    className="w-full rounded-[14px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.92rem] text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05]"
+                  />
+                  <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
+                    {title.length} / {MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH}
+                  </span>
+                </label>
 
-            <label className="mt-5 flex min-h-0 flex-1 flex-col">
-              <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
-                Note
-              </span>
-              <textarea
-                value={note}
-                onChange={(event) =>
-                  setNote(event.target.value.slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH))
-                }
-                placeholder={'## Context\n- Investigate how this works\n- Capture links or next steps'}
-                rows={10}
-                className="min-h-[180px] flex-1 resize-none rounded-[16px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.86rem] leading-6 text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05] lg:min-h-0"
-              />
-              <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
-                {note.length} / {MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH}
-              </span>
-            </label>
+                <label className="mt-5 flex min-h-0 flex-1 flex-col">
+                  <span className="mb-2 block text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                    Note
+                  </span>
+                  <textarea
+                    value={note}
+                    onChange={(event) =>
+                      setNote(event.target.value.slice(0, MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH))
+                    }
+                    placeholder={'## Context\n- Investigate how this works\n- Capture links or next steps'}
+                    rows={10}
+                    className="min-h-[180px] flex-1 resize-none rounded-[16px] border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.86rem] leading-6 text-primary outline-none transition placeholder:text-white/25 focus:border-violet-300/35 focus:bg-violet-500/[0.05] lg:min-h-0"
+                  />
+                  <span className="mt-1.5 block text-right text-[0.69rem] text-white/34">
+                    {note.length} / {MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH}
+                  </span>
+                </label>
+              </>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                    Title
+                  </p>
+                  <p className="mt-2 text-[0.98rem] font-semibold text-primary">
+                    {normalizedTitle || 'Untitled task'}
+                  </p>
+                </div>
+                <div className="mt-4 rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                    Note
+                  </p>
+                  <div className="mt-3 min-h-[220px] overflow-y-auto rounded-[16px] border border-white/8 bg-[#10151d] px-4 py-3">
+                    {previewBlocks.length === 0 ? (
+                      <p className="text-[0.8rem] leading-6 text-white/28">
+                        No notes yet.
+                      </p>
+                    ) : (
+                      <MarkdownPreview
+                        blocks={previewBlocks}
+                        onToggleTaskItem={
+                          state.mode === 'preview'
+                            ? (lineIndex) =>
+                                onToggleChecklist(state.itemId, lineIndex)
+                            : undefined
+                        }
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div
-            className={`min-h-0 border-t border-white/8 bg-black/10 px-5 py-5 sm:px-6 ${
-              isCompactLayout
-                ? compactMode === 'preview'
-                  ? 'flex flex-col'
-                  : 'hidden'
-                : 'flex flex-col lg:border-l lg:border-t-0'
-            }`}
-          >
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <span className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
-                  Preview
-                </span>
-                <span className="text-[0.68rem] text-white/30">Markdown</span>
-              </div>
-              <div className="min-h-[180px] flex-1 overflow-y-auto rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3 lg:min-h-0">
-                {previewBlocks.length === 0 ? (
-                  <p className="text-[0.8rem] leading-6 text-white/28">
-                    Add notes to preview headings, lists, code, and links.
-                  </p>
-                ) : (
-                  <MarkdownPreview blocks={previewBlocks} />
-                )}
+          {showSplitEditor ? (
+            <div
+              className={`min-h-0 border-t border-white/8 bg-black/10 px-5 py-5 sm:px-6 ${
+                isCompactLayout
+                  ? compactMode === 'preview'
+                    ? 'flex flex-col'
+                    : 'hidden'
+                  : 'flex flex-col lg:border-l lg:border-t-0'
+              }`}
+            >
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-white/42">
+                    Preview
+                  </span>
+                  <span className="text-[0.68rem] text-white/30">Markdown</span>
+                </div>
+                <div className="min-h-[180px] flex-1 overflow-y-auto rounded-[16px] border border-white/8 bg-white/[0.03] px-4 py-3 lg:min-h-0">
+                  {previewBlocks.length === 0 ? (
+                    <p className="text-[0.8rem] leading-6 text-white/28">
+                      Add notes to preview headings, lists, code, and links.
+                    </p>
+                  ) : (
+                    <MarkdownPreview blocks={previewBlocks} />
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col items-start justify-between gap-3 border-t border-white/8 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
@@ -1296,7 +1472,11 @@ function ManualTaskEditorModal({
                 }
                 className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.08] px-4 py-2 text-[0.8rem] font-semibold text-violet-100 transition hover:border-violet-300/35 hover:bg-violet-400/[0.12]"
               >
-                {compactMode === 'edit' ? 'Preview' : 'Edit'}
+                {compactMode === 'edit'
+                  ? 'Preview'
+                  : isPreviewMode
+                    ? 'Details'
+                    : 'Edit'}
               </button>
             ) : null}
             <button
@@ -1304,27 +1484,37 @@ function ManualTaskEditorModal({
               onClick={onClose}
               className="inline-flex items-center rounded-full border border-white/12 bg-white/[0.03] px-4 py-2 text-[0.8rem] font-semibold text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
-              Cancel
+              {isCreateMode ? 'Cancel' : 'Close'}
             </button>
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={() => {
-                if (!canSubmit) {
-                  return;
-                }
+            {isPreviewMode ? (
+              <button
+                type="button"
+                onClick={() => onStartEdit(state.itemId, state.title, state.note)}
+                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18]"
+              >
+                Edit
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!canSubmit}
+                onClick={() => {
+                  if (!canSubmit) {
+                    return;
+                  }
 
-                if (state.mode === 'create') {
-                  onCreate(normalizedTitle, normalizedNote);
-                  return;
-                }
+                  if (state.mode === 'create') {
+                    onCreate(normalizedTitle, normalizedNote);
+                    return;
+                  }
 
-                onUpdate(state.itemId, normalizedTitle, normalizedNote);
-              }}
-              className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
-            >
-              {state.mode === 'create' ? 'Add task' : 'Save'}
-            </button>
+                  onUpdate(state.itemId, normalizedTitle, normalizedNote);
+                }}
+                className="inline-flex items-center rounded-full border border-violet-300/20 bg-violet-400/[0.12] px-4 py-2 text-[0.8rem] font-semibold text-violet-50 transition hover:border-violet-300/35 hover:bg-violet-400/[0.18] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.04] disabled:text-white/30"
+              >
+                {state.mode === 'create' ? 'Add task' : 'Save'}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1362,7 +1552,10 @@ function setCustomDragImage(dataTransfer: DataTransfer, sourceElement: HTMLDivEl
 type MarkdownBlock =
   | { type: 'heading'; level: 1 | 2 | 3; text: string }
   | { type: 'list'; items: string[] }
-  | { type: 'task-list'; items: Array<{ text: string; checked: boolean }> }
+  | {
+      type: 'task-list';
+      items: Array<{ text: string; checked: boolean; lineIndex: number }>;
+    }
   | { type: 'paragraph'; lines: string[] }
   | { type: 'code'; text: string };
 
@@ -1373,7 +1566,13 @@ type InlineToken =
   | { type: 'em'; value: string }
   | { type: 'link'; value: string; href: string };
 
-function MarkdownPreview({ blocks }: { blocks: MarkdownBlock[] }) {
+function MarkdownPreview({
+  blocks,
+  onToggleTaskItem,
+}: {
+  blocks: MarkdownBlock[];
+  onToggleTaskItem?: (lineIndex: number) => void;
+}) {
   return (
     <div className="space-y-3 text-[0.82rem] leading-6 text-secondary">
       {blocks.map((block, index) => {
@@ -1408,19 +1607,43 @@ function MarkdownPreview({ blocks }: { blocks: MarkdownBlock[] }) {
             <div key={`${block.type}-${index}`} className="space-y-1.5">
               {block.items.map((item, itemIndex) => (
                 <div key={`${item.text}-${itemIndex}`} className="flex items-start gap-2 text-secondary">
-                  <span
-                    className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border ${
-                      item.checked
-                        ? 'border-emerald-300/30 bg-emerald-400/[0.16] text-emerald-100'
-                        : 'border-white/14 bg-white/[0.04] text-white/34'
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <TaskCheckboxIcon checked={item.checked} />
-                  </span>
-                  <span className={item.checked ? 'text-white/52 line-through' : ''}>
-                    {renderInlineMarkdown(item.text)}
-                  </span>
+                  {onToggleTaskItem ? (
+                    <button
+                      type="button"
+                      onClick={() => onToggleTaskItem(item.lineIndex)}
+                      className="flex items-start gap-2 text-left transition hover:text-white/84"
+                    >
+                      <span
+                        className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border ${
+                          item.checked
+                            ? 'border-emerald-300/30 bg-emerald-400/[0.16] text-emerald-100'
+                            : 'border-white/14 bg-white/[0.04] text-white/34'
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <TaskCheckboxIcon checked={item.checked} />
+                      </span>
+                      <span className={item.checked ? 'text-white/52 line-through' : ''}>
+                        {renderInlineMarkdown(item.text)}
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      <span
+                        className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border ${
+                          item.checked
+                            ? 'border-emerald-300/30 bg-emerald-400/[0.16] text-emerald-100'
+                            : 'border-white/14 bg-white/[0.04] text-white/34'
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <TaskCheckboxIcon checked={item.checked} />
+                      </span>
+                      <span className={item.checked ? 'text-white/52 line-through' : ''}>
+                        {renderInlineMarkdown(item.text)}
+                      </span>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -1491,9 +1714,10 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
     }
 
     if (/^[-*]\s+/.test(line)) {
-      const taskItems: Array<{ text: string; checked: boolean }> = [];
+      const taskItems: Array<{ text: string; checked: boolean; lineIndex: number }> = [];
       const listItems: string[] = [];
       while (index < lines.length) {
+        const currentLineIndex = index;
         const listLine = lines[index].trim();
         if (!/^[-*]\s+/.test(listLine)) {
           break;
@@ -1503,6 +1727,7 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
         if (taskMatch) {
           taskItems.push({
             checked: taskMatch[1].toLowerCase() === 'x',
+            lineIndex: currentLineIndex,
             text: taskMatch[2].trim(),
           });
         } else {
@@ -1660,12 +1885,33 @@ function parseInlineMarkdown(text: string): InlineToken[] {
 function getManualTaskPreview(note: string) {
   return note
     .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^[-*]\s+\[[ xX]\]\s+/gm, '')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*]\s+/gm, '')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
     .replace(/[*_`]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function toggleMarkdownTaskListLine(note: string, lineIndex: number) {
+  const lines = note.split(/\r?\n/);
+  if (lineIndex < 0 || lineIndex >= lines.length) {
+    return null;
+  }
+
+  const line = lines[lineIndex];
+  if (/^(\s*[-*]\s+)\[\s\](\s+)/.test(line)) {
+    lines[lineIndex] = line.replace(/^(\s*[-*]\s+)\[\s\](\s+)/, '$1[x]$2');
+    return lines.join('\n');
+  }
+
+  if (/^(\s*[-*]\s+)\[[xX]\](\s+)/.test(line)) {
+    lines[lineIndex] = line.replace(/^(\s*[-*]\s+)\[[xX]\](\s+)/, '$1[ ]$2');
+    return lines.join('\n');
+  }
+
+  return null;
 }
 
 function getJiraPrAlignmentWarning(item: FocusJiraItem) {
