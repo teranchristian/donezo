@@ -556,11 +556,6 @@ function ManualFocusTaskCard({
   onInternalDragStart: (payload: FocusInternalDragPayload) => void;
 }) {
   const isCompleted = item.completedAt !== null;
-  const notePreview = getManualTaskPreview(item.note);
-  const previewBlocks = parseMarkdownBlocks(item.note);
-  const checklistItems = previewBlocks
-    .flatMap((block) => (block.type === 'task-list' ? block.items : []))
-    .slice(0, 4);
 
   function handleDragStart(event: React.DragEvent<HTMLDivElement>) {
     const payload = {
@@ -656,49 +651,6 @@ function ManualFocusTaskCard({
                 >
                   {item.title}
                 </p>
-                {checklistItems.length > 0 ? (
-                  <div className="mt-1.5 space-y-1">
-                    {checklistItems.map((checklistItem, index) => (
-                      <button
-                        key={`${checklistItem.lineIndex}-${index}`}
-                        type="button"
-                        disabled={isNoteChecklistDisabled}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onToggleNoteCheckbox(checklistItem.lineIndex);
-                        }}
-                        className={`flex w-full items-start gap-2 text-left text-[0.72rem] leading-4 transition ${
-                          isNoteChecklistDisabled
-                            ? 'cursor-not-allowed text-white/32'
-                            : 'text-secondary hover:text-white/84'
-                        }`}
-                      >
-                        <span
-                          className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border ${
-                            checklistItem.checked
-                              ? 'border-emerald-300/30 bg-emerald-400/[0.16] text-emerald-100'
-                              : 'border-white/14 bg-white/[0.04] text-white/34'
-                          }`}
-                          aria-hidden="true"
-                        >
-                          <TaskCheckboxIcon checked={checklistItem.checked} />
-                        </span>
-                        <span
-                          className={
-                            checklistItem.checked ? 'text-white/52 line-through' : ''
-                          }
-                        >
-                          {checklistItem.text}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {notePreview ? (
-                  <p className="mt-1 line-clamp-2 text-[0.72rem] leading-4 text-secondary">
-                    {notePreview}
-                  </p>
-                ) : null}
               </div>
             </div>
           </div>
