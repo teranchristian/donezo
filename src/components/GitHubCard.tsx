@@ -882,6 +882,13 @@ function PullRequestRow({
   const shouldShowAuthor =
     pullRequest.source !== 'authored' && Boolean(pullRequest.authorLogin);
   const repositoryLabel = getRepositoryLabel(pullRequest.repositoryName);
+  const markPullRequestSeen = () => {
+    onMarkNotificationsSeen?.(pullRequest);
+    if (activeView === 'team-prs') {
+      onMarkTeamPrSeen?.(pullRequest);
+    }
+    onClearWarningHighlight?.(pullRequest);
+  };
 
   return (
     <a
@@ -900,12 +907,11 @@ function PullRequestRow({
           `${pullRequest.repositoryName}#${pullRequest.pullNumber}`,
         );
       }}
-      onClick={() => {
-        onMarkNotificationsSeen?.(pullRequest);
-        if (activeView === 'team-prs') {
-          onMarkTeamPrSeen?.(pullRequest);
+      onClick={markPullRequestSeen}
+      onAuxClick={(event) => {
+        if (event.button === 1) {
+          markPullRequestSeen();
         }
-        onClearWarningHighlight?.(pullRequest);
       }}
       className={`group -mx-2 block cursor-pointer px-2 py-1.5 transition ${
         isWarningHighlighted
