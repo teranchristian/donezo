@@ -166,7 +166,8 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       }),
       createPullRequest({
         id: 202,
-        title: 'CLK-112 Venue play pause schedule update',
+        title: 'Venue play pause schedule update',
+        headRefName: 'xtian/CLK-112-venue-play-pause-schedule-update',
         repositoryName: 'acme/platform-web',
         owner: 'acme',
         repo: 'platform-web',
@@ -594,6 +595,7 @@ function createPullRequest(
   return {
     id: overrides.id,
     title: overrides.title,
+    headRefName: overrides.headRefName ?? '',
     repositoryId: overrides.repositoryId ?? overrides.id,
     repositoryName: overrides.repositoryName,
     repositoryUrl:

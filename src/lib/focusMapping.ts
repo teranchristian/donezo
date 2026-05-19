@@ -1,8 +1,8 @@
 import type { GitHubPullRequestItem } from './githubApi';
 import {
-  extractJiraKey,
   getGitHubFocusStatusLabel,
   getGitHubFocusStatusTone,
+  getPullRequestJiraKey,
 } from './githubDomain';
 import type { JiraIssue } from './jiraApi';
 import { getJiraBrowseUrl } from './jiraApi';
@@ -21,7 +21,7 @@ export function mapGitHubPullRequestToFocusItem(
     title: pullRequest.title,
     statusLabel: getGitHubFocusStatusLabel(pullRequest.reviewStatus),
     statusTone: getGitHubFocusStatusTone(pullRequest.reviewStatus),
-    jiraKey: extractJiraKey(pullRequest.title),
+    jiraKey: getPullRequestJiraKey(pullRequest),
     repositoryName: pullRequest.repositoryName,
   };
 }
@@ -51,6 +51,6 @@ export function getMatchingGitHubFocusPullRequests(
   jiraKey: string,
 ) {
   return pullRequests
-    .filter((pullRequest) => extractJiraKey(pullRequest.title) === jiraKey)
+    .filter((pullRequest) => getPullRequestJiraKey(pullRequest) === jiraKey)
     .map((pullRequest) => mapGitHubPullRequestToFocusItem(pullRequest));
 }

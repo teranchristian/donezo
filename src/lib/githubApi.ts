@@ -25,6 +25,7 @@ export type GitHubNotification = {
 export type GitHubPullRequestItem = {
   id: number;
   title: string;
+  headRefName: string;
   repositoryId: number;
   repositoryName: string;
   repositoryUrl: string;
@@ -167,6 +168,10 @@ function normalizeGitHubDashboardData(
 
   const normalizePullRequestItem = (pullRequest: GitHubPullRequestItem) => ({
     ...pullRequest,
+    headRefName:
+      typeof pullRequest.headRefName === 'string'
+        ? pullRequest.headRefName.trim()
+        : '',
     repositoryId:
       Number.isFinite(pullRequest.repositoryId) && pullRequest.repositoryId > 0
         ? pullRequest.repositoryId

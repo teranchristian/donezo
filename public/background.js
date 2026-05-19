@@ -48,6 +48,7 @@ const GITHUB_PULL_REQUESTS_QUERY = `
   fragment PullRequestFields on PullRequest {
     number
     title
+    headRefName
     url
     isDraft
     createdAt
@@ -1055,6 +1056,7 @@ function mapGraphQlPullRequest(pullRequest, source) {
   return {
     id: getPullRequestStableId(owner, repo, pullRequest.number),
     title: pullRequest.title,
+    headRefName: String(pullRequest.headRefName ?? ''),
     repositoryId: Number(pullRequest.repository?.databaseId ?? 0),
     repositoryName: `${owner}/${repo}`,
     repositoryUrl: pullRequest.repository?.url ?? `https://github.com/${owner}/${repo}`,

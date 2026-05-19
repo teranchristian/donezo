@@ -10,6 +10,13 @@ export function extractJiraKey(value: string) {
   return match ? match[1].toUpperCase() : null;
 }
 
+export function getPullRequestJiraKey(pullRequest: GitHubPullRequestItem) {
+  return (
+    extractJiraKey(pullRequest.title) ??
+    extractJiraKey(pullRequest.headRefName)
+  );
+}
+
 export function getGitHubFocusStatusLabel(
   reviewStatus: GitHubPullRequestItem['reviewStatus'],
 ) {
