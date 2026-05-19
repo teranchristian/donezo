@@ -6,17 +6,14 @@ import {
   GitHubPullRequestItem,
 } from '../lib/githubApi';
 import {
-  buildRecentOpenPullRequestsQuery,
-  calculateGitHubSummaryCounts,
-  filterGitHubPullRequests,
-  getGitHubViewContent,
   getNoFilterResultsMessage,
-  getPullRequestNewCommentCountByKey,
   getRepositoryLabel,
   mapPullRequestToFocusItem,
-  sortGitHubItems,
-  shouldDisplayNotification,
 } from '../lib/githubCardDomain';
+import {
+  getGitHubCardPullRequestGroups,
+  getGitHubCardViewModel,
+} from '../lib/githubCardViewModel';
 import { formatRelativeTime } from '../lib/date';
 import {
   getGitHubPullRequestAttentionStateKey,
@@ -96,45 +93,13 @@ export function GitHubCard({
     'flex h-9 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.035] bg-white/[0.025] px-2.5 text-[0.8rem] text-white/40 transition hover:bg-white/[0.04] hover:text-white/54';
   const filterSelectClass =
     'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
-  const organizationFilter = isMockMode ? 'all' : ownerFilter.trim() || 'all';
-  const resolvedPullRequests = data.pullRequests;
-  const myOpenPRs = resolvedPullRequests.filter(
-    (pullRequest) => pullRequest.source === 'authored',
-  );
-  const reviewRequestedPRs = resolvedPullRequests.filter(
-    (pullRequest) => pullRequest.source === 'review-requested',
-  );
-  const recentOpenPRs = data.recentPullRequests ?? [];
-  const notifications = (data.notifications ?? []).filter(
-    shouldDisplayNotification,
-  );
-  const recentViewQuery = buildRecentOpenPullRequestsQuery(ownerFilter);
-  const normalizedUsername = username.trim().toLowerCase();
-  const myPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
-  const recentPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(recentViewQuery)}`;
-  const hiddenRepositoryFullNames = new Set(
-    hiddenRepositories.map((repository) => repository.fullName),
-  );
-  const ownerFilteredMyOpenPRs = filterGitHubPullRequests(
-    myOpenPRs,
-    organizationFilter,
-  );
-  const ownerFilteredReviewRequestedPRs = filterGitHubPullRequests(
-    reviewRequestedPRs,
-    organizationFilter,
-  );
-  const ownerFilteredRecentOpenPRs = filterGitHubPullRequests(
-    recentOpenPRs,
-    organizationFilter,
-  );
-  const nonAuthoredRecentOpenPRs = ownerFilteredRecentOpenPRs.filter(
-    (pullRequest) =>
-      !normalizedUsername ||
-      pullRequest.authorLogin.trim().toLowerCase() !== normalizedUsername,
-  );
-  const visibleRecentOpenPRs = nonAuthoredRecentOpenPRs.filter(
-    (pullRequest) => !hiddenRepositoryFullNames.has(pullRequest.repositoryName),
-  );
+  const pullRequestGroups = getGitHubCardPullRequestGroups({
+    data,
+    username,
+    ownerFilter,
+    hiddenRepositories,
+    isMockMode,
+  });
   const {
     sortOrder,
     setSortOrder,
@@ -151,69 +116,53 @@ export function GitHubCard({
     connectionStatus: data.connectionStatus,
     isLoading,
     lastUpdatedAt: data.lastUpdatedAt,
-    resolvedPullRequests,
-    visibleRecentOpenPullRequests: visibleRecentOpenPRs,
+    resolvedPullRequests: pullRequestGroups.resolvedPullRequests,
+    visibleRecentOpenPullRequests:
+      pullRequestGroups.visibleRecentOpenPullRequests,
   });
-  const pullRequestNewCommentCountByKey =
-    hasLoadedGitHubPrNotificationSeenAtState
-      ? getPullRequestNewCommentCountByKey(
-          notifications,
-          gitHubPrNotificationSeenAtState,
-        )
-      : {};
-  const filteredMyOpenPRs = filterGitHubPullRequests(
-    myOpenPRs,
-    organizationFilter,
+  const viewModel = getGitHubCardViewModel({
+    data,
+    groups: pullRequestGroups,
+    activeView,
     prStatusFilter,
-  );
-  const filteredReviewRequestedPRs = ownerFilteredReviewRequestedPRs;
-  const filteredRecentOpenPRs = visibleRecentOpenPRs;
-  const filteredMyOpenPrCount = filteredMyOpenPRs.length;
-  const filteredRecentOpenPrCount = filteredRecentOpenPRs.length;
-  const filteredReviewRequestedCount = filteredReviewRequestedPRs.length;
-  const summaryCounts = calculateGitHubSummaryCounts({
-    resolvedPullRequests,
-    myOpenPullRequests: myOpenPRs,
-    ownerFilteredMyOpenPullRequests: ownerFilteredMyOpenPRs,
-    ownerFilteredReviewRequestedPullRequests: ownerFilteredReviewRequestedPRs,
-    notifications: hasLoadedGitHubPrNotificationSeenAtState ? notifications : [],
+    sortOrder,
+    hasLoadedNotificationSeenAtState:
+      hasLoadedGitHubPrNotificationSeenAtState,
     notificationSeenAtState: gitHubPrNotificationSeenAtState,
     readyState: gitHubPrReadyState,
     warningState: gitHubPrWarningState,
   });
-  const currentView = getGitHubViewContent({
-    activeGitHubView: activeView,
-    data,
-    myOpenPullRequests: filteredMyOpenPRs,
-    recentOpenPullRequests: filteredRecentOpenPRs,
-    reviewRequestedPullRequests: filteredReviewRequestedPRs,
-  });
-  const filteredItems = sortGitHubItems(currentView.items, sortOrder);
   const tabItems = [
     {
       key: 'my-prs',
       label: 'My PRs',
-      value: formatCount(filteredMyOpenPrCount, isLoading),
+      value: formatCount(viewModel.filteredMyOpenPullRequestCount, isLoading),
       isActive: activeView === 'my-prs',
       title: isLoading
         ? undefined
-        : `${filteredMyOpenPrCount} of ${myOpenPRs.length} PRs`,
+        : `${viewModel.filteredMyOpenPullRequestCount} of ${pullRequestGroups.myOpenPullRequests.length} PRs`,
       onClick: () => onViewChange('my-prs'),
     },
     {
       key: 'team-prs',
       label: 'Team PRs',
-      value: formatCount(filteredRecentOpenPrCount, isLoading),
+      value: formatCount(
+        viewModel.filteredRecentOpenPullRequestCount,
+        isLoading,
+      ),
       isActive: activeView === 'team-prs',
       title: isLoading
         ? undefined
-        : `${filteredRecentOpenPrCount} of ${recentOpenPRs.length} PRs`,
+        : `${viewModel.filteredRecentOpenPullRequestCount} of ${pullRequestGroups.recentOpenPullRequests.length} PRs`,
       onClick: () => onViewChange('team-prs'),
     },
     {
       key: 'review',
       label: 'Review',
-      value: formatCount(filteredReviewRequestedCount, isLoading),
+      value: formatCount(
+        viewModel.filteredReviewRequestedPullRequestCount,
+        isLoading,
+      ),
       isActive: activeView === 'review',
       onClick: () => onViewChange('review'),
     },
@@ -224,29 +173,29 @@ export function GitHubCard({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
       openTeamPrCount: gitHubTeamPrTrackerState.pendingNewKeys.length,
-      readyToMergeCount: summaryCounts.readyToMergeCount,
-      failedBuildCount: summaryCounts.failedBuildCount,
-      failedBuildBadgeCount: summaryCounts.failedBuildBadgeCount,
-      highlightedCommentCount: summaryCounts.highlightedCommentCount,
-      highlightedReadyCount: summaryCounts.highlightedReadyCount,
-      highlightedWarningCount: summaryCounts.highlightedWarningCount,
-      reviewRequestedCount: summaryCounts.reviewRequestedCount,
-      approvedPrCount: summaryCounts.approvedPrCount,
-      relevantPrCount: summaryCounts.relevantPrCount,
+      readyToMergeCount: viewModel.summaryCounts.readyToMergeCount,
+      failedBuildCount: viewModel.summaryCounts.failedBuildCount,
+      failedBuildBadgeCount: viewModel.summaryCounts.failedBuildBadgeCount,
+      highlightedCommentCount: viewModel.summaryCounts.highlightedCommentCount,
+      highlightedReadyCount: viewModel.summaryCounts.highlightedReadyCount,
+      highlightedWarningCount: viewModel.summaryCounts.highlightedWarningCount,
+      reviewRequestedCount: viewModel.summaryCounts.reviewRequestedCount,
+      approvedPrCount: viewModel.summaryCounts.approvedPrCount,
+      relevantPrCount: viewModel.summaryCounts.relevantPrCount,
     });
   }, [
     data.connectionStatus,
     data.missingUsername,
     gitHubTeamPrTrackerState.pendingNewKeys.length,
-    summaryCounts.readyToMergeCount,
-    summaryCounts.failedBuildCount,
-    summaryCounts.failedBuildBadgeCount,
-    summaryCounts.highlightedCommentCount,
-    summaryCounts.highlightedReadyCount,
-    summaryCounts.highlightedWarningCount,
-    summaryCounts.reviewRequestedCount,
-    summaryCounts.approvedPrCount,
-    summaryCounts.relevantPrCount,
+    viewModel.summaryCounts.readyToMergeCount,
+    viewModel.summaryCounts.failedBuildCount,
+    viewModel.summaryCounts.failedBuildBadgeCount,
+    viewModel.summaryCounts.highlightedCommentCount,
+    viewModel.summaryCounts.highlightedReadyCount,
+    viewModel.summaryCounts.highlightedWarningCount,
+    viewModel.summaryCounts.reviewRequestedCount,
+    viewModel.summaryCounts.approvedPrCount,
+    viewModel.summaryCounts.relevantPrCount,
     onSummaryMetricsChange,
   ]);
 
@@ -354,15 +303,15 @@ export function GitHubCard({
                   <ListItemSkeleton key={index} />
                 ))}
               </div>
-            ) : filteredItems.length === 0 ? (
+            ) : viewModel.filteredItems.length === 0 ? (
               <div className="rounded-[14px] bg-[var(--card-bg-soft)] px-4 py-5 text-sm text-secondary shadow-[var(--shadow-card-soft)]">
-                {currentView.items.length === 0
-                  ? currentView.emptyMessage
-                  : getNoFilterResultsMessage(currentView.itemLabel)}
+                {viewModel.currentView.items.length === 0
+                  ? viewModel.currentView.emptyMessage
+                  : getNoFilterResultsMessage(viewModel.currentView.itemLabel)}
               </div>
           ) : (
               <PullRequestList
-                pullRequests={filteredItems.map((item) => item.value)}
+                pullRequests={viewModel.filteredItems.map((item) => item.value)}
                 todayFocusPullRequestRanks={todayFocusPullRequestRanks}
                 activeView={activeView}
                 gitHubPrReadyState={gitHubPrReadyState}
@@ -372,7 +321,7 @@ export function GitHubCard({
                   hasLoadedGitHubTeamPrTrackerState
                 }
                 pullRequestNewCommentCountByKey={
-                  pullRequestNewCommentCountByKey
+                  viewModel.pullRequestNewCommentCountByKey
                 }
             onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
             onMarkTeamPrSeen={handleMarkTeamPrSeen}
@@ -396,7 +345,11 @@ export function GitHubCard({
                 <span />
               )}
               <a
-                href={activeView === 'my-prs' ? myPrsViewAllUrl : recentPrsViewAllUrl}
+                href={
+                  activeView === 'my-prs'
+                    ? pullRequestGroups.myPrsViewAllUrl
+                    : pullRequestGroups.recentPrsViewAllUrl
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-secondary transition hover:text-primary"
