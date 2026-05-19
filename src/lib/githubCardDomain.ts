@@ -14,6 +14,7 @@ import {
 } from './githubDomain';
 import type {
   ActiveGitHubView,
+  GitHubHiddenRepository,
   GitHubListSort,
   GitHubPrNotificationSeenAtState,
   GitHubPrReadyState,
@@ -60,6 +61,33 @@ export function getOwnerFromRepositoryName(repositoryName: string) {
 export function getRepositoryLabel(repositoryName: string) {
   const segments = repositoryName.split('/');
   return segments[segments.length - 1] ?? repositoryName;
+}
+
+export function mapPullRequestToHiddenRepository(
+  pullRequest: GitHubPullRequestItem,
+): GitHubHiddenRepository {
+  return {
+    id:
+      Number.isFinite(pullRequest.repositoryId) && pullRequest.repositoryId > 0
+        ? pullRequest.repositoryId
+        : pullRequest.id,
+    name: pullRequest.repo,
+    fullName: pullRequest.repositoryName,
+    owner: pullRequest.owner,
+    url:
+      typeof pullRequest.repositoryUrl === 'string' &&
+      pullRequest.repositoryUrl.trim()
+        ? pullRequest.repositoryUrl.trim()
+        : `https://github.com/${pullRequest.owner}/${pullRequest.repo}`,
+  };
+}
+
+export function formatCount(value: number, isLoading: boolean) {
+  if (isLoading) {
+    return '...';
+  }
+
+  return String(value);
 }
 
 export function filterGitHubPullRequests(
