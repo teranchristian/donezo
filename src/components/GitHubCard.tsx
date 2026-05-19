@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type MouseEvent, ReactNode, useEffect, useState } from 'react';
+import { type KeyboardEvent, type MouseEvent, ReactNode, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   GitHubConnectionStatus,
@@ -6,18 +6,11 @@ import {
   GitHubPullRequestItem,
 } from '../lib/githubApi';
 import {
-  areGitHubPrNotificationSeenAtStatesEqual,
-  areGitHubPrReadyStatesEqual,
-  areGitHubPrReadyStatesExactlyEqual,
-  areGitHubPrWarningStatesEqual,
-  areGitHubPrWarningStatesExactlyEqual,
-  areGitHubTeamPrTrackerStatesEqual,
   buildRecentOpenPullRequestsQuery,
   calculateGitHubSummaryCounts,
   filterGitHubPullRequests,
   getGitHubViewContent,
   getNoFilterResultsMessage,
-  getNextGitHubTeamPrTrackerState,
   getPullRequestNewCommentCountByKey,
   getRepositoryLabel,
   mapPullRequestToFocusItem,
@@ -26,10 +19,7 @@ import {
 } from '../lib/githubCardDomain';
 import { formatRelativeTime } from '../lib/date';
 import {
-  buildGitHubPrReadyState,
-  buildGitHubPrWarningState,
   getGitHubPullRequestAttentionStateKey,
-  getGitHubPullRequestWarningStateKey,
   getPullRequestDisplayStatus,
   isGitHubPrReadyHighlighted,
   isGitHubPrWarningHighlighted,
@@ -38,33 +28,16 @@ import {
   isPullRequestReadyToMerge,
 } from '../lib/githubDomain';
 import {
-  getStoredGitHubPrNotificationSeenAtState,
-  getStoredGitHubPrReadyState,
-  getStoredGitHubTeamPrTrackerState,
-  getStoredGitHubPrWarningState,
-  getStoredGitHubSortOrder,
-  saveStoredGitHubPrNotificationSeenAtState,
-  saveStoredGitHubPrReadyState,
-  saveStoredGitHubTeamPrTrackerState,
-  saveStoredGitHubPrWarningState,
-  saveStoredGitHubSortOrder,
   type ActiveGitHubView,
   type GitHubHiddenRepository,
   type GitHubPrReadyState,
-  type GitHubPrNotificationSeenAtState,
   type GitHubTeamPrTrackerState,
   type GitHubPrWarningState,
   type GitHubPrStatusFilter,
   type GitHubListSort,
 } from '../lib/storage';
-import { subscribeStoredValues } from '../lib/storage/backend';
 import type { TodayFocusPullRequestRanks } from '../lib/todayFocusPriority';
-import {
-  GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY,
-  GITHUB_PR_READY_STATE_STORAGE_KEY,
-  GITHUB_PR_WARNING_STATE_STORAGE_KEY,
-  GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
-} from '../lib/storage/keys';
+import { useGitHubCardState } from '../hooks/useGitHubCardState';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 import { StatusBadge } from './StatusBadge';
@@ -123,31 +96,6 @@ export function GitHubCard({
     'flex h-9 min-w-0 items-center gap-1.5 rounded-[10px] border border-white/[0.035] bg-white/[0.025] px-2.5 text-[0.8rem] text-white/40 transition hover:bg-white/[0.04] hover:text-white/54';
   const filterSelectClass =
     'min-w-0 bg-transparent pr-5 text-[0.8rem] font-medium text-white/76 outline-none';
-  const [sortOrder, setSortOrder] =
-    useState<GitHubListSort>('recently-updated');
-  const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
-  const [gitHubPrReadyState, setGitHubPrReadyState] =
-    useState<GitHubPrReadyState>({});
-  const [hasLoadedGitHubPrReadyState, setHasLoadedGitHubPrReadyState] =
-    useState(false);
-  const [gitHubPrWarningState, setGitHubPrWarningState] =
-    useState<GitHubPrWarningState>({});
-  const [hasLoadedGitHubPrWarningState, setHasLoadedGitHubPrWarningState] =
-    useState(false);
-  const [gitHubPrNotificationSeenAtState, setGitHubPrNotificationSeenAtState] =
-    useState<GitHubPrNotificationSeenAtState>({});
-  const [
-    hasLoadedGitHubPrNotificationSeenAtState,
-    setHasLoadedGitHubPrNotificationSeenAtState,
-  ] = useState(false);
-  const [gitHubTeamPrTrackerState, setGitHubTeamPrTrackerState] =
-    useState<GitHubTeamPrTrackerState>({
-      snapshotKeys: [],
-      pendingNewKeys: [],
-      lastProcessedUpdatedAt: null,
-    });
-  const [hasLoadedGitHubTeamPrTrackerState, setHasLoadedGitHubTeamPrTrackerState] =
-    useState(false);
   const organizationFilter = isMockMode ? 'all' : ownerFilter.trim() || 'all';
   const resolvedPullRequests = data.pullRequests;
   const myOpenPRs = resolvedPullRequests.filter(
@@ -160,13 +108,6 @@ export function GitHubCard({
   const notifications = (data.notifications ?? []).filter(
     shouldDisplayNotification,
   );
-  const pullRequestNewCommentCountByKey =
-    hasLoadedGitHubPrNotificationSeenAtState
-      ? getPullRequestNewCommentCountByKey(
-          notifications,
-          gitHubPrNotificationSeenAtState,
-        )
-      : {};
   const recentViewQuery = buildRecentOpenPullRequestsQuery(ownerFilter);
   const normalizedUsername = username.trim().toLowerCase();
   const myPrsViewAllUrl = `https://github.com/pulls?q=${encodeURIComponent(`is:pr is:open author:${username.trim()}`)}`;
@@ -194,6 +135,32 @@ export function GitHubCard({
   const visibleRecentOpenPRs = nonAuthoredRecentOpenPRs.filter(
     (pullRequest) => !hiddenRepositoryFullNames.has(pullRequest.repositoryName),
   );
+  const {
+    sortOrder,
+    setSortOrder,
+    gitHubPrReadyState,
+    gitHubPrWarningState,
+    gitHubPrNotificationSeenAtState,
+    hasLoadedGitHubPrNotificationSeenAtState,
+    gitHubTeamPrTrackerState,
+    hasLoadedGitHubTeamPrTrackerState,
+    handleMarkPullRequestNotificationsSeen,
+    handleMarkTeamPrSeen,
+    handleClearWarningHighlight,
+  } = useGitHubCardState({
+    connectionStatus: data.connectionStatus,
+    isLoading,
+    lastUpdatedAt: data.lastUpdatedAt,
+    resolvedPullRequests,
+    visibleRecentOpenPullRequests: visibleRecentOpenPRs,
+  });
+  const pullRequestNewCommentCountByKey =
+    hasLoadedGitHubPrNotificationSeenAtState
+      ? getPullRequestNewCommentCountByKey(
+          notifications,
+          gitHubPrNotificationSeenAtState,
+        )
+      : {};
   const filteredMyOpenPRs = filterGitHubPullRequests(
     myOpenPRs,
     organizationFilter,
@@ -253,316 +220,6 @@ export function GitHubCard({
   ];
 
   useEffect(() => {
-    let isMounted = true;
-
-    getStoredGitHubSortOrder().then((storedSortOrder) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setSortOrder(storedSortOrder);
-      setHasLoadedSortOrder(true);
-    });
-
-    getStoredGitHubPrReadyState().then((storedReadyState) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setGitHubPrReadyState(storedReadyState);
-      setHasLoadedGitHubPrReadyState(true);
-    });
-
-    getStoredGitHubPrWarningState().then((storedWarningState) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setGitHubPrWarningState(storedWarningState);
-      setHasLoadedGitHubPrWarningState(true);
-    });
-
-    getStoredGitHubPrNotificationSeenAtState().then((storedSeenAtState) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setGitHubPrNotificationSeenAtState(storedSeenAtState);
-      setHasLoadedGitHubPrNotificationSeenAtState(true);
-    });
-
-    getStoredGitHubTeamPrTrackerState().then((storedTrackerState) => {
-      if (!isMounted) {
-        return;
-      }
-
-      setGitHubTeamPrTrackerState(storedTrackerState);
-      setHasLoadedGitHubTeamPrTrackerState(true);
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const unsubscribe = subscribeStoredValues(
-      [
-        GITHUB_PR_READY_STATE_STORAGE_KEY,
-        GITHUB_PR_WARNING_STATE_STORAGE_KEY,
-        GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY,
-        GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
-      ],
-      (changedKeys) => {
-        void (async () => {
-          if (changedKeys.has(GITHUB_PR_READY_STATE_STORAGE_KEY)) {
-            const storedReadyState = await getStoredGitHubPrReadyState();
-            if (!isMounted) {
-              return;
-            }
-
-            setGitHubPrReadyState((currentState) =>
-              areGitHubPrReadyStatesExactlyEqual(currentState, storedReadyState)
-                ? currentState
-                : storedReadyState,
-            );
-            setHasLoadedGitHubPrReadyState(true);
-          }
-
-          if (changedKeys.has(GITHUB_PR_WARNING_STATE_STORAGE_KEY)) {
-            const storedWarningState = await getStoredGitHubPrWarningState();
-            if (!isMounted) {
-              return;
-            }
-
-            setGitHubPrWarningState((currentState) =>
-              areGitHubPrWarningStatesExactlyEqual(
-                currentState,
-                storedWarningState,
-              )
-                ? currentState
-                : storedWarningState,
-            );
-            setHasLoadedGitHubPrWarningState(true);
-          }
-
-          if (changedKeys.has(GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY)) {
-            const storedSeenAtState =
-              await getStoredGitHubPrNotificationSeenAtState();
-            if (!isMounted) {
-              return;
-            }
-
-            setGitHubPrNotificationSeenAtState((currentState) =>
-              areGitHubPrNotificationSeenAtStatesEqual(
-                currentState,
-                storedSeenAtState,
-              )
-                ? currentState
-                : storedSeenAtState,
-            );
-            setHasLoadedGitHubPrNotificationSeenAtState(true);
-          }
-
-          if (changedKeys.has(GITHUB_TEAM_PR_TRACKER_STORAGE_KEY)) {
-            const storedTrackerState = await getStoredGitHubTeamPrTrackerState();
-            if (!isMounted) {
-              return;
-            }
-
-            setGitHubTeamPrTrackerState((currentState) =>
-              areGitHubTeamPrTrackerStatesEqual(
-                currentState,
-                storedTrackerState,
-              )
-                ? currentState
-                : storedTrackerState,
-            );
-            setHasLoadedGitHubTeamPrTrackerState(true);
-          }
-        })();
-      },
-    );
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedSortOrder) {
-      return;
-    }
-
-    void saveStoredGitHubSortOrder(sortOrder);
-  }, [hasLoadedSortOrder, sortOrder]);
-
-  useEffect(() => {
-    if (!hasLoadedGitHubPrReadyState) {
-      return;
-    }
-
-    void saveStoredGitHubPrReadyState(gitHubPrReadyState);
-  }, [gitHubPrReadyState, hasLoadedGitHubPrReadyState]);
-
-  useEffect(() => {
-    if (!hasLoadedGitHubPrWarningState) {
-      return;
-    }
-
-    void saveStoredGitHubPrWarningState(gitHubPrWarningState);
-  }, [gitHubPrWarningState, hasLoadedGitHubPrWarningState]);
-
-  useEffect(() => {
-    if (!hasLoadedGitHubPrNotificationSeenAtState) {
-      return;
-    }
-
-    void saveStoredGitHubPrNotificationSeenAtState(
-      gitHubPrNotificationSeenAtState,
-    );
-  }, [
-    gitHubPrNotificationSeenAtState,
-    hasLoadedGitHubPrNotificationSeenAtState,
-  ]);
-
-  useEffect(() => {
-    if (!hasLoadedGitHubTeamPrTrackerState) {
-      return;
-    }
-
-    void saveStoredGitHubTeamPrTrackerState(gitHubTeamPrTrackerState);
-  }, [gitHubTeamPrTrackerState, hasLoadedGitHubTeamPrTrackerState]);
-
-  useEffect(() => {
-    if (!hasLoadedGitHubPrReadyState) {
-      return;
-    }
-
-    setGitHubPrReadyState((currentState) => {
-      const nextState = buildGitHubPrReadyState(
-        currentState,
-        resolvedPullRequests,
-      );
-      return areGitHubPrReadyStatesEqual(currentState, nextState)
-        ? currentState
-        : nextState;
-    });
-  }, [hasLoadedGitHubPrReadyState, resolvedPullRequests]);
-
-  useEffect(() => {
-    if (!hasLoadedGitHubPrWarningState) {
-      return;
-    }
-
-    setGitHubPrWarningState((currentState) => {
-      const nextState = buildGitHubPrWarningState(
-        currentState,
-        resolvedPullRequests,
-      );
-      return areGitHubPrWarningStatesEqual(currentState, nextState)
-        ? currentState
-        : nextState;
-    });
-  }, [hasLoadedGitHubPrWarningState, resolvedPullRequests]);
-
-  useEffect(() => {
-    if (
-      !hasLoadedGitHubPrNotificationSeenAtState ||
-      data.connectionStatus !== 'connected' ||
-      isLoading
-    ) {
-      return;
-    }
-
-    const activePullRequestKeys = new Set(
-      [...resolvedPullRequests, ...visibleRecentOpenPRs].map((pullRequest) =>
-        getGitHubPullRequestAttentionStateKey(pullRequest),
-      ),
-    );
-
-    setGitHubPrNotificationSeenAtState((currentState) => {
-      const nextState = Object.fromEntries(
-        Object.entries(currentState).filter(([key]) =>
-          activePullRequestKeys.has(key),
-        ),
-      );
-
-      return Object.keys(nextState).length === Object.keys(currentState).length
-        ? currentState
-        : nextState;
-    });
-  }, [
-    data.connectionStatus,
-    hasLoadedGitHubPrNotificationSeenAtState,
-    isLoading,
-    resolvedPullRequests,
-    visibleRecentOpenPRs,
-  ]);
-
-  useEffect(() => {
-    if (
-      !hasLoadedGitHubTeamPrTrackerState ||
-      data.connectionStatus !== 'connected' ||
-      isLoading
-    ) {
-      return;
-    }
-
-    setGitHubTeamPrTrackerState((currentState) =>
-      getNextGitHubTeamPrTrackerState({
-        currentState,
-        visibleRecentOpenPullRequests: visibleRecentOpenPRs,
-        lastUpdatedAt: data.lastUpdatedAt,
-      }),
-    );
-  }, [
-    data.connectionStatus,
-    data.lastUpdatedAt,
-    hasLoadedGitHubTeamPrTrackerState,
-    isLoading,
-    visibleRecentOpenPRs,
-  ]);
-
-  function handleMarkPullRequestNotificationsSeen(
-    pullRequest: GitHubPullRequestItem,
-  ) {
-    const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-    const nextSeenAt = Date.now();
-
-    setGitHubPrNotificationSeenAtState((currentState) => {
-      if (currentState[pullRequestKey] === nextSeenAt) {
-        return currentState;
-      }
-
-      return {
-        ...currentState,
-        [pullRequestKey]: nextSeenAt,
-      };
-    });
-  }
-
-  function handleMarkTeamPrSeen(pullRequest: GitHubPullRequestItem) {
-    const pullRequestKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-
-    setGitHubTeamPrTrackerState((currentState) => {
-      if (!currentState.pendingNewKeys.includes(pullRequestKey)) {
-        return currentState;
-      }
-
-      return {
-        ...currentState,
-        pendingNewKeys: currentState.pendingNewKeys.filter(
-          (key) => key !== pullRequestKey,
-        ),
-      };
-    });
-  }
-
-  useEffect(() => {
     onSummaryMetricsChange({
       connectionStatus: data.connectionStatus,
       missingUsername: data.missingUsername,
@@ -592,41 +249,6 @@ export function GitHubCard({
     summaryCounts.relevantPrCount,
     onSummaryMetricsChange,
   ]);
-
-  function handleClearWarningHighlight(pullRequest: GitHubPullRequestItem) {
-    const readyStateKey = getGitHubPullRequestAttentionStateKey(pullRequest);
-    const warningStateKey = getGitHubPullRequestWarningStateKey(pullRequest);
-
-    setGitHubPrReadyState((currentState) => {
-      const currentEntry = currentState[readyStateKey];
-      if (!currentEntry?.highlighted) {
-        return currentState;
-      }
-
-      return {
-        ...currentState,
-        [readyStateKey]: {
-          ...currentEntry,
-          highlighted: false,
-        },
-      };
-    });
-
-    setGitHubPrWarningState((currentState) => {
-      const currentEntry = currentState[warningStateKey];
-      if (!currentEntry?.highlighted) {
-        return currentState;
-      }
-
-      return {
-        ...currentState,
-        [warningStateKey]: {
-          ...currentEntry,
-          highlighted: false,
-        },
-      };
-    });
-  }
 
   return (
     <CardShell className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden">
