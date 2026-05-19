@@ -17,6 +17,8 @@ import {
   type FocusPullRequestItem,
   type ManualFocusTaskItem,
 } from '../lib/storage';
+import { subscribeStoredValues } from '../lib/storage/backend';
+import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from '../lib/storage/keys';
 import {
   reconcileTodayFocusGitHubItems,
   reconcileTodayFocusJiraItems,
@@ -77,6 +79,48 @@ export function useTodayFocusState({
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const unsubscribe = subscribeStoredValues(
+      [TODAY_FOCUS_ITEMS_STORAGE_KEY],
+      () => {
+        void (async () => {
+          const storedSnapshot = await getStoredTodayFocusItemsSnapshot();
+          if (!isMounted || storedSnapshot === null) {
+            return;
+          }
+
+          const nextVersion = storedSnapshot.version;
+          const nextItems = storedSnapshot.items;
+          if (
+            nextVersion === todayFocusStorageVersionRef.current &&
+            areTodayFocusItemsEqual(nextItems, todayFocusItemsRef.current)
+          ) {
+            return;
+          }
+
+          logTodayFocusDebug('storage-sync-items', {
+            previousVersion: todayFocusStorageVersionRef.current,
+            nextVersion,
+            nextCount: nextItems.length,
+            nextItems,
+          });
+          todayFocusItemsRef.current = nextItems;
+          todayFocusStorageVersionRef.current = nextVersion;
+          setTodayFocusItems(nextItems);
+          hasLoadedTodayFocusItemsRef.current = true;
+          setHasLoadedTodayFocusItems(true);
+        })();
+      },
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -806,6 +850,10 @@ function logTodayFocusDebug(event: string, details: Record<string, unknown>) {
   }
 
   console.debug(`[TodayFocus] ${event}`, details);
+}
+
+function areTodayFocusItemsEqual(left: FocusItem[], right: FocusItem[]) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function getNestedPullRequestEndTargetId(parentId: string) {

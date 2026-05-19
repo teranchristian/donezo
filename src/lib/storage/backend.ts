@@ -2,6 +2,56 @@ export function hasChromeStorage() {
   return typeof chrome !== 'undefined' && Boolean(chrome.storage?.local);
 }
 
+export function subscribeStoredValues(
+  keys: readonly string[],
+  callback: (changedKeys: Set<string>) => void,
+) {
+  const keySet = new Set(keys);
+  if (keySet.size === 0) {
+    return () => {};
+  }
+
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    const handleStorageChanged = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string,
+    ) => {
+      if (areaName !== 'local') {
+        return;
+      }
+
+      const changedKeys = new Set(
+        Object.keys(changes).filter((key) => keySet.has(key)),
+      );
+      if (changedKeys.size > 0) {
+        callback(changedKeys);
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChanged);
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChanged);
+    };
+  }
+
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const handleStorageChanged = (event: StorageEvent) => {
+    if (!event.key || !keySet.has(event.key)) {
+      return;
+    }
+
+    callback(new Set([event.key]));
+  };
+
+  window.addEventListener('storage', handleStorageChanged);
+  return () => {
+    window.removeEventListener('storage', handleStorageChanged);
+  };
+}
+
 export async function getStoredValue<T>(key: string) {
   if (hasChromeStorage()) {
     const result = await chrome.storage.local.get(key);

@@ -49,6 +49,13 @@ import {
   type GitHubPrStatusFilter,
   type GitHubListSort,
 } from '../lib/storage';
+import { subscribeStoredValues } from '../lib/storage/backend';
+import {
+  GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY,
+  GITHUB_PR_READY_STATE_STORAGE_KEY,
+  GITHUB_PR_WARNING_STATE_STORAGE_KEY,
+  GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
+} from '../lib/storage/keys';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 import { StatusBadge } from './StatusBadge';
@@ -286,6 +293,93 @@ export function GitHubCard({
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const unsubscribe = subscribeStoredValues(
+      [
+        GITHUB_PR_READY_STATE_STORAGE_KEY,
+        GITHUB_PR_WARNING_STATE_STORAGE_KEY,
+        GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY,
+        GITHUB_TEAM_PR_TRACKER_STORAGE_KEY,
+      ],
+      (changedKeys) => {
+        void (async () => {
+          if (changedKeys.has(GITHUB_PR_READY_STATE_STORAGE_KEY)) {
+            const storedReadyState = await getStoredGitHubPrReadyState();
+            if (!isMounted) {
+              return;
+            }
+
+            setGitHubPrReadyState((currentState) =>
+              areGitHubPrReadyStatesExactlyEqual(currentState, storedReadyState)
+                ? currentState
+                : storedReadyState,
+            );
+            setHasLoadedGitHubPrReadyState(true);
+          }
+
+          if (changedKeys.has(GITHUB_PR_WARNING_STATE_STORAGE_KEY)) {
+            const storedWarningState = await getStoredGitHubPrWarningState();
+            if (!isMounted) {
+              return;
+            }
+
+            setGitHubPrWarningState((currentState) =>
+              areGitHubPrWarningStatesExactlyEqual(
+                currentState,
+                storedWarningState,
+              )
+                ? currentState
+                : storedWarningState,
+            );
+            setHasLoadedGitHubPrWarningState(true);
+          }
+
+          if (changedKeys.has(GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY)) {
+            const storedSeenAtState =
+              await getStoredGitHubPrNotificationSeenAtState();
+            if (!isMounted) {
+              return;
+            }
+
+            setGitHubPrNotificationSeenAtState((currentState) =>
+              areGitHubPrNotificationSeenAtStatesEqual(
+                currentState,
+                storedSeenAtState,
+              )
+                ? currentState
+                : storedSeenAtState,
+            );
+            setHasLoadedGitHubPrNotificationSeenAtState(true);
+          }
+
+          if (changedKeys.has(GITHUB_TEAM_PR_TRACKER_STORAGE_KEY)) {
+            const storedTrackerState = await getStoredGitHubTeamPrTrackerState();
+            if (!isMounted) {
+              return;
+            }
+
+            setGitHubTeamPrTrackerState((currentState) =>
+              areGitHubTeamPrTrackerStatesEqual(
+                currentState,
+                storedTrackerState,
+              )
+                ? currentState
+                : storedTrackerState,
+            );
+            setHasLoadedGitHubTeamPrTrackerState(true);
+          }
+        })();
+      },
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -1433,6 +1527,34 @@ function areGitHubPrReadyStatesEqual(
   return true;
 }
 
+function areGitHubPrReadyStatesExactlyEqual(
+  left: GitHubPrReadyState,
+  right: GitHubPrReadyState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (
+      !rightEntry ||
+      leftEntry.isReady !== rightEntry.isReady ||
+      leftEntry.highlighted !== rightEntry.highlighted ||
+      leftEntry.updatedAt !== rightEntry.updatedAt
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function areGitHubPrWarningStatesEqual(
   left: GitHubPrWarningState,
   right: GitHubPrWarningState,
@@ -1466,4 +1588,57 @@ function areGitHubPrWarningStatesEqual(
   }
 
   return true;
+}
+
+function areGitHubPrWarningStatesExactlyEqual(
+  left: GitHubPrWarningState,
+  right: GitHubPrWarningState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (
+      !rightEntry ||
+      leftEntry.highlighted !== rightEntry.highlighted ||
+      leftEntry.updatedAt !== rightEntry.updatedAt ||
+      !arraysEqual(leftEntry.activeCaseKeys, rightEntry.activeCaseKeys)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function areGitHubPrNotificationSeenAtStatesEqual(
+  left: GitHubPrNotificationSeenAtState,
+  right: GitHubPrNotificationSeenAtState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => left[key] === right[key]);
+}
+
+function areGitHubTeamPrTrackerStatesEqual(
+  left: GitHubTeamPrTrackerState,
+  right: GitHubTeamPrTrackerState,
+) {
+  return (
+    arraysEqual(left.snapshotKeys, right.snapshotKeys) &&
+    arraysEqual(left.pendingNewKeys, right.pendingNewKeys) &&
+    left.lastProcessedUpdatedAt === right.lastProcessedUpdatedAt
+  );
 }
