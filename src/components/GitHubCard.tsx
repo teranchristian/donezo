@@ -18,10 +18,7 @@ import {
 } from '../lib/githubCardViewModel';
 import { formatRelativeTime } from '../lib/date';
 import {
-  getGitHubPullRequestAttentionStateKey,
   getPullRequestDisplayStatus,
-  isGitHubPrReadyHighlighted,
-  isGitHubPrWarningHighlighted,
   isPullRequestOutOfDate,
   isPullRequestQueued,
   isPullRequestReadyToMerge,
@@ -29,9 +26,6 @@ import {
 import {
   type ActiveGitHubView,
   type GitHubHiddenRepository,
-  type GitHubPrReadyState,
-  type GitHubTeamPrTrackerState,
-  type GitHubPrWarningState,
   type GitHubPrStatusFilter,
   type GitHubListSort,
 } from '../lib/storage';
@@ -48,6 +42,7 @@ import {
 } from './GitHubPullRequestIcons';
 import { HideRepositoryIcon } from './HideRepositoryIcon';
 import { PullRequestCommentBadge } from './PullRequestCommentBadge';
+import { PullRequestList } from './PullRequestList';
 import { StatusBadge } from './StatusBadge';
 import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
 import { TodayFocusIndicator } from './TodayFocusIndicator';
@@ -334,11 +329,14 @@ export function GitHubCard({
                 pullRequestNewCommentCountByKey={
                   viewModel.pullRequestNewCommentCountByKey
                 }
-            onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
-            onMarkTeamPrSeen={handleMarkTeamPrSeen}
-            onClearWarningHighlight={handleClearWarningHighlight}
-            onHideRepository={onHideRepository}
-          />
+                onMarkNotificationsSeen={handleMarkPullRequestNotificationsSeen}
+                onMarkTeamPrSeen={handleMarkTeamPrSeen}
+                onClearWarningHighlight={handleClearWarningHighlight}
+                onHideRepository={onHideRepository}
+                renderPullRequest={(rowProps) => (
+                  <PullRequestRow {...rowProps} />
+                )}
+              />
             )}
           </div>
           {!isLoading &&
@@ -571,6 +569,7 @@ function PullRequestTrailingIcon({
 }) {
   return <PullRequestCheckStatusIcon ciStatus={pullRequest.ciStatus} />;
 }
+<<<<<<< HEAD
 
 function PullRequestList({
   pullRequests,
@@ -725,3 +724,5 @@ function PullRequestList({
     </div>
   );
 }
+=======
+>>>>>>> 42c947e (Extract pull request list)
