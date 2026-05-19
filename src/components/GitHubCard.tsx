@@ -6,10 +6,18 @@ import {
   GitHubPullRequestItem,
 } from '../lib/githubApi';
 import {
+  areGitHubPrNotificationSeenAtStatesEqual,
+  areGitHubPrReadyStatesEqual,
+  areGitHubPrReadyStatesExactlyEqual,
+  areGitHubPrWarningStatesEqual,
+  areGitHubPrWarningStatesExactlyEqual,
+  areGitHubTeamPrTrackerStatesEqual,
+  buildRecentOpenPullRequestsQuery,
   calculateGitHubSummaryCounts,
   filterGitHubPullRequests,
   getGitHubViewContent,
   getNoFilterResultsMessage,
+  getNextGitHubTeamPrTrackerState,
   getPullRequestNewCommentCountByKey,
   getRepositoryLabel,
   mapPullRequestToFocusItem,
@@ -504,71 +512,13 @@ export function GitHubCard({
       return;
     }
 
-    const currentTeamPrKeys = visibleRecentOpenPRs.map((pullRequest) =>
-      getGitHubPullRequestAttentionStateKey(pullRequest),
+    setGitHubTeamPrTrackerState((currentState) =>
+      getNextGitHubTeamPrTrackerState({
+        currentState,
+        visibleRecentOpenPullRequests: visibleRecentOpenPRs,
+        lastUpdatedAt: data.lastUpdatedAt,
+      }),
     );
-    const currentTeamPrKeySet = new Set(currentTeamPrKeys);
-    const refreshUpdatedAt =
-      typeof data.lastUpdatedAt === 'number' && Number.isFinite(data.lastUpdatedAt)
-        ? data.lastUpdatedAt
-        : null;
-
-    setGitHubTeamPrTrackerState((currentState) => {
-      const existingPendingNewKeys = currentState.pendingNewKeys.filter((key) =>
-        currentTeamPrKeySet.has(key),
-      );
-
-      if (refreshUpdatedAt === null) {
-        if (
-          arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
-          arraysEqual(currentState.pendingNewKeys, existingPendingNewKeys)
-        ) {
-          return currentState;
-        }
-
-        return {
-          ...currentState,
-          snapshotKeys: currentTeamPrKeys,
-          pendingNewKeys: existingPendingNewKeys,
-        };
-      }
-
-      if (currentState.lastProcessedUpdatedAt === refreshUpdatedAt) {
-        if (
-          arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
-          arraysEqual(currentState.pendingNewKeys, existingPendingNewKeys)
-        ) {
-          return currentState;
-        }
-
-        return {
-          ...currentState,
-          snapshotKeys: currentTeamPrKeys,
-          pendingNewKeys: existingPendingNewKeys,
-        };
-      }
-
-      const hasExistingSnapshot = currentState.snapshotKeys.length > 0;
-      const currentSnapshotKeySet = new Set(currentState.snapshotKeys);
-      const newlyDiscoveredKeys = hasExistingSnapshot
-        ? currentTeamPrKeys.filter((key) => !currentSnapshotKeySet.has(key))
-        : [];
-      const nextPendingNewKeys = [...new Set([...existingPendingNewKeys, ...newlyDiscoveredKeys])];
-
-      if (
-        arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
-        arraysEqual(currentState.pendingNewKeys, nextPendingNewKeys) &&
-        currentState.lastProcessedUpdatedAt === refreshUpdatedAt
-      ) {
-        return currentState;
-      }
-
-      return {
-        snapshotKeys: currentTeamPrKeys,
-        pendingNewKeys: nextPendingNewKeys,
-        lastProcessedUpdatedAt: refreshUpdatedAt,
-      };
-    });
   }, [
     data.connectionStatus,
     data.lastUpdatedAt,
@@ -837,17 +787,6 @@ export function GitHubCard({
       </div>
     </CardShell>
   );
-}
-
-function buildRecentOpenPullRequestsQuery(ownerFilter: string) {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const normalizedOwnerFilter = ownerFilter.trim();
-  const ownerScope =
-    normalizedOwnerFilter && normalizedOwnerFilter !== 'all'
-      ? ` user:${normalizedOwnerFilter}`
-      : '';
-
-  return `is:pr is:open draft:false created:>=${since}${ownerScope}`;
 }
 
 function PullRequestRow({
@@ -1507,154 +1446,4 @@ function formatCount(value: number, isLoading: boolean) {
   }
 
   return String(value);
-}
-
-function arraysEqual(left: string[], right: string[]) {
-  return (
-    left.length === right.length &&
-    left.every((value, index) => value === right[index])
-  );
-}
-
-function areGitHubPrReadyStatesEqual(
-  left: GitHubPrReadyState,
-  right: GitHubPrReadyState,
-) {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    const leftEntry = left[key];
-    const rightEntry = right[key];
-
-    if (
-      !rightEntry ||
-      leftEntry.isReady !== rightEntry.isReady ||
-      leftEntry.highlighted !== rightEntry.highlighted
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function areGitHubPrReadyStatesExactlyEqual(
-  left: GitHubPrReadyState,
-  right: GitHubPrReadyState,
-) {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    const leftEntry = left[key];
-    const rightEntry = right[key];
-
-    if (
-      !rightEntry ||
-      leftEntry.isReady !== rightEntry.isReady ||
-      leftEntry.highlighted !== rightEntry.highlighted ||
-      leftEntry.updatedAt !== rightEntry.updatedAt
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function areGitHubPrWarningStatesEqual(
-  left: GitHubPrWarningState,
-  right: GitHubPrWarningState,
-) {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    const leftEntry = left[key];
-    const rightEntry = right[key];
-
-    if (!rightEntry || leftEntry.highlighted !== rightEntry.highlighted) {
-      return false;
-    }
-
-    if (leftEntry.activeCaseKeys.length !== rightEntry.activeCaseKeys.length) {
-      return false;
-    }
-
-    for (let index = 0; index < leftEntry.activeCaseKeys.length; index += 1) {
-      if (
-        leftEntry.activeCaseKeys[index] !== rightEntry.activeCaseKeys[index]
-      ) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-function areGitHubPrWarningStatesExactlyEqual(
-  left: GitHubPrWarningState,
-  right: GitHubPrWarningState,
-) {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    const leftEntry = left[key];
-    const rightEntry = right[key];
-
-    if (
-      !rightEntry ||
-      leftEntry.highlighted !== rightEntry.highlighted ||
-      leftEntry.updatedAt !== rightEntry.updatedAt ||
-      !arraysEqual(leftEntry.activeCaseKeys, rightEntry.activeCaseKeys)
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function areGitHubPrNotificationSeenAtStatesEqual(
-  left: GitHubPrNotificationSeenAtState,
-  right: GitHubPrNotificationSeenAtState,
-) {
-  const leftKeys = Object.keys(left);
-  const rightKeys = Object.keys(right);
-
-  if (leftKeys.length !== rightKeys.length) {
-    return false;
-  }
-
-  return leftKeys.every((key) => left[key] === right[key]);
-}
-
-function areGitHubTeamPrTrackerStatesEqual(
-  left: GitHubTeamPrTrackerState,
-  right: GitHubTeamPrTrackerState,
-) {
-  return (
-    arraysEqual(left.snapshotKeys, right.snapshotKeys) &&
-    arraysEqual(left.pendingNewKeys, right.pendingNewKeys) &&
-    left.lastProcessedUpdatedAt === right.lastProcessedUpdatedAt
-  );
 }
