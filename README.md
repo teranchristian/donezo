@@ -9,7 +9,7 @@ The app is built with React, TypeScript, Vite, and Tailwind CSS. It is currently
 When the extension is loaded in Chrome, opening a new tab shows a dashboard with:
 
 - a dashboard header and integration switcher
-- a GitHub workspace card for PRs, review requests, and notifications
+- a GitHub workspace card for your PRs, team PRs, and review requests
 - a Jira workspace card for active assigned issues
 - a Today focus board for the top items you want to close today
 - a notes card for quick local capture
@@ -22,8 +22,8 @@ When the extension is loaded in Chrome, opening a new tab shows a dashboard with
 The GitHub side of the dashboard includes:
 
 - your open pull requests
+- recent team pull requests
 - pull requests requesting your review
-- GitHub notifications related to pull requests
 - review status, CI status, merge state, and draft state signals
 - status filters such as approved, ready to merge, and waiting review
 - owner or organization scoping through Settings
@@ -57,6 +57,7 @@ It supports:
 - nesting GitHub pull requests under Jira items
 - reordering top-level items and nested pull requests
 - a limit of 3 top-level focus items
+- manual tasks with a preview-first details view and explicit edit flow
 
 It also has some useful automation:
 
@@ -66,12 +67,18 @@ It also has some useful automation:
 - GitHub-backed focus items stay synced with fresh PR title, URL, and review status data
 - if a focus item is no longer present in the main dashboard payload, fallback lookups try to refresh Jira issue details and GitHub PR terminal states
 
-### GitHub notifications and favicon state
+Manual tasks support:
 
-Donezo surfaces GitHub notification activity in two ways:
+- creating standalone focus tasks
+- Markdown notes with headings, lists, checkboxes, links, inline code, and fenced code blocks
+- clickable checklist toggles inside the manual-task preview
+- a preview mode before edit mode
+- completion state directly on the Today focus card
+- chrome-storage persistence for task content and ordering
 
-- a notifications view inside the GitHub card
-- dynamic favicon and browser-tab title updates based on PR attention state
+### GitHub warning state and favicon state
+
+Donezo still surfaces pull request warning activity through dashboard signals and browser chrome:
 
 The favicon changes when the dashboard detects:
 
@@ -126,13 +133,13 @@ This matters because:
 
 The GitHub integration uses:
 
-- REST API calls for notifications and connection checks
+- REST API calls for connection checks and pull-request-related signals
 - GraphQL API calls for pull request search and metadata
 
 The dashboard currently fetches:
 
-- recent GitHub notifications
 - PRs authored by you
+- recent team pull requests
 - PRs requesting your review
 - review decision state
 - merge state
@@ -315,13 +322,13 @@ Key files and modules:
 - [src/pages/SettingsPage.tsx](/Users/xtian/dev/donezo/src/pages/SettingsPage.tsx): settings and connection management
 - [src/components/GitHubCard.tsx](/Users/xtian/dev/donezo/src/components/GitHubCard.tsx): GitHub dashboard UI
 - [src/components/JiraCard.tsx](/Users/xtian/dev/donezo/src/components/JiraCard.tsx): Jira dashboard UI
-- [src/components/SummaryCard.tsx](/Users/xtian/dev/donezo/src/components/SummaryCard.tsx): Today focus board UI
+- [src/components/SummaryCard.tsx](/Users/xtian/dev/donezo/src/components/SummaryCard.tsx): Today focus board UI and manual-task preview/editor flow
 - [src/components/GitHubRepoLauncher.tsx](/Users/xtian/dev/donezo/src/components/GitHubRepoLauncher.tsx): repository search launcher UI
 - [src/hooks/useGitHubDashboard.ts](/Users/xtian/dev/donezo/src/hooks/useGitHubDashboard.ts): GitHub dashboard loading and refresh behavior
 - [src/hooks/useJiraDashboard.ts](/Users/xtian/dev/donezo/src/hooks/useJiraDashboard.ts): Jira dashboard loading and refresh behavior
 - [src/hooks/useTodayFocusState.ts](/Users/xtian/dev/donezo/src/hooks/useTodayFocusState.ts): Today focus state and mutations
 - [src/hooks/useTodayFocusFallbacks.ts](/Users/xtian/dev/donezo/src/hooks/useTodayFocusFallbacks.ts): focused fallback refresh logic for Today focus items
-- [src/hooks/useFaviconState.ts](/Users/xtian/dev/donezo/src/hooks/useFaviconState.ts): favicon and title attention state
+- [src/hooks/useFaviconState.ts](/Users/xtian/dev/donezo/src/hooks/useFaviconState.ts): favicon and title warning state
 - [src/lib/githubApi.ts](/Users/xtian/dev/donezo/src/lib/githubApi.ts): UI-side GitHub bridge helpers
 - [src/lib/jiraApi.ts](/Users/xtian/dev/donezo/src/lib/jiraApi.ts): UI-side Jira bridge helpers
 - [src/lib/githubDomain.ts](/Users/xtian/dev/donezo/src/lib/githubDomain.ts): GitHub domain rules
