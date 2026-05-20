@@ -34,6 +34,7 @@ export type PullRequestListRowProps = {
 type PullRequestListProps = {
   pullRequests: GitHubPullRequestItem[];
   todayFocusPullRequestRanks: TodayFocusPullRequestRanks;
+  shouldPrioritizeReadyToClose?: boolean;
   activeView: ActiveGitHubView;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
@@ -50,6 +51,7 @@ type PullRequestListProps = {
 export function PullRequestList({
   pullRequests,
   todayFocusPullRequestRanks,
+  shouldPrioritizeReadyToClose = true,
   activeView,
   gitHubPrReadyState,
   gitHubPrWarningState,
@@ -89,6 +91,14 @@ export function PullRequestList({
         )}
       </Fragment>
     ));
+
+  if (!shouldPrioritizeReadyToClose) {
+    return (
+      <div className="border-b border-white/[0.06] divide-y divide-white/[0.06]">
+        {renderPullRequests(pullRequests)}
+      </div>
+    );
+  }
 
   if (readyToClose.length === 0) {
     return (

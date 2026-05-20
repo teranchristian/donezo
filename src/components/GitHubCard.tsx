@@ -137,6 +137,7 @@ export function GitHubCard({
     notificationSeenAtState: gitHubPrNotificationSeenAtState,
     readyState: gitHubPrReadyState,
     warningState: gitHubPrWarningState,
+    todayFocusPullRequestRanks,
   });
   const tabItems = [
     {
@@ -277,6 +278,12 @@ export function GitHubCard({
                   className={`${filterSelectClass} flex-1`}
                 >
                   <option
+                    value="focus-priority"
+                    className="bg-panel text-stone-100"
+                  >
+                    Focus priority
+                  </option>
+                  <option
                     value="recently-updated"
                     className="bg-panel text-stone-100"
                   >
@@ -319,6 +326,7 @@ export function GitHubCard({
               <PullRequestList
                 pullRequests={viewModel.filteredItems.map((item) => item.value)}
                 todayFocusPullRequestRanks={todayFocusPullRequestRanks}
+                shouldPrioritizeReadyToClose={sortOrder !== 'focus-priority'}
                 activeView={activeView}
                 gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}

@@ -22,6 +22,7 @@ import type {
   GitHubTeamPrTrackerState,
   GitHubPrWarningState,
 } from './storage';
+import type { TodayFocusPullRequestRanks } from './todayFocusPriority';
 
 export type GitHubViewItem =
   {
@@ -128,10 +129,21 @@ export function filterGitHubPullRequests(
 export function sortGitHubItems(
   items: GitHubViewItem[],
   sortOrder: GitHubListSort,
+  options: {
+    todayFocusPullRequestRanks?: TodayFocusPullRequestRanks;
+  } = {},
 ) {
   const sortedItems = [...items];
 
   sortedItems.sort((left, right) => {
+    if (sortOrder === 'focus-priority') {
+      return compareByFocusPriority(
+        left,
+        right,
+        options.todayFocusPullRequestRanks,
+      );
+    }
+
     if (sortOrder === 'oldest-updated') {
       return (
         new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
@@ -152,6 +164,35 @@ export function sortGitHubItems(
   });
 
   return sortedItems;
+}
+
+function compareByFocusPriority(
+  left: GitHubViewItem,
+  right: GitHubViewItem,
+  todayFocusPullRequestRanks?: TodayFocusPullRequestRanks,
+) {
+  const leftRank = getFocusPriorityRank(left, todayFocusPullRequestRanks);
+  const rightRank = getFocusPriorityRank(right, todayFocusPullRequestRanks);
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  return compareByRecentlyUpdated(left, right);
+}
+
+function getFocusPriorityRank(
+  item: GitHubViewItem,
+  todayFocusPullRequestRanks?: TodayFocusPullRequestRanks,
+) {
+  return (
+    todayFocusPullRequestRanks?.ranks.get(mapPullRequestToFocusItem(item.value).id) ??
+    Number.POSITIVE_INFINITY
+  );
+}
+
+function compareByRecentlyUpdated(left: GitHubViewItem, right: GitHubViewItem) {
+  return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
 }
 
 export function getGitHubViewContent(options: {

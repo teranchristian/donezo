@@ -17,6 +17,7 @@ import type {
   GitHubPrStatusFilter,
   GitHubPrWarningState,
 } from './storage';
+import type { TodayFocusPullRequestRanks } from './todayFocusPriority';
 
 export function getGitHubCardPullRequestGroups(options: {
   data: GitHubDashboardData;
@@ -93,6 +94,7 @@ export function getGitHubCardViewModel(options: {
   notificationSeenAtState: GitHubPrNotificationSeenAtState;
   readyState: GitHubPrReadyState;
   warningState: GitHubPrWarningState;
+  todayFocusPullRequestRanks: TodayFocusPullRequestRanks;
 }) {
   const {
     data,
@@ -104,6 +106,7 @@ export function getGitHubCardViewModel(options: {
     notificationSeenAtState,
     readyState,
     warningState,
+    todayFocusPullRequestRanks,
   } = options;
   const notifications = (data.notifications ?? []).filter(
     shouldDisplayNotification,
@@ -149,6 +152,8 @@ export function getGitHubCardViewModel(options: {
     filteredRecentOpenPullRequestCount: filteredRecentOpenPullRequests.length,
     summaryCounts,
     currentView,
-    filteredItems: sortGitHubItems(currentView.items, sortOrder),
+    filteredItems: sortGitHubItems(currentView.items, sortOrder, {
+      todayFocusPullRequestRanks,
+    }),
   };
 }

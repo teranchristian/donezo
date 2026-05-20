@@ -197,6 +197,7 @@ export async function saveStoredGitHubTeamPrTrackerState(
 
 function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
   if (
+    sortOrder === 'focus-priority' ||
     sortOrder === 'oldest-updated' ||
     sortOrder === 'repository-asc' ||
     sortOrder === 'title-asc' ||
