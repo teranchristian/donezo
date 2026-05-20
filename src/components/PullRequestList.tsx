@@ -14,13 +14,15 @@ import type {
   GitHubPrWarningState,
   GitHubTeamPrTrackerState,
 } from '../lib/storage';
+import type { TodayFocusPullRequestRanks } from '../lib/todayFocusPriority';
 
 export type PullRequestListRowProps = {
   pullRequest: GitHubPullRequestItem;
   activeView: ActiveGitHubView;
   newNotificationCount: number;
   isNewTeamPr: boolean;
-  isInTodayFocus: boolean;
+  todayFocusRank?: number;
+  todayFocusTotalRanks: number;
   isReadyHighlighted: boolean;
   isWarningHighlighted: boolean;
   onMarkNotificationsSeen: (pullRequest: GitHubPullRequestItem) => void;
@@ -31,7 +33,7 @@ export type PullRequestListRowProps = {
 
 type PullRequestListProps = {
   pullRequests: GitHubPullRequestItem[];
-  todayFocusItemIds: Set<string>;
+  todayFocusPullRequestRanks: TodayFocusPullRequestRanks;
   activeView: ActiveGitHubView;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
@@ -47,7 +49,7 @@ type PullRequestListProps = {
 
 export function PullRequestList({
   pullRequests,
-  todayFocusItemIds,
+  todayFocusPullRequestRanks,
   activeView,
   gitHubPrReadyState,
   gitHubPrWarningState,
@@ -72,7 +74,7 @@ export function PullRequestList({
         {renderPullRequest(
           getPullRequestListRowProps({
             pullRequest,
-            todayFocusItemIds,
+            todayFocusPullRequestRanks,
             activeView,
             gitHubPrReadyState,
             gitHubPrWarningState,
@@ -108,7 +110,7 @@ export function PullRequestList({
 
 function getPullRequestListRowProps(options: {
   pullRequest: GitHubPullRequestItem;
-  todayFocusItemIds: Set<string>;
+  todayFocusPullRequestRanks: TodayFocusPullRequestRanks;
   activeView: ActiveGitHubView;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
@@ -122,7 +124,7 @@ function getPullRequestListRowProps(options: {
 }): PullRequestListRowProps {
   const {
     pullRequest,
-    todayFocusItemIds,
+    todayFocusPullRequestRanks,
     activeView,
     gitHubPrReadyState,
     gitHubPrWarningState,
@@ -148,9 +150,10 @@ function getPullRequestListRowProps(options: {
       gitHubTeamPrTrackerState.pendingNewKeys.includes(
         getGitHubPullRequestAttentionStateKey(pullRequest),
       ),
-    isInTodayFocus: todayFocusItemIds.has(
+    todayFocusRank: todayFocusPullRequestRanks.ranks.get(
       mapPullRequestToFocusItem(pullRequest).id,
     ),
+    todayFocusTotalRanks: todayFocusPullRequestRanks.totalRanks,
     isReadyHighlighted: isGitHubPrReadyHighlighted(
       gitHubPrReadyState,
       pullRequest,
