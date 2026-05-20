@@ -478,9 +478,11 @@ function PullRequestRow({
             <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-secondary">
               <div
                 className="flex min-w-0 items-center overflow-hidden"
-                title={`${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
+                title={`#${pullRequest.pullNumber} • ${pullRequest.repositoryName}${shouldShowAuthor ? ` • by ${pullRequest.authorLogin}` : ''}`}
               >
                 <p className="truncate">
+                  <span className="text-white/42">#{pullRequest.pullNumber}</span>
+                  <span className="mx-1.5 text-white/22">•</span>
                   <span>{repositoryLabel}</span>
                 </p>
                 {isQueued ? (
