@@ -50,6 +50,7 @@ import {
   type GitHubListSort,
 } from '../lib/storage';
 import { subscribeStoredValues } from '../lib/storage/backend';
+import type { TodayFocusPullRequestRanks } from '../lib/todayFocusPriority';
 import {
   GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY,
   GITHUB_PR_READY_STATE_STORAGE_KEY,
@@ -65,7 +66,7 @@ import { TodayFocusIndicator } from './TodayFocusIndicator';
 type GitHubCardProps = {
   topBar?: ReactNode;
   data: GitHubDashboardData;
-  todayFocusItemIds: Set<string>;
+  todayFocusPullRequestRanks: TodayFocusPullRequestRanks;
   username: string;
   ownerFilter: string;
   hiddenRepositories: GitHubHiddenRepository[];
@@ -97,7 +98,7 @@ export type GitHubSummaryMetrics = {
 export function GitHubCard({
   topBar,
   data,
-  todayFocusItemIds,
+  todayFocusPullRequestRanks,
   username,
   ownerFilter,
   hiddenRepositories,
@@ -790,7 +791,7 @@ export function GitHubCard({
           ) : (
               <PullRequestList
                 pullRequests={filteredItems.map((item) => item.value)}
-                todayFocusItemIds={todayFocusItemIds}
+                todayFocusPullRequestRanks={todayFocusPullRequestRanks}
                 activeView={activeView}
                 gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}
@@ -854,7 +855,8 @@ function PullRequestRow({
   activeView,
   newNotificationCount,
   isNewTeamPr = false,
-  isInTodayFocus,
+  todayFocusRank,
+  todayFocusTotalRanks,
   isReadyHighlighted = false,
   isWarningHighlighted = false,
   onMarkNotificationsSeen,
@@ -866,7 +868,8 @@ function PullRequestRow({
   activeView: ActiveGitHubView;
   newNotificationCount: number;
   isNewTeamPr?: boolean;
-  isInTodayFocus: boolean;
+  todayFocusRank?: number;
+  todayFocusTotalRanks: number;
   isReadyHighlighted?: boolean;
   isWarningHighlighted?: boolean;
   onMarkNotificationsSeen?: (pullRequest: GitHubPullRequestItem) => void;
@@ -933,8 +936,12 @@ function PullRequestRow({
                 {pullRequest.title}
               </p>
               <PullRequestTrailingIcon pullRequest={pullRequest} />
-              {isInTodayFocus ? (
-                <TodayFocusIndicator className="font-semibold" />
+              {typeof todayFocusRank === 'number' ? (
+                <TodayFocusIndicator
+                  rank={todayFocusRank}
+                  totalRanks={todayFocusTotalRanks}
+                  className="font-semibold"
+                />
               ) : null}
             </div>
             <div className="mt-0.25 flex min-w-0 items-center overflow-hidden text-[0.66rem] text-secondary">
@@ -1162,7 +1169,7 @@ function PullRequestQueueIcon() {
 
 function PullRequestList({
   pullRequests,
-  todayFocusItemIds,
+  todayFocusPullRequestRanks,
   activeView,
   gitHubPrReadyState,
   gitHubPrWarningState,
@@ -1175,7 +1182,7 @@ function PullRequestList({
   onHideRepository,
 }: {
   pullRequests: GitHubPullRequestItem[];
-  todayFocusItemIds: Set<string>;
+  todayFocusPullRequestRanks: TodayFocusPullRequestRanks;
   activeView: ActiveGitHubView;
   gitHubPrReadyState: GitHubPrReadyState;
   gitHubPrWarningState: GitHubPrWarningState;
@@ -1214,9 +1221,10 @@ function PullRequestList({
                 getGitHubPullRequestAttentionStateKey(pullRequest),
               )
             }
-            isInTodayFocus={todayFocusItemIds.has(
+            todayFocusRank={todayFocusPullRequestRanks.ranks.get(
               mapPullRequestToFocusItem(pullRequest).id,
             )}
+            todayFocusTotalRanks={todayFocusPullRequestRanks.totalRanks}
             isReadyHighlighted={isGitHubPrReadyHighlighted(
               gitHubPrReadyState,
               pullRequest,
@@ -1254,9 +1262,10 @@ function PullRequestList({
               getGitHubPullRequestAttentionStateKey(pullRequest),
             )
           }
-          isInTodayFocus={todayFocusItemIds.has(
+          todayFocusRank={todayFocusPullRequestRanks.ranks.get(
             mapPullRequestToFocusItem(pullRequest).id,
           )}
+          todayFocusTotalRanks={todayFocusPullRequestRanks.totalRanks}
           isReadyHighlighted={isGitHubPrReadyHighlighted(
             gitHubPrReadyState,
             pullRequest,
@@ -1289,9 +1298,10 @@ function PullRequestList({
                   getGitHubPullRequestAttentionStateKey(pullRequest),
                 )
               }
-              isInTodayFocus={todayFocusItemIds.has(
+              todayFocusRank={todayFocusPullRequestRanks.ranks.get(
                 mapPullRequestToFocusItem(pullRequest).id,
               )}
+              todayFocusTotalRanks={todayFocusPullRequestRanks.totalRanks}
               isReadyHighlighted={isGitHubPrReadyHighlighted(
                 gitHubPrReadyState,
                 pullRequest,
