@@ -70,6 +70,7 @@ export type GitHubHiddenRepository = {
 
 export type GitHubListOrganizationFilter = 'all' | string;
 export type GitHubListSort =
+  | 'focus-priority'
   | 'recently-updated'
   | 'oldest-updated'
   | 'repository-asc'

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { DashboardAlerts } from '../components/DashboardAlerts';
 import { DashboardHeader } from '../components/DashboardHeader';
 import {
@@ -29,6 +29,7 @@ import type {
 } from '../lib/storage';
 import type { GitHubMockScenarioOption } from '../mocks/github/scenarios';
 import type { TodayFocusRefreshSignal } from '../lib/todayFocusSync';
+import { buildTodayFocusPullRequestRanks } from '../lib/todayFocusPriority';
 
 type DashboardPageProps = {
   settings: DashboardSettings;
@@ -303,6 +304,11 @@ function DashboardContent({
   onHideRepository: (repository: GitHubHiddenRepository) => Promise<void>;
   onJiraViewChange: (view: ActiveJiraView) => void;
 }) {
+  const todayFocusPullRequestRanks = useMemo(
+    () => buildTodayFocusPullRequestRanks(todayFocus.todayFocusItems),
+    [todayFocus.todayFocusItems],
+  );
+
   return (
     <div className="dashboard-main-grid">
       <section className="dashboard-side-column">
@@ -336,7 +342,7 @@ function DashboardContent({
             <GitHubCard
               topBar={activeIntegration === 'github' ? integrationSwitcher : undefined}
               data={gitHubData}
-              todayFocusItemIds={todayFocus.todayFocusItemIds}
+              todayFocusPullRequestRanks={todayFocusPullRequestRanks}
               username={settings.integrations.github.username}
               ownerFilter={settings.integrations.github.ownerFilter}
               hiddenRepositories={settings.integrations.github.hiddenRepositories}

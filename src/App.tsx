@@ -1,15 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import {
-  getDefaultSettings,
-  getStoredSettings,
-  saveStoredSettings,
-  type DashboardSettings
-} from './lib/storage';
 import { getGitHubMockScenarioOptions } from './mocks/github/scenarios';
 import { type GitHubSummaryMetrics } from './components/GitHubCard';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { useDashboardSettings } from './hooks/useDashboardSettings';
 import { useFaviconState } from './hooks/useFaviconState';
 import { useGitHubDashboard } from './hooks/useGitHubDashboard';
 import { useGitHubMockMode } from './hooks/useGitHubMockMode';
@@ -32,8 +27,11 @@ const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
 const DASHBOARD_LOADING_OVERLAY_DELAY_MS = 400;
 
 export default function App() {
-  const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const {
+    settings,
+    isLoadingSettings,
+    saveSettings,
+  } = useDashboardSettings();
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
     useState<GitHubSummaryMetrics>(DEFAULT_GITHUB_SUMMARY_METRICS);
   const gitHubMockMode = useGitHubMockMode();
@@ -50,31 +48,6 @@ export default function App() {
     useState(false);
 
   useFaviconState(gitHubSummaryMetrics);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadInitialState = async () => {
-      const storedSettings = await getStoredSettings();
-      if (!active) {
-        return;
-      }
-
-      setSettings(storedSettings);
-      setIsLoadingSettings(false);
-    };
-
-    void loadInitialState();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function handleSaveSettings(nextSettings: DashboardSettings) {
-    await saveStoredSettings(nextSettings);
-    setSettings(nextSettings);
-  }
 
   const isDashboardReady =
     gitHubDashboard.isGitHubInitialized &&
@@ -115,7 +88,7 @@ export default function App() {
         isJiraLoading={jiraDashboard.isJiraLoading}
         onRefreshJira={() => void jiraDashboard.refresh()}
         onGitHubSummaryMetricsChange={setGitHubSummaryMetrics}
-        onUpdateSettings={handleSaveSettings}
+        onUpdateSettings={saveSettings}
       />
     ) : (
       shouldShowDelayedDashboardLoader ? (
@@ -143,7 +116,7 @@ export default function App() {
               settings={settings}
               gitHubOwnerOptions={gitHubDashboard.gitHubOwnerOptions}
               onLoadGitHubOwnerOptions={gitHubDashboard.loadOwnerOptions}
-              onSave={handleSaveSettings}
+              onSave={saveSettings}
               onTestGitHubConnection={gitHubDashboard.testConnectionStatus}
               onTestJiraConnection={jiraDashboard.testConnectionStatus}
               isGitHubDevModeEnabled={gitHubMockMode.isGitHubMockMode}

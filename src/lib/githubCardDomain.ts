@@ -14,12 +14,15 @@ import {
 } from './githubDomain';
 import type {
   ActiveGitHubView,
+  GitHubHiddenRepository,
   GitHubListSort,
   GitHubPrNotificationSeenAtState,
   GitHubPrReadyState,
   GitHubPrStatusFilter,
+  GitHubTeamPrTrackerState,
   GitHubPrWarningState,
 } from './storage';
+import type { TodayFocusPullRequestRanks } from './todayFocusPriority';
 
 export type GitHubViewItem =
   {
@@ -61,6 +64,33 @@ export function getRepositoryLabel(repositoryName: string) {
   return segments[segments.length - 1] ?? repositoryName;
 }
 
+export function mapPullRequestToHiddenRepository(
+  pullRequest: GitHubPullRequestItem,
+): GitHubHiddenRepository {
+  return {
+    id:
+      Number.isFinite(pullRequest.repositoryId) && pullRequest.repositoryId > 0
+        ? pullRequest.repositoryId
+        : pullRequest.id,
+    name: pullRequest.repo,
+    fullName: pullRequest.repositoryName,
+    owner: pullRequest.owner,
+    url:
+      typeof pullRequest.repositoryUrl === 'string' &&
+      pullRequest.repositoryUrl.trim()
+        ? pullRequest.repositoryUrl.trim()
+        : `https://github.com/${pullRequest.owner}/${pullRequest.repo}`,
+  };
+}
+
+export function formatCount(value: number, isLoading: boolean) {
+  if (isLoading) {
+    return '...';
+  }
+
+  return String(value);
+}
+
 export function filterGitHubPullRequests(
   pullRequests: GitHubPullRequestItem[],
   organizationFilter: string,
@@ -99,10 +129,21 @@ export function filterGitHubPullRequests(
 export function sortGitHubItems(
   items: GitHubViewItem[],
   sortOrder: GitHubListSort,
+  options: {
+    todayFocusPullRequestRanks?: TodayFocusPullRequestRanks;
+  } = {},
 ) {
   const sortedItems = [...items];
 
   sortedItems.sort((left, right) => {
+    if (sortOrder === 'focus-priority') {
+      return compareByFocusPriority(
+        left,
+        right,
+        options.todayFocusPullRequestRanks,
+      );
+    }
+
     if (sortOrder === 'oldest-updated') {
       return (
         new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
@@ -123,6 +164,35 @@ export function sortGitHubItems(
   });
 
   return sortedItems;
+}
+
+function compareByFocusPriority(
+  left: GitHubViewItem,
+  right: GitHubViewItem,
+  todayFocusPullRequestRanks?: TodayFocusPullRequestRanks,
+) {
+  const leftRank = getFocusPriorityRank(left, todayFocusPullRequestRanks);
+  const rightRank = getFocusPriorityRank(right, todayFocusPullRequestRanks);
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  return compareByRecentlyUpdated(left, right);
+}
+
+function getFocusPriorityRank(
+  item: GitHubViewItem,
+  todayFocusPullRequestRanks?: TodayFocusPullRequestRanks,
+) {
+  return (
+    todayFocusPullRequestRanks?.ranks.get(mapPullRequestToFocusItem(item.value).id) ??
+    Number.POSITIVE_INFINITY
+  );
+}
+
+function compareByRecentlyUpdated(left: GitHubViewItem, right: GitHubViewItem) {
+  return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
 }
 
 export function getGitHubViewContent(options: {
@@ -177,6 +247,17 @@ export function getGitHubViewContent(options: {
 
 export function getNoFilterResultsMessage(itemLabel: string) {
   return `No ${itemLabel} match the current filters.`;
+}
+
+export function buildRecentOpenPullRequestsQuery(ownerFilter: string) {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const normalizedOwnerFilter = ownerFilter.trim();
+  const ownerScope =
+    normalizedOwnerFilter && normalizedOwnerFilter !== 'all'
+      ? ` user:${normalizedOwnerFilter}`
+      : '';
+
+  return `is:pr is:open draft:false created:>=${since}${ownerScope}`;
 }
 
 export function shouldDisplayNotification(notification: GitHubNotification) {
@@ -323,6 +404,228 @@ export function calculateGitHubSummaryCounts(options: {
     relevantPrCount,
     pullRequestNewCommentCountByKey,
   };
+}
+
+export function getNextGitHubTeamPrTrackerState(options: {
+  currentState: GitHubTeamPrTrackerState;
+  visibleRecentOpenPullRequests: GitHubPullRequestItem[];
+  lastUpdatedAt: number | null;
+}) {
+  const { currentState, visibleRecentOpenPullRequests, lastUpdatedAt } = options;
+  const currentTeamPrKeys = visibleRecentOpenPullRequests.map((pullRequest) =>
+    getGitHubPullRequestAttentionStateKey(pullRequest),
+  );
+  const currentTeamPrKeySet = new Set(currentTeamPrKeys);
+  const refreshUpdatedAt =
+    typeof lastUpdatedAt === 'number' && Number.isFinite(lastUpdatedAt)
+      ? lastUpdatedAt
+      : null;
+  const existingPendingNewKeys = currentState.pendingNewKeys.filter((key) =>
+    currentTeamPrKeySet.has(key),
+  );
+
+  if (refreshUpdatedAt === null) {
+    if (
+      arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
+      arraysEqual(currentState.pendingNewKeys, existingPendingNewKeys)
+    ) {
+      return currentState;
+    }
+
+    return {
+      ...currentState,
+      snapshotKeys: currentTeamPrKeys,
+      pendingNewKeys: existingPendingNewKeys,
+    };
+  }
+
+  if (currentState.lastProcessedUpdatedAt === refreshUpdatedAt) {
+    if (
+      arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
+      arraysEqual(currentState.pendingNewKeys, existingPendingNewKeys)
+    ) {
+      return currentState;
+    }
+
+    return {
+      ...currentState,
+      snapshotKeys: currentTeamPrKeys,
+      pendingNewKeys: existingPendingNewKeys,
+    };
+  }
+
+  const hasExistingSnapshot = currentState.snapshotKeys.length > 0;
+  const currentSnapshotKeySet = new Set(currentState.snapshotKeys);
+  const newlyDiscoveredKeys = hasExistingSnapshot
+    ? currentTeamPrKeys.filter((key) => !currentSnapshotKeySet.has(key))
+    : [];
+  const nextPendingNewKeys = [
+    ...new Set([...existingPendingNewKeys, ...newlyDiscoveredKeys]),
+  ];
+
+  if (
+    arraysEqual(currentState.snapshotKeys, currentTeamPrKeys) &&
+    arraysEqual(currentState.pendingNewKeys, nextPendingNewKeys) &&
+    currentState.lastProcessedUpdatedAt === refreshUpdatedAt
+  ) {
+    return currentState;
+  }
+
+  return {
+    snapshotKeys: currentTeamPrKeys,
+    pendingNewKeys: nextPendingNewKeys,
+    lastProcessedUpdatedAt: refreshUpdatedAt,
+  };
+}
+
+export function arraysEqual(left: string[], right: string[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+export function areGitHubPrReadyStatesEqual(
+  left: GitHubPrReadyState,
+  right: GitHubPrReadyState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (
+      !rightEntry ||
+      leftEntry.isReady !== rightEntry.isReady ||
+      leftEntry.highlighted !== rightEntry.highlighted
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function areGitHubPrReadyStatesExactlyEqual(
+  left: GitHubPrReadyState,
+  right: GitHubPrReadyState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (
+      !rightEntry ||
+      leftEntry.isReady !== rightEntry.isReady ||
+      leftEntry.highlighted !== rightEntry.highlighted ||
+      leftEntry.updatedAt !== rightEntry.updatedAt
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function areGitHubPrWarningStatesEqual(
+  left: GitHubPrWarningState,
+  right: GitHubPrWarningState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (!rightEntry || leftEntry.highlighted !== rightEntry.highlighted) {
+      return false;
+    }
+
+    if (leftEntry.activeCaseKeys.length !== rightEntry.activeCaseKeys.length) {
+      return false;
+    }
+
+    for (let index = 0; index < leftEntry.activeCaseKeys.length; index += 1) {
+      if (
+        leftEntry.activeCaseKeys[index] !== rightEntry.activeCaseKeys[index]
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+export function areGitHubPrWarningStatesExactlyEqual(
+  left: GitHubPrWarningState,
+  right: GitHubPrWarningState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    const leftEntry = left[key];
+    const rightEntry = right[key];
+
+    if (
+      !rightEntry ||
+      leftEntry.highlighted !== rightEntry.highlighted ||
+      leftEntry.updatedAt !== rightEntry.updatedAt ||
+      !arraysEqual(leftEntry.activeCaseKeys, rightEntry.activeCaseKeys)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function areGitHubPrNotificationSeenAtStatesEqual(
+  left: GitHubPrNotificationSeenAtState,
+  right: GitHubPrNotificationSeenAtState,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => left[key] === right[key]);
+}
+
+export function areGitHubTeamPrTrackerStatesEqual(
+  left: GitHubTeamPrTrackerState,
+  right: GitHubTeamPrTrackerState,
+) {
+  return (
+    arraysEqual(left.snapshotKeys, right.snapshotKeys) &&
+    arraysEqual(left.pendingNewKeys, right.pendingNewKeys) &&
+    left.lastProcessedUpdatedAt === right.lastProcessedUpdatedAt
+  );
 }
 
 function getPullRequestIdentityKey(pullRequestIdentity: {
