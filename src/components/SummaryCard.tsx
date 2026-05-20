@@ -9,7 +9,10 @@ import {
   type FocusPullRequestItem,
   type ManualFocusTaskItem,
 } from '../lib/storage';
-import { FocusTargetIcon } from './TodayFocusIndicator';
+import {
+  FocusTargetIcon,
+  getTodayFocusIndicatorColor,
+} from './TodayFocusIndicator';
 import { getRepositoryLabel } from '../lib/githubCardDomain';
 import { getJiraBrowseUrl, normalizeJiraBaseUrl } from '../lib/jiraApi';
 
@@ -279,7 +282,7 @@ export function SummaryCard({
       </div>
 
       <div className="mt-3.5 space-y-1.5">
-        {visibleItems.map((item) => (
+        {visibleItems.map((item, index) => (
           <div
             key={item.id}
             onDragOver={(event) => handleTopLevelCardDragOver(event, item.id)}
@@ -306,6 +309,8 @@ export function SummaryCard({
             />
             <FocusItemCard
               item={item}
+              rank={index + 1}
+              totalRanks={visibleItems.length}
               jiraBaseUrl={jiraBaseUrl}
               onRemove={onRemoveItem}
               onEditManualTask={(task) => {
@@ -478,6 +483,8 @@ export function SummaryCard({
 
 function FocusItemCard({
   item,
+  rank,
+  totalRanks,
   jiraBaseUrl,
   onRemove,
   onEditManualTask,
@@ -492,6 +499,8 @@ function FocusItemCard({
   onReorderNestedPullRequest
 }: {
   item: FocusItem;
+  rank: number;
+  totalRanks: number;
   jiraBaseUrl?: string;
   onRemove: (itemId: string) => void;
   onEditManualTask: (task: ManualFocusTaskItem) => void;
@@ -509,6 +518,8 @@ function FocusItemCard({
     return (
       <FocusJiraCard
         item={item}
+        rank={rank}
+        totalRanks={totalRanks}
         jiraBaseUrl={jiraBaseUrl}
         onRemove={onRemove}
         activeInternalDrag={activeInternalDrag}
@@ -525,6 +536,8 @@ function FocusItemCard({
     return (
       <ManualFocusTaskCard
         item={item}
+        rank={rank}
+        totalRanks={totalRanks}
         onEdit={() => onEditManualTask(item)}
         onRemove={() => onRemove(item.id)}
         onToggleComplete={() => onToggleManualTask(item.id)}
@@ -541,6 +554,8 @@ function FocusItemCard({
   return (
     <FocusPullRequestCard
       item={item}
+      rank={rank}
+      totalRanks={totalRanks}
       jiraBaseUrl={jiraBaseUrl}
       onRemove={() => onRemove(item.id)}
       isNested={false}
@@ -550,8 +565,29 @@ function FocusItemCard({
   );
 }
 
+function TodayFocusRankToken({
+  rank,
+  totalRanks,
+}: {
+  rank: number;
+  totalRanks: number;
+}) {
+  return (
+    <span
+      className="shrink-0 text-[0.62rem] font-semibold tabular-nums leading-4"
+      style={{ color: getTodayFocusIndicatorColor(rank, totalRanks) }}
+      title={`Today Focus priority ${rank}`}
+      aria-label={`Today Focus priority ${rank}`}
+    >
+      #{rank}
+    </span>
+  );
+}
+
 function ManualFocusTaskCard({
   item,
+  rank,
+  totalRanks,
   onEdit,
   onRemove,
   onToggleComplete,
@@ -561,6 +597,8 @@ function ManualFocusTaskCard({
   onInternalDragStart,
 }: {
   item: ManualFocusTaskItem;
+  rank: number;
+  totalRanks: number;
   onEdit: () => void;
   onRemove: () => void;
   onToggleComplete: () => void;
@@ -646,9 +684,7 @@ function ManualFocusTaskCard({
             <div className="flex min-w-0 items-start gap-2 pr-1">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="shrink-0 text-white/28" aria-hidden="true">
-                    <DragHandleIcon />
-                  </span>
+                  <TodayFocusRankToken rank={rank} totalRanks={totalRanks} />
                   <span className="shrink-0 text-[0.63rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     Manual task
                   </span>
@@ -679,6 +715,8 @@ function ManualFocusTaskCard({
 
 function FocusJiraCard({
   item,
+  rank,
+  totalRanks,
   jiraBaseUrl,
   onRemove,
   activeInternalDrag,
@@ -689,6 +727,8 @@ function FocusJiraCard({
   onReorderNestedPullRequest
 }: {
   item: FocusJiraItem;
+  rank: number;
+  totalRanks: number;
   jiraBaseUrl?: string;
   onRemove: (itemId: string) => void;
   activeInternalDrag: FocusInternalDragPayload | null;
@@ -824,9 +864,7 @@ function FocusJiraCard({
             <div className="flex min-w-0 items-start gap-2 pr-1">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="shrink-0 text-white/28" aria-hidden="true">
-                    <DragHandleIcon />
-                  </span>
+                  <TodayFocusRankToken rank={rank} totalRanks={totalRanks} />
                   <span className="shrink-0 text-[0.63rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     {item.sourceLabel}
                   </span>
@@ -932,6 +970,8 @@ function FocusJiraCard({
 
 function FocusPullRequestCard({
   item,
+  rank,
+  totalRanks,
   jiraBaseUrl,
   onRemove,
   isNested,
@@ -940,6 +980,8 @@ function FocusPullRequestCard({
   onInternalDragStart
 }: {
   item: FocusPullRequestItem;
+  rank?: number;
+  totalRanks?: number;
   jiraBaseUrl?: string;
   onRemove: () => void;
   isNested: boolean;
@@ -1021,9 +1063,9 @@ function FocusPullRequestCard({
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="shrink-0 text-white/28" aria-hidden="true">
-                    <DragHandleIcon />
-                  </span>
+                  {typeof rank === 'number' && typeof totalRanks === 'number' ? (
+                    <TodayFocusRankToken rank={rank} totalRanks={totalRanks} />
+                  ) : null}
                   <span className="shrink-0 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-white/34">
                     {item.sourceLabel}
                   </span>
@@ -2170,19 +2212,6 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2">
       <path d="m6.5 6.5 11 11m0-11-11 11" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function DragHandleIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
-      <circle cx="5" cy="4" r="1" />
-      <circle cx="11" cy="4" r="1" />
-      <circle cx="5" cy="8" r="1" />
-      <circle cx="11" cy="8" r="1" />
-      <circle cx="5" cy="12" r="1" />
-      <circle cx="11" cy="12" r="1" />
     </svg>
   );
 }

@@ -10,8 +10,8 @@ type TodayFocusIndicatorProps = {
 
 const FOCUS_INDICATOR_HUE = 254;
 const FOCUS_INDICATOR_SATURATION = 52;
-const FOCUS_INDICATOR_TOP_LIGHTNESS = 80;
-const FOCUS_INDICATOR_BOTTOM_LIGHTNESS = 58;
+const FOCUS_INDICATOR_TOP_LIGHTNESS = 72;
+const FOCUS_INDICATOR_BOTTOM_LIGHTNESS = 54;
 
 export function FocusTargetIcon({ className = 'h-5 w-5' }: FocusTargetIconProps) {
   return (
@@ -46,7 +46,7 @@ export function TodayFocusIndicator({
   );
 }
 
-function getTodayFocusIndicatorColor(rank?: number, totalRanks?: number) {
+export function getTodayFocusIndicatorColor(rank?: number, totalRanks?: number) {
   if (typeof rank !== 'number') {
     return `hsl(${FOCUS_INDICATOR_HUE} ${FOCUS_INDICATOR_SATURATION}% 68%)`;
   }
