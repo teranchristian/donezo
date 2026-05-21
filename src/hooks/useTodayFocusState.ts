@@ -13,12 +13,11 @@ import {
   MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH,
   saveStoredTodayFocusItems,
   saveStoredTodayFocusItemsSnapshot,
+  subscribeStoredTodayFocusItems,
   type FocusItem,
   type FocusPullRequestItem,
   type ManualFocusTaskItem,
 } from '../lib/storage';
-import { subscribeStoredValues } from '../lib/storage/backend';
-import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from '../lib/storage/keys';
 import {
   reconcileTodayFocusGitHubItems,
   reconcileTodayFocusJiraItems,
@@ -85,8 +84,7 @@ export function useTodayFocusState({
   useEffect(() => {
     let isMounted = true;
 
-    const unsubscribe = subscribeStoredValues(
-      [TODAY_FOCUS_ITEMS_STORAGE_KEY],
+    const unsubscribe = subscribeStoredTodayFocusItems(
       () => {
         void (async () => {
           const storedSnapshot = await getStoredTodayFocusItemsSnapshot();

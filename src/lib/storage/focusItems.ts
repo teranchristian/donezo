@@ -1,6 +1,7 @@
 import {
-  getStoredJsonValue,
-  setStoredJsonValue,
+  getStoredAreaJsonValue,
+  setStoredAreaJsonValue,
+  subscribeStoredValues,
 } from './backend';
 import { TODAY_FOCUS_ITEMS_STORAGE_KEY } from './keys';
 import type {
@@ -36,20 +37,24 @@ type StoredTodayFocusItemsValue =
       items?: unknown;
     };
 
+const TODAY_FOCUS_EXTENSION_STORAGE_AREA = 'sync';
+
 export async function getStoredTodayFocusItems() {
   const snapshot = await getStoredTodayFocusItemsSnapshot();
   return snapshot?.items ?? null;
 }
 
 export async function getStoredTodayFocusItemsSnapshot() {
-  const storedItems = await getStoredJsonValue<StoredTodayFocusItemsValue>(
+  const syncedItems = await getStoredAreaJsonValue<StoredTodayFocusItemsValue>(
     TODAY_FOCUS_ITEMS_STORAGE_KEY,
+    { area: TODAY_FOCUS_EXTENSION_STORAGE_AREA },
   );
-  if (storedItems === null) {
+
+  if (syncedItems === null) {
     return null;
   }
 
-  return normalizeStoredTodayFocusItemsSnapshot(storedItems);
+  return normalizeStoredTodayFocusItemsSnapshot(syncedItems);
 }
 
 export async function saveStoredTodayFocusItems(items: FocusItem[]) {
@@ -68,7 +73,19 @@ export async function saveStoredTodayFocusItemsSnapshot(
     items: normalizedItems,
   };
 
-  await setStoredJsonValue(TODAY_FOCUS_ITEMS_STORAGE_KEY, normalizedSnapshot);
+  await setStoredAreaJsonValue(
+    TODAY_FOCUS_ITEMS_STORAGE_KEY,
+    normalizedSnapshot,
+    { area: TODAY_FOCUS_EXTENSION_STORAGE_AREA },
+  );
+}
+
+export function subscribeStoredTodayFocusItems(callback: () => void) {
+  return subscribeStoredValues(
+    [TODAY_FOCUS_ITEMS_STORAGE_KEY],
+    callback,
+    { area: TODAY_FOCUS_EXTENSION_STORAGE_AREA },
+  );
 }
 
 function mergeFocusItems(items?: FocusItem[] | LegacyFocusItem[] | null) {

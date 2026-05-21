@@ -1,12 +1,24 @@
-export function hasChromeStorage() {
-  return typeof chrome !== 'undefined' && Boolean(chrome.storage?.local);
+export type ChromeStorageAreaName = 'local' | 'sync';
+
+type StoredValueOptions = {
+  area?: ChromeStorageAreaName;
+};
+
+function getChromeStorageArea(area: ChromeStorageAreaName = 'local') {
+  return typeof chrome !== 'undefined' ? chrome.storage?.[area] : undefined;
+}
+
+export function hasChromeStorage(area: ChromeStorageAreaName = 'local') {
+  return Boolean(getChromeStorageArea(area));
 }
 
 export function subscribeStoredValues(
   keys: readonly string[],
   callback: (changedKeys: Set<string>) => void,
+  options: StoredValueOptions = {},
 ) {
   const keySet = new Set(keys);
+  const area = options.area ?? 'local';
   if (keySet.size === 0) {
     return () => {};
   }
@@ -16,7 +28,7 @@ export function subscribeStoredValues(
       changes: Record<string, chrome.storage.StorageChange>,
       areaName: string,
     ) => {
-      if (areaName !== 'local') {
+      if (areaName !== area) {
         return;
       }
 
@@ -61,6 +73,19 @@ export async function getStoredValue<T>(key: string) {
   return undefined;
 }
 
+export async function getStoredAreaValue<T>(
+  key: string,
+  options: StoredValueOptions = {},
+) {
+  const storageArea = getChromeStorageArea(options.area ?? 'local');
+  if (storageArea) {
+    const result = await storageArea.get(key);
+    return result[key] as T | undefined;
+  }
+
+  return undefined;
+}
+
 export async function getChromeStorageValue<T>(key: string) {
   const result = await chrome.storage.local.get(key);
   return result[key] as T | undefined;
@@ -78,6 +103,20 @@ export async function setChromeStorageValues(values: Record<string, unknown>) {
 export async function setStoredValue(key: string, value: unknown) {
   if (hasChromeStorage()) {
     await chrome.storage.local.set({ [key]: value });
+    return;
+  }
+
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+export async function setStoredAreaValue(
+  key: string,
+  value: unknown,
+  options: StoredValueOptions = {},
+) {
+  const storageArea = getChromeStorageArea(options.area ?? 'local');
+  if (storageArea) {
+    await storageArea.set({ [key]: value });
     return;
   }
 
@@ -152,6 +191,17 @@ export async function getStoredJsonValue<T>(key: string) {
   return getLocalStorageJsonValue<T>(key);
 }
 
+export async function getStoredAreaJsonValue<T>(
+  key: string,
+  options: StoredValueOptions = {},
+) {
+  if (hasChromeStorage(options.area ?? 'local')) {
+    return (await getStoredAreaValue<T>(key, options)) ?? null;
+  }
+
+  return getLocalStorageJsonValue<T>(key);
+}
+
 export async function setStoredJsonValue(key: string, value: unknown) {
   if (hasChromeStorage()) {
     await chrome.storage.local.set({ [key]: value });
@@ -159,4 +209,12 @@ export async function setStoredJsonValue(key: string, value: unknown) {
   }
 
   setLocalStorageJsonValue(key, value);
+}
+
+export async function setStoredAreaJsonValue(
+  key: string,
+  value: unknown,
+  options: StoredValueOptions = {},
+) {
+  await setStoredAreaValue(key, value, options);
 }
