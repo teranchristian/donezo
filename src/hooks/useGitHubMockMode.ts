@@ -12,6 +12,10 @@ import {
   type GitHubMockScenario
 } from '../mocks/github/scenarios';
 
+const IS_GITHUB_MOCK_MODE_AVAILABLE = Boolean(
+  (import.meta as { env?: { DEV?: boolean } }).env?.DEV,
+);
+
 export function useGitHubMockMode() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGitHubMockMode, setIsGitHubMockMode] = useState(false);
@@ -29,6 +33,17 @@ export function useGitHubMockMode() {
     let isActive = true;
 
     void (async () => {
+      if (!IS_GITHUB_MOCK_MODE_AVAILABLE) {
+        if (!isActive) {
+          return;
+        }
+
+        setIsGitHubMockMode(false);
+        setGitHubMockScenarioKey(null);
+        setIsLoading(false);
+        return;
+      }
+
       const storedGitHubDevMode = await getStoredGitHubDevMode();
       const storedMockScenarioKey = await getStoredGitHubMockScenarioKey();
 
@@ -49,6 +64,12 @@ export function useGitHubMockMode() {
   }, []);
 
   const applyMockScenario = useCallback(async (nextMockScenarioKey: string) => {
+    if (!IS_GITHUB_MOCK_MODE_AVAILABLE) {
+      setIsGitHubMockMode(false);
+      setGitHubMockScenarioKey(null);
+      return;
+    }
+
     await saveStoredGitHubDevMode(true);
     await saveStoredGitHubMockScenarioKey(nextMockScenarioKey);
 
@@ -57,6 +78,12 @@ export function useGitHubMockMode() {
   }, []);
 
   const clearMockScenario = useCallback(async () => {
+    if (!IS_GITHUB_MOCK_MODE_AVAILABLE) {
+      setIsGitHubMockMode(false);
+      setGitHubMockScenarioKey(null);
+      return;
+    }
+
     await saveStoredGitHubDevMode(false);
     await clearStoredGitHubMockScenarioKey();
 
@@ -66,6 +93,12 @@ export function useGitHubMockMode() {
 
   const setGitHubDevMode = useCallback(
     async (isEnabled: boolean) => {
+      if (!IS_GITHUB_MOCK_MODE_AVAILABLE) {
+        setIsGitHubMockMode(false);
+        setGitHubMockScenarioKey(null);
+        return;
+      }
+
       if (isEnabled) {
         await applyMockScenario(gitHubMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY);
         return;
@@ -78,6 +111,7 @@ export function useGitHubMockMode() {
 
   return {
     isLoading,
+    isGitHubMockModeAvailable: IS_GITHUB_MOCK_MODE_AVAILABLE,
     isGitHubMockMode,
     gitHubMockScenarioKey,
     gitHubMockScenario,

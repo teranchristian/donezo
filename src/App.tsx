@@ -119,6 +119,7 @@ export default function App() {
               onSave={saveSettings}
               onTestGitHubConnection={gitHubDashboard.testConnectionStatus}
               onTestJiraConnection={jiraDashboard.testConnectionStatus}
+              isGitHubDevModeAvailable={gitHubMockMode.isGitHubMockModeAvailable}
               isGitHubDevModeEnabled={gitHubMockMode.isGitHubMockMode}
               onSetGitHubDevMode={gitHubMockMode.setGitHubDevMode}
               gitHubTestStatus={gitHubDashboard.gitHubSettingsTestStatus}

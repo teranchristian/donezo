@@ -178,7 +178,7 @@ The Settings page manages:
 - Jira base URL
 - Jira email
 - Jira API token
-- GitHub dev mode toggle
+- GitHub dev mode toggle in Vite development builds
 
 Connection testing is built into the Settings page for both GitHub and Jira.
 
@@ -297,21 +297,23 @@ If you make code changes:
 1. Re-run `npm run build`
 2. Reload the extension in `chrome://extensions`
 
-## Dev Mode And Mock Data
+## Development-Only Mock Data
 
-The dashboard supports a stored GitHub dev mode for mock scenarios.
+The dashboard supports GitHub mock scenarios only in Vite development builds.
 
 How it works:
 
-- GitHub dev mode is enabled from the Settings page
-- once enabled, dev mode is stored locally
+- `npm run dev` enables the Settings page dev-mode toggle
+- once enabled, dev mode is stored locally for development
 - the active mock scenario is selected from the header menu
-- the Settings page includes an `Enable dev mode` toggle
+- `npm run build` disables mock mode and hides the Settings toggle
+- production builds ignore any previously stored mock/dev-mode value
 
 Notes:
 
-- scenario selection still happens in the UI
+- scenario selection still happens in the UI during development
 - clearing dev mode returns the dashboard to live GitHub data
+- mock data is not available in the packaged extension build
 
 ## Project Structure
 
