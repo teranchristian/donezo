@@ -30,6 +30,7 @@ export default function App() {
   const {
     settings,
     isLoadingSettings,
+    saveDisplayName,
     saveSettings,
   } = useDashboardSettings();
   const [gitHubSummaryMetrics, setGitHubSummaryMetrics] =
@@ -116,6 +117,7 @@ export default function App() {
               settings={settings}
               gitHubOwnerOptions={gitHubDashboard.gitHubOwnerOptions}
               onLoadGitHubOwnerOptions={gitHubDashboard.loadOwnerOptions}
+              onSaveDisplayName={saveDisplayName}
               onSave={saveSettings}
               onTestGitHubConnection={gitHubDashboard.testConnectionStatus}
               onTestJiraConnection={jiraDashboard.testConnectionStatus}

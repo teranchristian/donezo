@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   getDefaultSettings,
+  saveStoredDisplayName,
   getStoredSettings,
   saveStoredSettings,
   type DashboardSettings,
 } from '../lib/storage';
 import { subscribeStoredValues } from '../lib/storage/backend';
-import { SETTINGS_STORAGE_KEY } from '../lib/storage/keys';
+import {
+  DISPLAY_NAME_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+} from '../lib/storage/keys';
 
 export function useDashboardSettings() {
   const [settings, setSettings] = useState<DashboardSettings>(getDefaultSettings);
@@ -35,13 +39,21 @@ export function useDashboardSettings() {
   useEffect(() => {
     let isMounted = true;
 
-    const unsubscribe = subscribeStoredValues([SETTINGS_STORAGE_KEY], () => {
+    const unsubscribeSettings = subscribeStoredValues([SETTINGS_STORAGE_KEY], () => {
       void loadStoredSettings(() => isMounted);
     });
+    const unsubscribeDisplayName = subscribeStoredValues(
+      [DISPLAY_NAME_STORAGE_KEY],
+      () => {
+        void loadStoredSettings(() => isMounted);
+      },
+      { area: 'sync' },
+    );
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      unsubscribeSettings();
+      unsubscribeDisplayName();
     };
   }, [loadStoredSettings]);
 
@@ -50,9 +62,20 @@ export function useDashboardSettings() {
     setSettings(nextSettings);
   }, []);
 
+  const saveDisplayName = useCallback(async (displayName: string) => {
+    const normalizedDisplayName = displayName.trim().slice(0, 40);
+
+    await saveStoredDisplayName(normalizedDisplayName);
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      name: normalizedDisplayName,
+    }));
+  }, []);
+
   return {
     settings,
     isLoadingSettings,
+    saveDisplayName,
     saveSettings,
   };
 }

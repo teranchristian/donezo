@@ -1,6 +1,7 @@
 export const NOTES_STORAGE_KEY = 'dashboard-notes';
 export const TODAY_FOCUS_ITEMS_STORAGE_KEY = 'today-focus-items';
 export const SETTINGS_STORAGE_KEY = 'dashboard-settings';
+export const DISPLAY_NAME_STORAGE_KEY = 'dashboard-display-name';
 export const GITHUB_OWNER_FILTER_STORAGE_KEY = 'githubOwnerFilter';
 export const GITHUB_SORT_ORDER_STORAGE_KEY = 'githubSortOrder';
 export const GITHUB_PR_STATUS_FILTER_STORAGE_KEY = 'githubPrStatusFilter';

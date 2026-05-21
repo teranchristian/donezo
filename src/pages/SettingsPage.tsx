@@ -13,6 +13,7 @@ type SettingsPageProps = {
     token: string;
     username?: string;
   }) => Promise<string[]>;
+  onSaveDisplayName: (displayName: string) => Promise<void>;
   onSave: (settings: DashboardSettings) => Promise<void>;
   isGitHubDevModeAvailable: boolean;
   isGitHubDevModeEnabled: boolean;
@@ -50,6 +51,7 @@ export function SettingsPage({
   settings,
   gitHubOwnerOptions,
   onLoadGitHubOwnerOptions,
+  onSaveDisplayName,
   onSave,
   isGitHubDevModeAvailable,
   isGitHubDevModeEnabled,
@@ -65,16 +67,71 @@ export function SettingsPage({
   const location = useLocation();
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
+  const [displayNameSaveState, setDisplayNameSaveState] = useState<
+    'idle' | 'saving' | 'saved'
+  >('idle');
   const [saveMessage, setSaveMessage] = useState('');
   const [isLoadingGitHubOwnerOptions, setIsLoadingGitHubOwnerOptions] = useState(false);
   const isLoadingGitHubOwnerOptionsRef = useRef(false);
+  const previousSettingsRef = useRef(settings);
   const [lastSuccessfulGitHubTestToken, setLastSuccessfulGitHubTestToken] = useState(
     gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
   );
 
   useEffect(() => {
+    const previousSettings = previousSettingsRef.current;
+    previousSettingsRef.current = settings;
+
+    if (
+      areSettingsIntegrationsEqual(
+        previousSettings.integrations,
+        settings.integrations,
+      )
+    ) {
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        name: settings.name,
+      }));
+      return;
+    }
+
     setDraft(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const nextDisplayName = draft.name.trim();
+    if (nextDisplayName === settings.name.trim()) {
+      return;
+    }
+
+    setDisplayNameSaveState('saving');
+    const timeoutId = window.setTimeout(() => {
+      void onSaveDisplayName(nextDisplayName);
+    }, 700);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [draft.name, onSaveDisplayName, settings.name]);
+
+  useEffect(() => {
+    if (displayNameSaveState !== 'saving') {
+      return;
+    }
+
+    if (draft.name.trim() !== settings.name.trim()) {
+      return;
+    }
+
+    setDisplayNameSaveState('saved');
+    const timeoutId = window.setTimeout(() => {
+      setDisplayNameSaveState('idle');
+    }, 1400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [displayNameSaveState, draft.name, settings.name]);
 
   useEffect(() => {
     setLastSuccessfulGitHubTestToken(
@@ -143,6 +200,16 @@ export function SettingsPage({
       draft.integrations.jira.email,
       draft.integrations.jira.apiToken
     );
+  }
+
+  async function handleDisplayNameBlur() {
+    const nextDisplayName = draft.name.trim();
+    if (nextDisplayName === settings.name.trim()) {
+      return;
+    }
+
+    setDisplayNameSaveState('saving');
+    await onSaveDisplayName(nextDisplayName);
   }
 
   async function handleShowRepositoryAgain(fullName: string) {
@@ -229,10 +296,16 @@ export function SettingsPage({
               <input
                 value={draft.name}
                 onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                onBlur={() => void handleDisplayNameBlur()}
                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-500 focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
                 placeholder="Your name"
                 maxLength={40}
               />
+              {displayNameSaveState !== 'idle' ? (
+                <span className="mt-2 block text-xs text-stone-500">
+                  {displayNameSaveState === 'saving' ? 'Saving...' : 'Saved'}
+                </span>
+              ) : null}
             </label>
 
             {isGitHubDevModeAvailable ? (
@@ -639,4 +712,44 @@ function getGitHubOwnerOptions({
   }
 
   return options;
+}
+
+function areSettingsIntegrationsEqual(
+  left: DashboardSettings['integrations'],
+  right: DashboardSettings['integrations'],
+) {
+  return (
+    left.github.username === right.github.username &&
+    left.github.token === right.github.token &&
+    left.github.ownerFilter === right.github.ownerFilter &&
+    areHiddenRepositoriesEqual(
+      left.github.hiddenRepositories,
+      right.github.hiddenRepositories,
+    ) &&
+    left.jira.baseUrl === right.jira.baseUrl &&
+    left.jira.email === right.jira.email &&
+    left.jira.apiToken === right.jira.apiToken
+  );
+}
+
+function areHiddenRepositoriesEqual(
+  left: DashboardSettings['integrations']['github']['hiddenRepositories'],
+  right: DashboardSettings['integrations']['github']['hiddenRepositories'],
+) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((repository, index) => {
+    const rightRepository = right[index];
+
+    return (
+      rightRepository &&
+      repository.id === rightRepository.id &&
+      repository.name === rightRepository.name &&
+      repository.fullName === rightRepository.fullName &&
+      repository.owner === rightRepository.owner &&
+      repository.url === rightRepository.url
+    );
+  });
 }

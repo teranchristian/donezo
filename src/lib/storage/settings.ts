@@ -1,6 +1,8 @@
 import {
+  getStoredAreaJsonValue,
   getStoredJsonValue,
   getStoredRawValue,
+  setStoredAreaJsonValue,
   setStoredJsonValue,
   setStoredRawValue,
 } from './backend';
@@ -10,6 +12,7 @@ import {
   getDefaultSettingsTemplate
 } from './defaults';
 import {
+  DISPLAY_NAME_STORAGE_KEY,
   GITHUB_OWNER_FILTER_STORAGE_KEY,
   JIRA_API_TOKEN_STORAGE_KEY,
   JIRA_BASE_URL_STORAGE_KEY,
@@ -20,11 +23,14 @@ import type { DashboardSettings, GitHubListOrganizationFilter } from './types';
 
 export { getDefaultSettings } from './defaults';
 
+const DISPLAY_NAME_EXTENSION_STORAGE_AREA = 'sync';
+
 export async function getStoredSettings() {
   const storedSettings = await getStoredJsonValue<Partial<DashboardSettings>>(
     SETTINGS_STORAGE_KEY,
   );
-  const [ownerFilter, baseUrl, email, apiToken] = await Promise.all([
+  const [displayName, ownerFilter, baseUrl, email, apiToken] = await Promise.all([
+    getStoredDisplayName(),
     getStoredRawValue(GITHUB_OWNER_FILTER_STORAGE_KEY),
     getStoredRawValue(JIRA_BASE_URL_STORAGE_KEY),
     getStoredRawValue(JIRA_EMAIL_STORAGE_KEY),
@@ -36,12 +42,18 @@ export async function getStoredSettings() {
     baseUrl,
     email,
     apiToken,
+    displayName,
   });
 }
 
 export async function saveStoredSettings(settings: DashboardSettings) {
+  const localSettings = {
+    integrations: settings.integrations,
+  };
+
   await Promise.all([
-    setStoredJsonValue(SETTINGS_STORAGE_KEY, settings),
+    saveStoredDisplayName(settings.name),
+    setStoredJsonValue(SETTINGS_STORAGE_KEY, localSettings),
     setStoredRawValue(
       GITHUB_OWNER_FILTER_STORAGE_KEY,
       settings.integrations.github.ownerFilter.trim(),
@@ -61,10 +73,28 @@ export async function saveStoredSettings(settings: DashboardSettings) {
   ]);
 }
 
+export async function getStoredDisplayName() {
+  const storedName = await getStoredAreaJsonValue<string>(
+    DISPLAY_NAME_STORAGE_KEY,
+    { area: DISPLAY_NAME_EXTENSION_STORAGE_AREA },
+  );
+
+  return normalizeDisplayName(storedName);
+}
+
+export async function saveStoredDisplayName(name: string) {
+  await setStoredAreaJsonValue(
+    DISPLAY_NAME_STORAGE_KEY,
+    normalizeDisplayName(name),
+    { area: DISPLAY_NAME_EXTENSION_STORAGE_AREA },
+  );
+}
+
 function mergeSettings(
   settings?: Partial<DashboardSettings>,
   overrides?: Partial<DashboardSettings['integrations']['jira']> & {
     ownerFilter?: string;
+    displayName?: string;
   }
 ): DashboardSettings {
   const defaultSettings = getDefaultSettingsTemplate();
@@ -80,7 +110,7 @@ function mergeSettings(
     : defaultSettings.integrations.github.hiddenRepositories;
 
   return {
-    name: settings?.name?.trim() ?? getDefaultSettings().name,
+    name: normalizeDisplayName(overrides?.displayName),
     integrations: {
       github: {
         username: settings?.integrations?.github?.username ?? defaultSettings.integrations.github.username,
@@ -95,6 +125,10 @@ function mergeSettings(
       }
     }
   };
+}
+
+function normalizeDisplayName(name: unknown) {
+  return typeof name === 'string' ? name.trim().slice(0, 40) : '';
 }
 
 function normalizeBaseUrl(value: string) {
