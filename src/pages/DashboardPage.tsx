@@ -106,6 +106,8 @@ export function DashboardPage({
   const todayFocus = useTodayFocusState({
     jiraIssues: jiraData.issues,
     gitHubPullRequests: gitHubData.pullRequests,
+    isGitHubFocusEnabled:
+      isGitHubLoading || gitHubData.connectionStatus === 'connected',
   });
 
   useEffect(() => {

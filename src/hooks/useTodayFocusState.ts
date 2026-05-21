@@ -7,11 +7,9 @@ import {
 } from '../lib/focusMapping';
 import type { JiraIssue } from '../lib/jiraApi';
 import {
-  getStoredTodayFocusItems,
   getStoredTodayFocusItemsSnapshot,
   MANUAL_FOCUS_TASK_NOTE_MAX_LENGTH,
   MANUAL_FOCUS_TASK_TITLE_MAX_LENGTH,
-  saveStoredTodayFocusItems,
   saveStoredTodayFocusItemsSnapshot,
   subscribeStoredTodayFocusItems,
   type FocusItem,
@@ -28,11 +26,13 @@ const TODAY_FOCUS_DEBUG = false;
 type UseTodayFocusStateOptions = {
   jiraIssues: JiraIssue[];
   gitHubPullRequests: GitHubPullRequestItem[];
+  isGitHubFocusEnabled: boolean;
 };
 
 export function useTodayFocusState({
   jiraIssues,
   gitHubPullRequests,
+  isGitHubFocusEnabled,
 }: UseTodayFocusStateOptions) {
   const [todayFocusItems, setTodayFocusItems] = useState<FocusItem[]>([]);
   const [isSavingTodayFocusItems, setIsSavingTodayFocusItems] = useState(false);
@@ -46,6 +46,10 @@ export function useTodayFocusState({
   const todayFocusItemsRef = useRef<FocusItem[]>([]);
   const todayFocusStorageVersionRef = useRef(0);
   const todayFocusItemIds = collectTodayFocusItemIds(todayFocusItems);
+  const gitHubUnavailableWarning =
+    !isGitHubFocusEnabled && hasGitHubTodayFocusItems(todayFocusItems)
+      ? 'GitHub is unavailable. PR status may be stale.'
+      : null;
 
   useEffect(() => {
     todayFocusItemsRef.current = todayFocusItems;
@@ -71,9 +75,6 @@ export function useTodayFocusState({
       setTodayFocusItems(nextItems);
       hasLoadedTodayFocusItemsRef.current = true;
       setHasLoadedTodayFocusItems(true);
-      if (storedSnapshot === null) {
-        void saveStoredTodayFocusItems(nextItems);
-      }
     });
 
     return () => {
@@ -243,6 +244,10 @@ export function useTodayFocusState({
 
   function handleAddTodayFocusItem(item: FocusItem) {
     setTodayFocusWarning(null);
+    if (item.source === 'github' && !isGitHubFocusEnabled) {
+      setTodayFocusWarning('Reconnect GitHub before adding PRs to Today focus.');
+      return;
+    }
 
     const addResult = addTodayFocusItem(
       todayFocusItemsRef.current,
@@ -321,6 +326,10 @@ export function useTodayFocusState({
     item: FocusPullRequestItem,
   ) {
     setTodayFocusWarning(null);
+    if (!isGitHubFocusEnabled) {
+      setTodayFocusWarning('Reconnect GitHub before adding PRs to Today focus.');
+      return;
+    }
 
     const nextState = nestNewPullRequestUnderJira(
       todayFocusItemsRef.current,
@@ -387,7 +396,7 @@ export function useTodayFocusState({
     todayFocusItems,
     todayFocusItemsRef,
     todayFocusItemIds,
-    todayFocusWarning,
+    todayFocusWarning: todayFocusWarning ?? gitHubUnavailableWarning,
     hasLoadedTodayFocusItems,
     commitTodayFocusItems,
     handleAddTodayFocusItem,
@@ -417,6 +426,14 @@ function collectTodayFocusItemIds(items: FocusItem[]) {
   }
 
   return itemIds;
+}
+
+function hasGitHubTodayFocusItems(items: FocusItem[]) {
+  return items.some(
+    (item) =>
+      item.source === 'github' ||
+      (item.source === 'jira' && item.children.length > 0),
+  );
 }
 
 function addTodayFocusItem(

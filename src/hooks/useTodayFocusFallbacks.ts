@@ -43,6 +43,7 @@ export function useTodayFocusFallbacks({
 
     void runFocusedGitHubFallback();
   }, [
+    gitHubData.connectionStatus,
     gitHubData.lastUpdatedAt,
     gitHubData.pullRequests,
     gitHubData.recentPullRequests,
@@ -141,7 +142,11 @@ export function useTodayFocusFallbacks({
 
   async function runFocusedGitHubFallback() {
     const token = settings.integrations.github.token.trim();
-    if (!token || isFocusedGitHubFallbackInFlightRef.current) {
+    if (
+      !token ||
+      gitHubData.connectionStatus !== 'connected' ||
+      isFocusedGitHubFallbackInFlightRef.current
+    ) {
       return;
     }
 
