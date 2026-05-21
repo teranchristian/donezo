@@ -668,18 +668,22 @@ async function fetchGitHubGraphQLResponse(query, variables, token, meta = {}) {
 async function testGitHubConnection(token) {
   const trimmedToken = normalizeGitHubToken(token);
   if (!trimmedToken) {
-    return 'not-connected';
+    return { status: 'not-connected', username: '' };
   }
 
   try {
-    await fetchGitHub('https://api.github.com/user', trimmedToken);
-    return 'connected';
+    const response = await fetchGitHub('https://api.github.com/user', trimmedToken);
+    const user = await response.json();
+    return {
+      status: 'connected',
+      username: normalizeGitHubUsername(user?.login)
+    };
   } catch (error) {
     if (error instanceof GitHubApiError && error.status === 401) {
-      return 'invalid';
+      return { status: 'invalid', username: '' };
     }
 
-    return 'error';
+    return { status: 'error', username: '' };
   }
 }
 
@@ -1820,8 +1824,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.type === 'TEST_GITHUB_CONNECTION') {
       try {
-        const status = await testGitHubConnection(payload.token);
-        sendResponse({ success: true, status });
+        const result = await testGitHubConnection(payload.token);
+        sendResponse({ success: true, ...result });
       } catch (error) {
         sendResponse({
           success: false,

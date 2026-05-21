@@ -6,6 +6,7 @@ import {
   getLatestGitHubDashboardData,
   loadGitHubDashboardData,
   testGitHubConnection,
+  type GitHubConnectionTestResult,
   type GitHubConnectionStatus,
   type GitHubDashboardData
 } from '../lib/githubApi';
@@ -317,20 +318,20 @@ export function useGitHubDashboard({
     };
   }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
 
-  const testConnectionStatus = useCallback(async (token: string) => {
+  const testConnectionStatus = useCallback(async (token: string): Promise<GitHubConnectionTestResult> => {
     setIsTestingGitHubSettings(true);
     setGitHubSettingsTestStatus('testing');
 
-    const status = await testGitHubConnection(token);
+    const result = await testGitHubConnection(token);
 
-    setGitHubSettingsTestStatus(status);
-    if (status !== 'connected' && isMountedRef.current) {
+    setGitHubSettingsTestStatus(result.status);
+    if (result.status !== 'connected' && isMountedRef.current) {
       setGitHubOwnerOptions([]);
     }
 
     setIsTestingGitHubSettings(false);
-    return status;
-  }, [settings.username]);
+    return result;
+  }, []);
 
   const refresh = useCallback(async () => {
     if (gitHubMockScenario) {

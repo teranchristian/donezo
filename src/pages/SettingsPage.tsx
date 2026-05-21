@@ -2,7 +2,10 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { CardShell } from '../components/CardShell';
 import { InfoBanner } from '../components/InfoBanner';
-import { GitHubConnectionStatus } from '../lib/githubApi';
+import {
+  GitHubConnectionStatus,
+  type GitHubConnectionTestResult
+} from '../lib/githubApi';
 import { JiraConnectionStatus } from '../lib/jiraApi';
 import { DashboardSettings } from '../lib/storage';
 
@@ -19,7 +22,7 @@ type SettingsPageProps = {
   isGitHubDevModeAvailable: boolean;
   isGitHubDevModeEnabled: boolean;
   onSetGitHubDevMode: (isEnabled: boolean) => Promise<void>;
-  onTestGitHubConnection: (token: string) => Promise<GitHubConnectionStatus>;
+  onTestGitHubConnection: (token: string) => Promise<GitHubConnectionTestResult>;
   onTestJiraConnection: (
     baseUrl: string,
     email: string,
@@ -45,7 +48,7 @@ function getGitHubConnectionStatusMessage(
   token: string,
 ) {
   if (status === 'not-connected' && token.trim()) {
-    return 'Token saved. Test the connection to verify access.';
+    return 'Test the connection to detect your GitHub account.';
   }
 
   return TEST_STATUS_COPY[status];
@@ -198,7 +201,28 @@ export function SettingsPage({
 
   async function handleTestConnection() {
     setSaveMessage('');
-    await onTestGitHubConnection(draft.integrations.github.token);
+    const result = await onTestGitHubConnection(draft.integrations.github.token);
+
+    if (result.status !== 'connected' || !result.username) {
+      return;
+    }
+
+    if (result.username === draft.integrations.github.username.trim()) {
+      setSaveMessage(`Connected as ${result.username}.`);
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      integrations: {
+        ...current.integrations,
+        github: {
+          ...current.integrations.github,
+          username: result.username
+        }
+      }
+    }));
+    setSaveMessage(`Connected as ${result.username}. Save settings to use it on the dashboard.`);
   }
 
   async function handleTestJira() {
@@ -251,9 +275,15 @@ export function SettingsPage({
     isLoading: isLoadingGitHubOwnerOptions
   });
   const hasGitHubToken = Boolean(draft.integrations.github.token.trim());
-  const shouldShowOwnerFilter = hasGitHubToken;
+  const detectedGitHubUsername = draft.integrations.github.username.trim();
+  const hasDetectedGitHubAccount = Boolean(detectedGitHubUsername);
+  const shouldShowOwnerFilter = hasGitHubToken && hasDetectedGitHubAccount;
+  const shouldRequireGitHubConnectionTest = hasGitHubToken && !hasDetectedGitHubAccount;
+  const displayedGitHubTestStatus = shouldRequireGitHubConnectionTest
+    ? 'not-connected'
+    : gitHubTestStatus;
   const gitHubConnectionStatusMessage = getGitHubConnectionStatusMessage(
-    gitHubTestStatus,
+    displayedGitHubTestStatus,
     draft.integrations.github.token,
   );
   const hiddenRepositories = draft.integrations.github.hiddenRepositories;
@@ -354,7 +384,7 @@ export function SettingsPage({
               <p className="text-[0.7rem] uppercase tracking-[0.28em] text-textSoft">Integrations</p>
               <h2 className="mt-2 text-xl font-medium text-stone-100">GitHub</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-400">
-                Save your GitHub username and personal access token, then verify the token against the GitHub API.
+                Save your GitHub personal access token, then verify the token against the GitHub API.
               </p>
             </div>
 
@@ -386,29 +416,6 @@ export function SettingsPage({
               </InfoBanner>
 
               <label className="block">
-                <span className="mb-2 block text-sm text-stone-300">GitHub username</span>
-                <input
-                  value={draft.integrations.github.username}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      integrations: {
-                        ...current.integrations,
-                        github: {
-                          ...current.integrations.github,
-                          username: event.target.value
-                        }
-                      }
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-500 focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
-                  placeholder="octocat"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </label>
-
-              <label className="block">
                 <span className="mb-2 block text-sm text-stone-300">GitHub personal access token</span>
                 <input
                   type="password"
@@ -420,7 +427,15 @@ export function SettingsPage({
                         ...current.integrations,
                         github: {
                           ...current.integrations.github,
-                          token: event.target.value
+                          token: event.target.value,
+                          username:
+                            event.target.value.trim() === settings.integrations.github.token.trim()
+                              ? settings.integrations.github.username
+                              : '',
+                          ownerFilter:
+                            event.target.value.trim() === settings.integrations.github.token.trim()
+                              ? current.integrations.github.ownerFilter
+                              : ''
                         }
                       }
                     }))
@@ -431,6 +446,16 @@ export function SettingsPage({
                   spellCheck={false}
                 />
               </label>
+
+              {hasDetectedGitHubAccount ? (
+                <div className="rounded-2xl border border-emerald-300/15 bg-emerald-300/8 px-4 py-3 text-sm text-emerald-100/90">
+                  Connected as <span className="font-medium">{detectedGitHubUsername}</span>
+                </div>
+              ) : hasGitHubToken ? (
+                <div className="rounded-2xl border border-white/5 bg-panelAlt/70 px-4 py-3 text-sm text-stone-300">
+                  Test the token to detect the GitHub account.
+                </div>
+              ) : null}
 
               {shouldShowOwnerFilter ? (
                 <label className="block">
@@ -481,7 +506,7 @@ export function SettingsPage({
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || shouldRequireGitHubConnectionTest}
                   className="rounded-2xl bg-accent px-4 py-3 text-sm font-medium text-stone-950 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isSaving ? 'Saving...' : 'Save settings'}

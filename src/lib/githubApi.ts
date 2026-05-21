@@ -1,6 +1,10 @@
 import { getStoredJsonValue } from './storage/backend';
 
 export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
+export type GitHubConnectionTestResult = {
+  status: GitHubConnectionStatus;
+  username: string;
+};
 export type GitHubPullRequestState = 'open' | 'merged' | 'closed' | 'not-found';
 
 export type GitHubNotification = {
@@ -103,6 +107,7 @@ type GitHubDashboardResponse = {
 type GitHubConnectionResponse = {
   success: boolean;
   status?: GitHubConnectionStatus;
+  username?: string;
   error?: string;
 };
 
@@ -201,14 +206,14 @@ function normalizeGitHubDashboardData(
   };
 }
 
-export async function testGitHubConnection(token: string): Promise<GitHubConnectionStatus> {
+export async function testGitHubConnection(token: string): Promise<GitHubConnectionTestResult> {
   const trimmedToken = token.trim();
   if (!trimmedToken) {
-    return 'not-connected';
+    return { status: 'not-connected', username: '' };
   }
 
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
-    return 'error';
+    return { status: 'error', username: '' };
   }
 
   try {
@@ -219,9 +224,12 @@ export async function testGitHubConnection(token: string): Promise<GitHubConnect
       }
     });
 
-    return response?.status ?? 'error';
+    return {
+      status: response?.status ?? 'error',
+      username: response?.username?.trim() ?? ''
+    };
   } catch {
-    return 'error';
+    return { status: 'error', username: '' };
   }
 }
 
