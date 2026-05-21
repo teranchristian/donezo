@@ -16,6 +16,7 @@ type DashboardHeaderControlsProps = {
   isGitHubLoading: boolean;
   isJiraLoading: boolean;
   isCheckingGitHubActivity: boolean;
+  gitHubRefreshWarning: string | null;
   lastGitHubUpdatedAt: number | null;
   lastJiraUpdatedAt: number | null;
   isGitHubMockMode: boolean;
@@ -41,6 +42,7 @@ export function DashboardHeaderControls({
   isGitHubLoading,
   isJiraLoading,
   isCheckingGitHubActivity,
+  gitHubRefreshWarning,
   lastGitHubUpdatedAt,
   lastJiraUpdatedAt,
   isGitHubMockMode,
@@ -72,6 +74,11 @@ export function DashboardHeaderControls({
         onOpenJira={onOpenJira}
       />
       {repoLauncherControl}
+      {gitHubRefreshWarning ? (
+        <p className="dashboard-refresh-warning" role="status">
+          {gitHubRefreshWarning}
+        </p>
+      ) : null}
       <HeaderMenu
         activeIntegration={activeIntegration}
         gitHubConnectionStatus={gitHubConnectionStatus}

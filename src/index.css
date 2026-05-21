@@ -118,9 +118,24 @@ body {
 
 .dashboard-header-status {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   min-width: 0;
+}
+
+.dashboard-refresh-warning {
+  max-width: min(360px, 100%);
+  margin: 0;
+  border: 1px solid rgba(251, 191, 36, 0.16);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.075);
+  padding: 8px 12px;
+  color: rgb(253, 230, 138);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .header-menu-panel {
@@ -330,6 +345,11 @@ body {
 
   .dashboard-header-status {
     justify-content: flex-start;
+  }
+
+  .dashboard-refresh-warning {
+    border-radius: 14px;
+    text-align: left;
   }
 
   .summary-cards-grid {

@@ -40,6 +40,7 @@ type DashboardPageProps = {
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
+  gitHubRefreshWarning: string | null;
   onClearGitHubMockScenario: () => void;
   onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onRefreshGitHub: () => void;
@@ -75,6 +76,7 @@ export function DashboardPage({
   isGitHubLoading,
   isCheckingGitHubActivity,
   lastGitHubActivityCheckAt,
+  gitHubRefreshWarning,
   onClearGitHubMockScenario,
   onApplyGitHubMockScenario,
   onRefreshGitHub,
@@ -208,6 +210,7 @@ export function DashboardPage({
             isGitHubLoading={isGitHubLoading}
             isJiraLoading={isJiraLoading}
             isCheckingGitHubActivity={isCheckingGitHubActivity}
+            gitHubRefreshWarning={gitHubRefreshWarning}
             lastGitHubUpdatedAt={gitHubData.lastUpdatedAt}
             lastJiraUpdatedAt={jiraData.lastUpdatedAt}
             isGitHubMockMode={isGitHubMockMode}

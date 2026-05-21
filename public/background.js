@@ -7,6 +7,7 @@ const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
 const GITHUB_NOTIFICATION_SIGNALS_CACHE_KEY = 'github-notification-signals';
 const GITHUB_PULL_REQUEST_SIGNALS_CACHE_KEY = 'github-pull-request-signals';
 const GITHUB_REPO_INDEX_CACHE_KEY = 'github-repo-index-cache';
+const GITHUB_REFRESH_STATUS_STORAGE_KEY = 'github-refresh-status';
 const GITHUB_CACHE_TTL_MS = 5 * 60 * 1000;
 const GITHUB_REPO_INDEX_CACHE_TTL_MS = 30 * 60 * 1000;
 const GITHUB_NOTIFICATIONS_WINDOW_DAYS = 7;
@@ -341,6 +342,24 @@ async function saveCachedGitHubRepoIndex(cacheToken, data) {
   });
 }
 
+async function saveGitHubRefreshStatus(cacheToken, status) {
+  const result = await chrome.storage.local.get(GITHUB_REFRESH_STATUS_STORAGE_KEY);
+  const previous = result[GITHUB_REFRESH_STATUS_STORAGE_KEY];
+  const previousFailureCount =
+    previous?.cacheToken === cacheToken && previous?.status === 'error'
+      ? Number(previous.failureCount ?? 0)
+      : 0;
+
+  await chrome.storage.local.set({
+    [GITHUB_REFRESH_STATUS_STORAGE_KEY]: {
+      cacheToken,
+      status,
+      updatedAt: Date.now(),
+      failureCount: status === 'error' ? previousFailureCount + 1 : 0
+    }
+  });
+}
+
 function getPullRequestNotificationSignals(notifications) {
   return notifications
     .filter((notification) => notification.subject?.type === 'PullRequest')
@@ -405,7 +424,8 @@ async function refreshGitHubDashboardFromStoredSettings(source = 'stored-setting
     return;
   }
 
-  await loadGitHubDashboardData({
+  const cacheToken = createGitHubCacheToken(username, token, ownerFilter);
+  const data = await loadGitHubDashboardData({
     username,
     token,
     ownerFilter,
@@ -413,6 +433,10 @@ async function refreshGitHubDashboardFromStoredSettings(source = 'stored-setting
     requestId,
     source
   });
+  await saveGitHubRefreshStatus(
+    cacheToken,
+    data.connectionStatus === 'error' ? 'error' : 'success'
+  );
 }
 
 async function refreshJiraDashboardFromStoredSettings() {

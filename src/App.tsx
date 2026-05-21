@@ -80,6 +80,7 @@ export default function App() {
         isGitHubLoading={gitHubDashboard.isGitHubLoading}
         isCheckingGitHubActivity={gitHubDashboard.isCheckingGitHubActivity}
         lastGitHubActivityCheckAt={gitHubDashboard.lastGitHubActivityCheckAt}
+        gitHubRefreshWarning={gitHubDashboard.gitHubRefreshWarning}
         onClearGitHubMockScenario={() => void gitHubMockMode.clearMockScenario()}
         onApplyGitHubMockScenario={(mockScenarioKey) => void gitHubMockMode.applyMockScenario(mockScenarioKey)}
         onRefreshGitHub={() => void gitHubDashboard.refresh()}
