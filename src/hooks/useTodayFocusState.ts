@@ -42,6 +42,7 @@ export function useTodayFocusState({
     null,
   );
   const hasLoadedTodayFocusItemsRef = useRef(false);
+  const hasSeenStoredTodayFocusSnapshotRef = useRef(false);
   const pendingTodayFocusSaveCountRef = useRef(0);
   const todayFocusItemsRef = useRef<FocusItem[]>([]);
   const todayFocusStorageVersionRef = useRef(0);
@@ -70,6 +71,7 @@ export function useTodayFocusState({
         nextCount: nextItems.length,
         nextItems,
       });
+      hasSeenStoredTodayFocusSnapshotRef.current = storedSnapshot !== null;
       todayFocusItemsRef.current = nextItems;
       todayFocusStorageVersionRef.current = storedSnapshot?.version ?? 0;
       setTodayFocusItems(nextItems);
@@ -108,6 +110,7 @@ export function useTodayFocusState({
             nextCount: nextItems.length,
             nextItems,
           });
+          hasSeenStoredTodayFocusSnapshotRef.current = true;
           todayFocusItemsRef.current = nextItems;
           todayFocusStorageVersionRef.current = nextVersion;
           setTodayFocusItems(nextItems);
@@ -220,6 +223,17 @@ export function useTodayFocusState({
     setTodayFocusItems(nextItems);
 
     if (reason === 'sync') {
+      return;
+    }
+
+    if (
+      nextItems.length === 0 &&
+      !hasSeenStoredTodayFocusSnapshotRef.current &&
+      todayFocusStorageVersionRef.current === 0
+    ) {
+      logTodayFocusDebug('skip-empty-save-before-storage-hydration', {
+        nextItems,
+      });
       return;
     }
 

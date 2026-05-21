@@ -19,7 +19,7 @@ type UseTodayFocusFallbacksOptions = {
   jiraRefreshSignal: TodayFocusRefreshSignal;
   hasLoadedTodayFocusItems: boolean;
   todayFocusItemsRef: React.MutableRefObject<FocusItem[]>;
-  commitTodayFocusItems: (nextItems: FocusItem[]) => void;
+  commitTodayFocusItems: (nextItems: FocusItem[], reason?: 'user' | 'sync') => void;
 };
 
 export function useTodayFocusFallbacks({
@@ -133,7 +133,7 @@ export function useTodayFocusFallbacks({
         fallbackIssues,
       );
       if (fallbackSyncResult.items !== todayFocusItemsRef.current) {
-        commitTodayFocusItems(fallbackSyncResult.items);
+        commitTodayFocusItems(fallbackSyncResult.items, 'sync');
       }
     } finally {
       isFocusedJiraFallbackInFlightRef.current = false;
@@ -184,7 +184,7 @@ export function useTodayFocusFallbacks({
         pullRequestStates,
       );
       if (nextItems !== todayFocusItemsRef.current) {
-        commitTodayFocusItems(nextItems);
+        commitTodayFocusItems(nextItems, 'sync');
       }
     } finally {
       isFocusedGitHubFallbackInFlightRef.current = false;
