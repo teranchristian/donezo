@@ -9,6 +9,7 @@ import {
 import { subscribeStoredValues } from '../lib/storage/backend';
 import {
   DISPLAY_NAME_STORAGE_KEY,
+  GITHUB_OWNER_FILTER_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
 } from '../lib/storage/keys';
 
@@ -49,11 +50,19 @@ export function useDashboardSettings() {
       },
       { area: 'sync' },
     );
+    const unsubscribeOwnerFilter = subscribeStoredValues(
+      [GITHUB_OWNER_FILTER_STORAGE_KEY],
+      () => {
+        void loadStoredSettings(() => isMounted);
+      },
+      { area: 'sync' },
+    );
 
     return () => {
       isMounted = false;
       unsubscribeSettings();
       unsubscribeDisplayName();
+      unsubscribeOwnerFilter();
     };
   }, [loadStoredSettings]);
 

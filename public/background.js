@@ -922,8 +922,17 @@ function getRecentOpenPullRequestsSinceIso() {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 }
 
-function buildRecentOpenPullRequestsQuery(ownerFilter) {
+function buildRecentOpenPullRequestsQuery(ownerFilter, username) {
   const since = getRecentOpenPullRequestsSinceIso();
+  const normalizedOwnerFilter = normalizeGitHubOwnerFilter(ownerFilter);
+  const normalizedUsername = normalizeGitHubUsername(username);
+
+  if (!normalizedOwnerFilter || normalizedOwnerFilter === 'all') {
+    return normalizedUsername
+      ? `is:pr is:open draft:false created:>=${since} involves:${normalizedUsername}`
+      : `is:pr is:open draft:false created:>=${since}`;
+  }
+
   return buildOwnerScopedQuery(
     `is:pr is:open draft:false created:>=${since}`,
     ownerFilter,
@@ -949,7 +958,10 @@ async function getDashboardPullRequests(username, token, ownerFilter) {
     ownerFilter,
     username
   });
-  const recentOpenQuery = buildRecentOpenPullRequestsQuery(ownerFilter);
+  const recentOpenQuery = buildRecentOpenPullRequestsQuery(
+    ownerFilter,
+    username,
+  );
   const data = await fetchGitHubGraphQL(
     GITHUB_PULL_REQUESTS_QUERY,
     {

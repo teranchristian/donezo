@@ -9,6 +9,7 @@ import { useFaviconState } from './hooks/useFaviconState';
 import { useGitHubDashboard } from './hooks/useGitHubDashboard';
 import { useGitHubMockMode } from './hooks/useGitHubMockMode';
 import { useJiraDashboard } from './hooks/useJiraDashboard';
+import { useStoredTodayFocusStatus } from './hooks/useStoredTodayFocusStatus';
 
 const DEFAULT_GITHUB_SUMMARY_METRICS: GitHubSummaryMetrics = {
   connectionStatus: 'not-connected',
@@ -45,6 +46,7 @@ export default function App() {
     settings: settings.integrations.jira,
     isLoadingSettings
   });
+  const todayFocusStatus = useStoredTodayFocusStatus();
   const [shouldShowDelayedDashboardLoader, setShouldShowDelayedDashboardLoader] =
     useState(false);
 
@@ -116,6 +118,7 @@ export default function App() {
             <SettingsPage
               settings={settings}
               gitHubOwnerOptions={gitHubDashboard.gitHubOwnerOptions}
+              hasTodayFocusItems={todayFocusStatus.hasStoredTodayFocusItems}
               onLoadGitHubOwnerOptions={gitHubDashboard.loadOwnerOptions}
               onSaveDisplayName={saveDisplayName}
               onSave={saveSettings}

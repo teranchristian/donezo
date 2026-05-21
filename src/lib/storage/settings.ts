@@ -24,6 +24,7 @@ import type { DashboardSettings, GitHubListOrganizationFilter } from './types';
 export { getDefaultSettings } from './defaults';
 
 const DISPLAY_NAME_EXTENSION_STORAGE_AREA = 'sync';
+const GITHUB_OWNER_FILTER_EXTENSION_STORAGE_AREA = 'sync';
 
 export async function getStoredSettings() {
   const storedSettings = await getStoredJsonValue<Partial<DashboardSettings>>(
@@ -31,7 +32,7 @@ export async function getStoredSettings() {
   );
   const [displayName, ownerFilter, baseUrl, email, apiToken] = await Promise.all([
     getStoredDisplayName(),
-    getStoredRawValue(GITHUB_OWNER_FILTER_STORAGE_KEY),
+    getStoredGitHubOwnerFilter(),
     getStoredRawValue(JIRA_BASE_URL_STORAGE_KEY),
     getStoredRawValue(JIRA_EMAIL_STORAGE_KEY),
     getStoredRawValue(JIRA_API_TOKEN_STORAGE_KEY),
@@ -48,16 +49,19 @@ export async function getStoredSettings() {
 
 export async function saveStoredSettings(settings: DashboardSettings) {
   const localSettings = {
-    integrations: settings.integrations,
+    integrations: {
+      ...settings.integrations,
+      github: {
+        ...settings.integrations.github,
+        ownerFilter: '',
+      },
+    },
   };
 
   await Promise.all([
     saveStoredDisplayName(settings.name),
+    saveStoredGitHubOwnerFilter(settings.integrations.github.ownerFilter),
     setStoredJsonValue(SETTINGS_STORAGE_KEY, localSettings),
-    setStoredRawValue(
-      GITHUB_OWNER_FILTER_STORAGE_KEY,
-      settings.integrations.github.ownerFilter.trim(),
-    ),
     setStoredRawValue(
       JIRA_BASE_URL_STORAGE_KEY,
       normalizeBaseUrl(settings.integrations.jira.baseUrl),
@@ -90,6 +94,25 @@ export async function saveStoredDisplayName(name: string) {
   );
 }
 
+export async function getStoredGitHubOwnerFilter() {
+  const storedOwnerFilter = await getStoredAreaJsonValue<string>(
+    GITHUB_OWNER_FILTER_STORAGE_KEY,
+    { area: GITHUB_OWNER_FILTER_EXTENSION_STORAGE_AREA },
+  );
+
+  return mergeGitHubOwnerFilter(storedOwnerFilter ?? undefined);
+}
+
+export async function saveStoredGitHubOwnerFilter(ownerFilter: string) {
+  const normalizedOwnerFilter = mergeGitHubOwnerFilter(ownerFilter);
+
+  await setStoredAreaJsonValue(
+    GITHUB_OWNER_FILTER_STORAGE_KEY,
+    normalizedOwnerFilter,
+    { area: GITHUB_OWNER_FILTER_EXTENSION_STORAGE_AREA },
+  );
+}
+
 function mergeSettings(
   settings?: Partial<DashboardSettings>,
   overrides?: Partial<DashboardSettings['integrations']['jira']> & {
@@ -102,7 +125,7 @@ function mergeSettings(
   const jiraEmail = overrides?.email ?? settings?.integrations?.jira?.email ?? defaultSettings.integrations.jira.email;
   const jiraApiToken =
     overrides?.apiToken ?? settings?.integrations?.jira?.apiToken ?? defaultSettings.integrations.jira.apiToken;
-  const gitHubOwnerFilter = mergeGitHubOwnerFilter(settings?.integrations?.github?.ownerFilter ?? overrides?.ownerFilter);
+  const gitHubOwnerFilter = mergeGitHubOwnerFilter(overrides?.ownerFilter);
   const hiddenRepositories = Array.isArray(settings?.integrations?.github?.hiddenRepositories)
     ? settings.integrations.github.hiddenRepositories
         .map((repository) => normalizeHiddenRepository(repository))

@@ -9,6 +9,7 @@ import { DashboardSettings } from '../lib/storage';
 type SettingsPageProps = {
   settings: DashboardSettings;
   gitHubOwnerOptions: string[];
+  hasTodayFocusItems: boolean;
   onLoadGitHubOwnerOptions: (options: {
     token: string;
     username?: string;
@@ -39,6 +40,17 @@ const TEST_STATUS_COPY: Record<GitHubConnectionStatus, string> = {
   error: 'GitHub could not be reached or returned an unexpected response.'
 };
 
+function getGitHubConnectionStatusMessage(
+  status: GitHubConnectionStatus,
+  token: string,
+) {
+  if (status === 'not-connected' && token.trim()) {
+    return 'Token saved. Test the connection to verify access.';
+  }
+
+  return TEST_STATUS_COPY[status];
+}
+
 const JIRA_TEST_STATUS_COPY: Record<JiraConnectionStatus, string> = {
   'not-connected': 'Complete the Jira URL, email, and API token first.',
   testing: 'Testing Jira connection...',
@@ -50,6 +62,7 @@ const JIRA_TEST_STATUS_COPY: Record<JiraConnectionStatus, string> = {
 export function SettingsPage({
   settings,
   gitHubOwnerOptions,
+  hasTodayFocusItems,
   onLoadGitHubOwnerOptions,
   onSaveDisplayName,
   onSave,
@@ -74,9 +87,6 @@ export function SettingsPage({
   const [isLoadingGitHubOwnerOptions, setIsLoadingGitHubOwnerOptions] = useState(false);
   const isLoadingGitHubOwnerOptionsRef = useRef(false);
   const previousSettingsRef = useRef(settings);
-  const [lastSuccessfulGitHubTestToken, setLastSuccessfulGitHubTestToken] = useState(
-    gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
-  );
 
   useEffect(() => {
     const previousSettings = previousSettingsRef.current;
@@ -134,12 +144,6 @@ export function SettingsPage({
   }, [displayNameSaveState, draft.name, settings.name]);
 
   useEffect(() => {
-    setLastSuccessfulGitHubTestToken(
-      gitHubTestStatus === 'connected' ? settings.integrations.github.token.trim() : ''
-    );
-  }, [gitHubTestStatus, settings.integrations.github.token]);
-
-  useEffect(() => {
     const hash = location.hash.replace(/^#/, '').trim();
     if (!hash) {
       return;
@@ -189,8 +193,7 @@ export function SettingsPage({
 
   async function handleTestConnection() {
     setSaveMessage('');
-    const status = await onTestGitHubConnection(draft.integrations.github.token);
-    setLastSuccessfulGitHubTestToken(status === 'connected' ? draft.integrations.github.token.trim() : '');
+    await onTestGitHubConnection(draft.integrations.github.token);
   }
 
   async function handleTestJira() {
@@ -238,10 +241,18 @@ export function SettingsPage({
     username: draft.integrations.github.username,
     isLoading: isLoadingGitHubOwnerOptions
   });
-  const hasValidatedCurrentGitHubToken =
-    gitHubTestStatus === 'connected' && draft.integrations.github.token.trim() === lastSuccessfulGitHubTestToken;
-  const shouldShowOwnerFilter = hasValidatedCurrentGitHubToken;
+  const hasGitHubToken = Boolean(draft.integrations.github.token.trim());
+  const shouldShowOwnerFilter = hasGitHubToken;
+  const gitHubConnectionStatusMessage = getGitHubConnectionStatusMessage(
+    gitHubTestStatus,
+    draft.integrations.github.token,
+  );
   const hiddenRepositories = draft.integrations.github.hiddenRepositories;
+  const shouldWarnAboutOwnerFilterChange = shouldShowTodayFocusOwnerFilterWarning({
+    hasTodayFocusItems,
+    nextOwnerFilter: draft.integrations.github.ownerFilter,
+    savedOwnerFilter: settings.integrations.github.ownerFilter,
+  });
 
   async function handleLoadGitHubOwnerOptions() {
     if (isLoadingGitHubOwnerOptionsRef.current) {
@@ -447,6 +458,11 @@ export function SettingsPage({
                   <p className="mt-2 text-sm leading-6 text-stone-400">
                     Loads from GitHub when you open the dropdown. Leave it on All to keep your combined view.
                   </p>
+                  {shouldWarnAboutOwnerFilterChange ? (
+                    <p className="mt-2 rounded-2xl border border-amber-300/15 bg-amber-300/8 px-3 py-2 text-sm leading-6 text-amber-100/86">
+                      Changing to a specific owner can hide pull requests that are already in Today focus if they belong to another owner.
+                    </p>
+                  ) : null}
                 </label>
               ) : null}
 
@@ -470,7 +486,7 @@ export function SettingsPage({
               </div>
 
               <div className="rounded-2xl border border-white/5 bg-panelAlt/70 px-4 py-3 text-sm text-stone-300">
-                <p>{TEST_STATUS_COPY[gitHubTestStatus]}</p>
+                <p>{gitHubConnectionStatusMessage}</p>
                 {saveMessage ? <p className="mt-2 text-stone-400">{saveMessage}</p> : null}
               </div>
 
@@ -712,6 +728,31 @@ function getGitHubOwnerOptions({
   }
 
   return options;
+}
+
+function shouldShowTodayFocusOwnerFilterWarning({
+  hasTodayFocusItems,
+  nextOwnerFilter,
+  savedOwnerFilter,
+}: {
+  hasTodayFocusItems: boolean;
+  nextOwnerFilter: string;
+  savedOwnerFilter: string;
+}) {
+  const normalizedNextOwnerFilter = normalizeOwnerFilter(nextOwnerFilter);
+  const normalizedSavedOwnerFilter = normalizeOwnerFilter(savedOwnerFilter);
+
+  return (
+    hasTodayFocusItems &&
+    normalizedNextOwnerFilter !== 'all' &&
+    normalizedNextOwnerFilter !== normalizedSavedOwnerFilter
+  );
+}
+
+function normalizeOwnerFilter(ownerFilter: string) {
+  const trimmedOwnerFilter = ownerFilter.trim();
+
+  return trimmedOwnerFilter ? trimmedOwnerFilter : 'all';
 }
 
 function areSettingsIntegrationsEqual(
