@@ -82,6 +82,7 @@ export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-prior
 
 export type GitHubPrWarningStateEntry = {
   activeCaseKeys: string[];
+  highlightedCaseKeys: string[];
   highlighted: boolean;
   updatedAt: number;
 };

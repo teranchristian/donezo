@@ -268,6 +268,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       warningState: {
         [getStateKey('acme/platform-web', 1533)]: {
           activeCaseKeys: ['has-conflicts'],
+          highlightedCaseKeys: [],
           highlighted: false,
           updatedAt: Date.now() - 10_000
         }
@@ -511,6 +512,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       warningState: {
         [getStateKey('acme/platform-web', 1533)]: {
           activeCaseKeys: [],
+          highlightedCaseKeys: [],
           highlighted: false,
           updatedAt: Date.now() - 10_000
         }
@@ -563,6 +565,7 @@ function createWarningScenario(
     warningState: {
       [getStateKey('acme/platform-web', 1533)]: {
         activeCaseKeys: [],
+        highlightedCaseKeys: [],
         highlighted: false,
         updatedAt: Date.now() - 10_000
       }

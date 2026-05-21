@@ -9,6 +9,8 @@ import {
   getGitHubPullRequestAttentionStateKey,
   getGitHubPullRequestWarningStateKey,
   isGitHubPrReadyHighlighted,
+  isGitHubPrWarningCaseHighlighted,
+  isGitHubPrWarningHighlighted,
   isPullRequestOutOfDate,
   isPullRequestReadyToMerge,
 } from './githubDomain';
@@ -360,8 +362,10 @@ export function calculateGitHubSummaryCounts(options: {
   const failedBuildBadgeCount = resolvedPullRequests.filter(
     (pullRequest) =>
       pullRequest.ciStatus === 'failing' &&
-      Boolean(
-        warningState[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted,
+      isGitHubPrWarningCaseHighlighted(
+        warningState,
+        pullRequest,
+        'failed-checks',
       ),
   ).length;
   const highlightedCommentCount = myOpenPullRequests.reduce(
@@ -375,13 +379,15 @@ export function calculateGitHubSummaryCounts(options: {
   const highlightedWarningCount = resolvedPullRequests.filter((pullRequest) => {
     const warningEntry =
       warningState[getGitHubPullRequestWarningStateKey(pullRequest)];
-    if (!warningEntry?.highlighted) {
+    if (!isGitHubPrWarningHighlighted(warningState, pullRequest)) {
       return false;
     }
 
-    return warningEntry.activeCaseKeys.some(
-      (caseKey) => caseKey !== 'failed-checks',
-    );
+    const highlightedCaseKeys =
+      warningEntry?.highlightedCaseKeys ??
+      (warningEntry?.highlighted ? warningEntry.activeCaseKeys : []);
+
+    return highlightedCaseKeys.some((caseKey) => caseKey !== 'failed-checks');
   }).length;
   const approvedPrCount = ownerFilteredMyOpenPullRequests.filter(
     (pullRequest) =>
@@ -555,7 +561,11 @@ export function areGitHubPrWarningStatesEqual(
     const leftEntry = left[key];
     const rightEntry = right[key];
 
-    if (!rightEntry || leftEntry.highlighted !== rightEntry.highlighted) {
+    if (
+      !rightEntry ||
+      leftEntry.highlighted !== rightEntry.highlighted ||
+      !arraysEqual(leftEntry.highlightedCaseKeys, rightEntry.highlightedCaseKeys)
+    ) {
       return false;
     }
 
@@ -594,7 +604,8 @@ export function areGitHubPrWarningStatesExactlyEqual(
       !rightEntry ||
       leftEntry.highlighted !== rightEntry.highlighted ||
       leftEntry.updatedAt !== rightEntry.updatedAt ||
-      !arraysEqual(leftEntry.activeCaseKeys, rightEntry.activeCaseKeys)
+      !arraysEqual(leftEntry.activeCaseKeys, rightEntry.activeCaseKeys) ||
+      !arraysEqual(leftEntry.highlightedCaseKeys, rightEntry.highlightedCaseKeys)
     ) {
       return false;
     }
