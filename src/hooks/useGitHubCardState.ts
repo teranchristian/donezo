@@ -417,7 +417,10 @@ export function useGitHubCardState({
 
     setGitHubPrWarningState((currentState) => {
       const currentEntry = currentState[warningStateKey];
-      if (!currentEntry?.highlighted) {
+      if (
+        !currentEntry?.highlightedCaseKeys?.length &&
+        !currentEntry?.highlighted
+      ) {
         return currentState;
       }
 
@@ -425,6 +428,7 @@ export function useGitHubCardState({
         ...currentState,
         [warningStateKey]: {
           ...currentEntry,
+          highlightedCaseKeys: [],
           highlighted: false,
         },
       };

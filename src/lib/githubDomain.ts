@@ -102,19 +102,21 @@ export function buildGitHubPrWarningState(
     const warningStateKey = getGitHubPullRequestWarningStateKey(pullRequest);
     const activeCaseKeys = getActiveGitHubPrWarningCaseKeys(pullRequest);
     const currentEntry = currentState[warningStateKey];
-    const hasNewWarningTransition =
-      Boolean(currentEntry) &&
-      currentEntry.activeCaseKeys.length === 0 &&
-      activeCaseKeys.length > 0;
+    const currentActiveCaseKeySet = new Set(currentEntry?.activeCaseKeys ?? []);
+    const currentHighlightedCaseKeySet = new Set(
+      currentEntry?.highlightedCaseKeys ??
+        (currentEntry?.highlighted ? currentEntry.activeCaseKeys : []),
+    );
+    const highlightedCaseKeys = activeCaseKeys.filter(
+      (caseKey) =>
+        (Boolean(currentEntry) && !currentActiveCaseKeySet.has(caseKey)) ||
+        currentHighlightedCaseKeySet.has(caseKey),
+    );
 
     nextState[warningStateKey] = {
       activeCaseKeys,
-      highlighted:
-        activeCaseKeys.length > 0
-          ? hasNewWarningTransition
-            ? true
-            : currentEntry?.highlighted ?? false
-          : false,
+      highlightedCaseKeys,
+      highlighted: highlightedCaseKeys.length > 0,
       updatedAt,
     };
   }
@@ -154,7 +156,24 @@ export function isGitHubPrWarningHighlighted(
   state: GitHubPrWarningState,
   pullRequest: GitHubPullRequestItem,
 ) {
-  return Boolean(state[getGitHubPullRequestWarningStateKey(pullRequest)]?.highlighted);
+  const entry = state[getGitHubPullRequestWarningStateKey(pullRequest)];
+
+  return Boolean(
+    entry?.highlightedCaseKeys?.length ?? entry?.highlighted,
+  );
+}
+
+export function isGitHubPrWarningCaseHighlighted(
+  state: GitHubPrWarningState,
+  pullRequest: GitHubPullRequestItem,
+  caseKey: string,
+) {
+  const entry = state[getGitHubPullRequestWarningStateKey(pullRequest)];
+
+  return Boolean(
+    entry?.highlightedCaseKeys?.includes(caseKey) ??
+      (entry?.highlighted && entry.activeCaseKeys.includes(caseKey)),
+  );
 }
 
 export function isGitHubPrReadyHighlighted(

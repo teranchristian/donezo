@@ -255,18 +255,28 @@ function mergeGitHubPrWarningState(state?: GitHubPrWarningState | null) {
           !value ||
           typeof value !== 'object' ||
           !Array.isArray(value.activeCaseKeys) ||
-          typeof value.highlighted !== 'boolean' ||
           typeof value.updatedAt !== 'number'
         ) {
           return null;
         }
 
         const activeCaseKeys = value.activeCaseKeys.filter((caseKey): caseKey is string => typeof caseKey === 'string');
+        const activeCaseKeySet = new Set(activeCaseKeys);
+        const highlightedCaseKeys = Array.isArray(value.highlightedCaseKeys)
+          ? value.highlightedCaseKeys.filter(
+              (caseKey): caseKey is string =>
+                typeof caseKey === 'string' && activeCaseKeySet.has(caseKey),
+            )
+          : typeof value.highlighted === 'boolean' && value.highlighted
+            ? activeCaseKeys
+            : [];
+
         return [
           key,
           {
             activeCaseKeys,
-            highlighted: value.highlighted,
+            highlightedCaseKeys,
+            highlighted: highlightedCaseKeys.length > 0,
             updatedAt: value.updatedAt
           }
         ] satisfies [string, GitHubPrWarningStateEntry];
