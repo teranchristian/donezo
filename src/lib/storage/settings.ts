@@ -25,6 +25,7 @@ export { getDefaultSettings } from './defaults';
 
 const DISPLAY_NAME_EXTENSION_STORAGE_AREA = 'sync';
 const GITHUB_OWNER_FILTER_EXTENSION_STORAGE_AREA = 'sync';
+let hasSeenStoredDisplayNameValue = false;
 
 export async function getStoredSettings() {
   const storedSettings = await getStoredJsonValue<Partial<DashboardSettings>>(
@@ -83,15 +84,22 @@ export async function getStoredDisplayName() {
     { area: DISPLAY_NAME_EXTENSION_STORAGE_AREA },
   );
 
+  hasSeenStoredDisplayNameValue = typeof storedName === 'string';
   return normalizeDisplayName(storedName);
 }
 
 export async function saveStoredDisplayName(name: string) {
+  const normalizedDisplayName = normalizeDisplayName(name);
+  if (!normalizedDisplayName && !hasSeenStoredDisplayNameValue) {
+    return;
+  }
+
   await setStoredAreaJsonValue(
     DISPLAY_NAME_STORAGE_KEY,
-    normalizeDisplayName(name),
+    normalizedDisplayName,
     { area: DISPLAY_NAME_EXTENSION_STORAGE_AREA },
   );
+  hasSeenStoredDisplayNameValue = true;
 }
 
 export async function getStoredGitHubOwnerFilter() {

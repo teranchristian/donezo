@@ -86,6 +86,7 @@ export function SettingsPage({
   const [saveMessage, setSaveMessage] = useState('');
   const [isLoadingGitHubOwnerOptions, setIsLoadingGitHubOwnerOptions] = useState(false);
   const isLoadingGitHubOwnerOptionsRef = useRef(false);
+  const hasEditedDisplayNameRef = useRef(false);
   const previousSettingsRef = useRef(settings);
 
   useEffect(() => {
@@ -109,6 +110,10 @@ export function SettingsPage({
   }, [settings]);
 
   useEffect(() => {
+    if (!hasEditedDisplayNameRef.current) {
+      return;
+    }
+
     const nextDisplayName = draft.name.trim();
     if (nextDisplayName === settings.name.trim()) {
       return;
@@ -206,6 +211,10 @@ export function SettingsPage({
   }
 
   async function handleDisplayNameBlur() {
+    if (!hasEditedDisplayNameRef.current) {
+      return;
+    }
+
     const nextDisplayName = draft.name.trim();
     if (nextDisplayName === settings.name.trim()) {
       return;
@@ -306,7 +315,10 @@ export function SettingsPage({
               <span className="mb-2 block text-sm text-stone-300">Display name</span>
               <input
                 value={draft.name}
-                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) => {
+                  hasEditedDisplayNameRef.current = true;
+                  setDraft((current) => ({ ...current, name: event.target.value }));
+                }}
                 onBlur={() => void handleDisplayNameBlur()}
                 className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-stone-100 outline-none transition placeholder:text-stone-500 focus:border-accent/50 focus:ring-1 focus:ring-accent/40"
                 placeholder="Your name"
