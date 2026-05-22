@@ -5,7 +5,8 @@ import type {
   DashboardSettings,
   GitHubListOrganizationFilter,
   GitHubListSort,
-  GitHubPrStatusFilter
+  GitHubPrStatusFilter,
+  GitHubSortOrders
 } from './types';
 
 const DEFAULT_SETTINGS: DashboardSettings = {
@@ -27,6 +28,11 @@ const DEFAULT_SETTINGS: DashboardSettings = {
 
 export const DEFAULT_GITHUB_OWNER_FILTER: GitHubListOrganizationFilter = 'all';
 export const DEFAULT_GITHUB_SORT_ORDER: GitHubListSort = 'recently-updated';
+export const DEFAULT_GITHUB_SORT_ORDERS: GitHubSortOrders = {
+  'my-prs': DEFAULT_GITHUB_SORT_ORDER,
+  'team-prs': DEFAULT_GITHUB_SORT_ORDER,
+  review: DEFAULT_GITHUB_SORT_ORDER
+};
 export const DEFAULT_GITHUB_PR_STATUS_FILTER: GitHubPrStatusFilter = 'all';
 export const DEFAULT_ACTIVE_INTEGRATION: ActiveIntegration = 'github';
 export const DEFAULT_ACTIVE_GITHUB_VIEW: ActiveGitHubView = 'my-prs';

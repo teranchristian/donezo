@@ -10,7 +10,8 @@ import {
   DEFAULT_ACTIVE_INTEGRATION,
   DEFAULT_ACTIVE_JIRA_VIEW,
   DEFAULT_GITHUB_PR_STATUS_FILTER,
-  DEFAULT_GITHUB_SORT_ORDER
+  DEFAULT_GITHUB_SORT_ORDER,
+  DEFAULT_GITHUB_SORT_ORDERS
 } from './defaults';
 import {
   ACTIVE_GITHUB_VIEW_STORAGE_KEY,
@@ -34,6 +35,7 @@ import type {
   GitHubPrReadyState,
   GitHubPrReadyStateEntry,
   GitHubPrStatusFilter,
+  GitHubSortOrders,
   GitHubTeamPrTrackerState,
   GitHubPrWarningState,
   GitHubPrWarningStateEntry
@@ -41,13 +43,16 @@ import type {
 
 export async function getStoredGitHubSortOrder() {
   return mergeGitHubSortOrder(
-    (await getStoredJsonValue<string>(GITHUB_SORT_ORDER_STORAGE_KEY)) ??
+    (await getStoredJsonValue<unknown>(GITHUB_SORT_ORDER_STORAGE_KEY)) ??
       undefined,
   );
 }
 
-export async function saveStoredGitHubSortOrder(sortOrder: GitHubListSort) {
-  await setStoredJsonValue(GITHUB_SORT_ORDER_STORAGE_KEY, sortOrder);
+export async function saveStoredGitHubSortOrder(sortOrders: GitHubSortOrders) {
+  await setStoredJsonValue(
+    GITHUB_SORT_ORDER_STORAGE_KEY,
+    mergeGitHubSortOrder(sortOrders),
+  );
 }
 
 export async function getStoredGitHubPrStatusFilter() {
@@ -195,7 +200,33 @@ export async function saveStoredGitHubTeamPrTrackerState(
   );
 }
 
-function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
+function mergeGitHubSortOrder(sortOrder?: unknown): GitHubSortOrders {
+  if (isGitHubListSort(sortOrder)) {
+    return {
+      'my-prs': sortOrder,
+      'team-prs': sortOrder,
+      review: sortOrder
+    };
+  }
+
+  if (sortOrder && typeof sortOrder === 'object') {
+    const sortOrders = sortOrder as Partial<Record<ActiveGitHubView, unknown>>;
+
+    return {
+      'my-prs': mergeGitHubListSort(sortOrders['my-prs']),
+      'team-prs': mergeGitHubListSort(sortOrders['team-prs']),
+      review: mergeGitHubListSort(sortOrders.review)
+    };
+  }
+
+  return DEFAULT_GITHUB_SORT_ORDERS;
+}
+
+function mergeGitHubListSort(sortOrder?: unknown): GitHubListSort {
+  return isGitHubListSort(sortOrder) ? sortOrder : DEFAULT_GITHUB_SORT_ORDER;
+}
+
+function isGitHubListSort(sortOrder: unknown): sortOrder is GitHubListSort {
   if (
     sortOrder === 'focus-priority' ||
     sortOrder === 'oldest-updated' ||
@@ -203,10 +234,10 @@ function mergeGitHubSortOrder(sortOrder?: string): GitHubListSort {
     sortOrder === 'title-asc' ||
     sortOrder === 'recently-updated'
   ) {
-    return sortOrder;
+    return true;
   }
 
-  return DEFAULT_GITHUB_SORT_ORDER;
+  return false;
 }
 
 function mergeGitHubPrStatusFilter(filter?: string): GitHubPrStatusFilter {

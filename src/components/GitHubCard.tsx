@@ -107,8 +107,8 @@ export function GitHubCard({
     isMockMode,
   });
   const {
-    sortOrder,
-    setSortOrder,
+    sortOrders,
+    setSortOrders,
     gitHubPrReadyState,
     gitHubPrWarningState,
     gitHubPrNotificationSeenAtState,
@@ -126,12 +126,26 @@ export function GitHubCard({
     visibleRecentOpenPullRequests:
       pullRequestGroups.visibleRecentOpenPullRequests,
   });
+  const activeSortOrder =
+    activeView === 'team-prs' && sortOrders[activeView] === 'focus-priority'
+      ? 'recently-updated'
+      : sortOrders[activeView];
+  const setActiveSortOrder = (nextSortOrder: GitHubListSort) => {
+    setSortOrders((currentSortOrders) =>
+      currentSortOrders[activeView] === nextSortOrder
+        ? currentSortOrders
+        : {
+            ...currentSortOrders,
+            [activeView]: nextSortOrder,
+          },
+    );
+  };
   const viewModel = getGitHubCardViewModel({
     data,
     groups: pullRequestGroups,
     activeView,
     prStatusFilter,
-    sortOrder,
+    sortOrder: activeSortOrder,
     hasLoadedNotificationSeenAtState:
       hasLoadedGitHubPrNotificationSeenAtState,
     notificationSeenAtState: gitHubPrNotificationSeenAtState,
@@ -271,18 +285,20 @@ export function GitHubCard({
                 </span>
                 <select
                   aria-label="Sort"
-                  value={sortOrder}
+                  value={activeSortOrder}
                   onChange={(event) =>
-                    setSortOrder(event.target.value as GitHubListSort)
+                    setActiveSortOrder(event.target.value as GitHubListSort)
                   }
                   className={`${filterSelectClass} flex-1`}
                 >
-                  <option
-                    value="focus-priority"
-                    className="bg-panel text-stone-100"
-                  >
-                    Focus priority
-                  </option>
+                  {activeView !== 'team-prs' ? (
+                    <option
+                      value="focus-priority"
+                      className="bg-panel text-stone-100"
+                    >
+                      Focus priority
+                    </option>
+                  ) : null}
                   <option
                     value="recently-updated"
                     className="bg-panel text-stone-100"
@@ -326,7 +342,9 @@ export function GitHubCard({
               <PullRequestList
                 pullRequests={viewModel.filteredItems.map((item) => item.value)}
                 todayFocusPullRequestRanks={todayFocusPullRequestRanks}
-                shouldPrioritizeReadyToClose={sortOrder !== 'focus-priority'}
+                shouldPrioritizeReadyToClose={
+                  activeSortOrder !== 'focus-priority'
+                }
                 activeView={activeView}
                 gitHubPrReadyState={gitHubPrReadyState}
                 gitHubPrWarningState={gitHubPrWarningState}
