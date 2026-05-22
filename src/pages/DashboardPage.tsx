@@ -19,6 +19,7 @@ import { useTodayFocusState } from '../hooks/useTodayFocusState';
 import { type GitHubDashboardData } from '../lib/githubApi';
 import { getJiraIssueCounts, type JiraDashboardData } from '../lib/jiraApi';
 import { getDashboardAlerts } from '../lib/dashboardPageDomain';
+import { formatGitHubRefreshWarningTime } from '../lib/githubRefreshStatus';
 import type {
   ActiveGitHubView,
   ActiveIntegration,
@@ -40,7 +41,7 @@ type DashboardPageProps = {
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
-  gitHubRefreshWarning: string | null;
+  gitHubRefreshWarning: number | null;
   onClearGitHubMockScenario: () => void;
   onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onRefreshGitHub: () => void;
@@ -298,7 +299,7 @@ function DashboardContent({
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
-  gitHubRefreshWarning: string | null;
+  gitHubRefreshWarning: number | null;
   isJiraLoading: boolean;
   todayFocus: ReturnType<typeof useTodayFocusState>;
   onRefreshGitHub: () => void;
@@ -317,6 +318,7 @@ function DashboardContent({
     <CardTopBar
       left={integrationSwitcher}
       warning={activeIntegration === 'github' ? gitHubRefreshWarning : null}
+      onRetry={onRefreshGitHub}
     />
   );
 
@@ -395,9 +397,11 @@ function DashboardContent({
 function CardTopBar({
   left,
   warning = null,
+  onRetry,
 }: {
   left: ReactNode;
-  warning?: string | null;
+  warning?: number | null;
+  onRetry?: () => void;
 }) {
   return (
     <div className="card-top-bar">
@@ -414,7 +418,23 @@ function CardTopBar({
               />
             </svg>
           </span>
-          <span className="min-w-0 truncate">{warning}</span>
+          <span className="min-w-0 truncate">
+            Cached {formatGitHubRefreshWarningTime(warning)}
+          </span>
+          {onRetry ? (
+            <>
+              <span className="github-card-refresh-warning__separator" aria-hidden="true">
+                •
+              </span>
+              <button
+                type="button"
+                className="github-card-refresh-warning__retry"
+                onClick={onRetry}
+              >
+                Retry
+              </button>
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>

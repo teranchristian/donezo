@@ -18,7 +18,6 @@ import {
 } from '../lib/storage';
 import {
   createGitHubCacheToken,
-  formatGitHubRefreshWarningTime,
   type GitHubRefreshStatus
 } from '../lib/githubRefreshStatus';
 import type { GitHubMockScenario } from '../mocks/github/scenarios';
@@ -60,7 +59,7 @@ export function useGitHubDashboard({
   const [isCheckingGitHubActivity, setIsCheckingGitHubActivity] = useState(false);
   const [lastGitHubActivityCheckAt, setLastGitHubActivityCheckAt] = useState<number | null>(null);
   const [gitHubOwnerOptions, setGitHubOwnerOptions] = useState<string[]>([]);
-  const [gitHubRefreshWarning, setGitHubRefreshWarning] = useState<string | null>(null);
+  const [gitHubRefreshWarning, setGitHubRefreshWarning] = useState<number | null>(null);
   const [gitHubSettingsTestStatus, setGitHubSettingsTestStatus] =
     useState<GitHubConnectionStatus>('not-connected');
   const [isTestingGitHubSettings, setIsTestingGitHubSettings] = useState(false);
@@ -91,9 +90,7 @@ export function useGitHubDashboard({
       return;
     }
 
-    setGitHubRefreshWarning(
-      `Unable to refresh GitHub. Showing data from ${formatGitHubRefreshWarningTime(lastUpdatedAt)}.`
-    );
+    setGitHubRefreshWarning(lastUpdatedAt);
   }, []);
 
   const handleRefreshFailure = useCallback(
@@ -133,11 +130,7 @@ export function useGitHubDashboard({
     setGitHubSettingsTestStatus(scenario.dashboardData.connectionStatus);
     clearRefreshFailureState();
     if (scenario.showRefreshWarning) {
-      setGitHubRefreshWarning(
-        `Unable to refresh GitHub. Showing data from ${formatGitHubRefreshWarningTime(
-          scenario.dashboardData.lastUpdatedAt ?? Date.now()
-        )}.`
-      );
+      setGitHubRefreshWarning(scenario.dashboardData.lastUpdatedAt ?? Date.now());
     }
     setIsGitHubInitialized(true);
     setIsGitHubMockReady(true);

@@ -206,25 +206,49 @@ body {
 .github-card-refresh-warning {
   display: inline-flex;
   min-width: 0;
-  max-width: min(440px, 100%);
-  height: 38px;
+  max-width: min(320px, 100%);
+  height: 32px;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
   margin: 0;
   border: 1px solid rgba(251, 191, 36, 0.22);
   border-radius: 999px;
   background: rgba(251, 191, 36, 0.055);
-  padding: 0 14px;
+  padding: 0 11px;
   color: rgba(251, 191, 36, 0.84);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 650;
   line-height: 1;
 }
 
+.github-card-refresh-warning__separator {
+  flex: 0 0 auto;
+  color: rgba(251, 191, 36, 0.36);
+}
+
+.github-card-refresh-warning__retry {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: rgba(251, 191, 36, 0.9);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.github-card-refresh-warning__retry:hover {
+  color: rgb(253, 230, 138);
+}
+
 .github-card-refresh-warning__icon {
   display: inline-flex;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
