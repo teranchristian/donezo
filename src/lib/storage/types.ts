@@ -78,6 +78,7 @@ export type GitHubListSort =
 export type GitHubPrStatusFilter = 'all' | 'approved' | 'ready-to-merge' | 'waiting-review';
 export type ActiveIntegration = 'github' | 'jira';
 export type ActiveGitHubView = 'my-prs' | 'team-prs' | 'review';
+export type GitHubSortOrders = Record<ActiveGitHubView, GitHubListSort>;
 export type ActiveJiraView = 'active' | 'in-progress' | 'blocking' | 'high-priority';
 
 export type GitHubPrWarningStateEntry = {

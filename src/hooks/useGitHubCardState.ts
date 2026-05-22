@@ -24,14 +24,15 @@ import {
   getStoredGitHubTeamPrTrackerState,
   getStoredGitHubPrWarningState,
   getStoredGitHubSortOrder,
+  DEFAULT_GITHUB_SORT_ORDERS,
   saveStoredGitHubPrNotificationSeenAtState,
   saveStoredGitHubPrReadyState,
   saveStoredGitHubTeamPrTrackerState,
   saveStoredGitHubPrWarningState,
   saveStoredGitHubSortOrder,
-  type GitHubListSort,
   type GitHubPrNotificationSeenAtState,
   type GitHubPrReadyState,
+  type GitHubSortOrders,
   type GitHubPrWarningState,
   type GitHubTeamPrTrackerState,
 } from '../lib/storage';
@@ -58,8 +59,9 @@ export function useGitHubCardState({
   resolvedPullRequests,
   visibleRecentOpenPullRequests,
 }: UseGitHubCardStateOptions) {
-  const [sortOrder, setSortOrder] =
-    useState<GitHubListSort>('recently-updated');
+  const [sortOrders, setSortOrders] = useState<GitHubSortOrders>(
+    DEFAULT_GITHUB_SORT_ORDERS,
+  );
   const [hasLoadedSortOrder, setHasLoadedSortOrder] = useState(false);
   const [gitHubPrReadyState, setGitHubPrReadyState] =
     useState<GitHubPrReadyState>({});
@@ -89,12 +91,12 @@ export function useGitHubCardState({
   useEffect(() => {
     let isMounted = true;
 
-    getStoredGitHubSortOrder().then((storedSortOrder) => {
+    getStoredGitHubSortOrder().then((storedSortOrders) => {
       if (!isMounted) {
         return;
       }
 
-      setSortOrder(storedSortOrder);
+      setSortOrders(storedSortOrders);
       setHasLoadedSortOrder(true);
     });
 
@@ -231,8 +233,8 @@ export function useGitHubCardState({
       return;
     }
 
-    void saveStoredGitHubSortOrder(sortOrder);
-  }, [hasLoadedSortOrder, sortOrder]);
+    void saveStoredGitHubSortOrder(sortOrders);
+  }, [hasLoadedSortOrder, sortOrders]);
 
   useEffect(() => {
     if (!hasLoadedGitHubPrReadyState) {
@@ -436,8 +438,8 @@ export function useGitHubCardState({
   }
 
   return {
-    sortOrder,
-    setSortOrder,
+    sortOrders,
+    setSortOrders,
     gitHubPrReadyState,
     gitHubPrWarningState,
     gitHubPrNotificationSeenAtState,
