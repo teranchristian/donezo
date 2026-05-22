@@ -144,7 +144,6 @@ export function HeaderMenu({
                 } else {
                   onRefreshJira?.();
                 }
-                setIsOpen(false);
               }}
               disabled={isRefreshDisabled}
               className="header-menu-refresh__button"
