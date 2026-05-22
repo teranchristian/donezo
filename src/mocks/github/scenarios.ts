@@ -2,13 +2,13 @@ import {
   getEmptyGitHubDashboardData,
   type GitHubDashboardData,
   type GitHubNotification,
-  type GitHubPullRequestItem
+  type GitHubPullRequestItem,
 } from '../../lib/githubApi';
 import type {
   GitHubPrNotificationSeenAtState,
   GitHubPrReadyState,
   GitHubTeamPrTrackerState,
-  GitHubPrWarningState
+  GitHubPrWarningState,
 } from '../../lib/storage';
 
 export type GitHubMockScenario = {
@@ -49,7 +49,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       reviewStatus: 'approved',
       ciStatus: 'passing',
       mergeStateStatus: 'CLEAN',
-      updatedAt: BASE_UPDATED_AT
+      updatedAt: BASE_UPDATED_AT,
     }),
     createPullRequest({
       id: 102,
@@ -63,7 +63,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       mergeStateStatus: 'CLEAN',
       source: 'review-requested',
       authorLogin: 'reginald',
-      updatedAt: '2026-05-06T09:12:00.000Z'
+      updatedAt: '2026-05-06T09:12:00.000Z',
     }),
     createPullRequest({
       id: 103,
@@ -75,7 +75,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       reviewStatus: 'approved',
       ciStatus: 'passing',
       mergeStateStatus: 'CLEAN',
-      updatedAt: '2026-05-06T08:54:00.000Z'
+      updatedAt: '2026-05-06T08:54:00.000Z',
     }),
     createPullRequest({
       id: 104,
@@ -87,8 +87,8 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       reviewStatus: 'open',
       ciStatus: 'no-checks',
       mergeStateStatus: 'CLEAN',
-      updatedAt: '2026-05-06T08:20:00.000Z'
-    })
+      updatedAt: '2026-05-06T08:20:00.000Z',
+    }),
   ],
   recentPullRequests: [
     createPullRequest({
@@ -103,7 +103,7 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       mergeStateStatus: 'CLEAN',
       source: 'recent',
       authorLogin: 'ava',
-      updatedAt: '2026-05-06T09:44:00.000Z'
+      updatedAt: '2026-05-06T09:44:00.000Z',
     }),
     createPullRequest({
       id: 302,
@@ -117,10 +117,10 @@ const BASE_DASHBOARD_DATA: GitHubDashboardData = {
       mergeStateStatus: 'CLEAN',
       source: 'recent',
       authorLogin: 'noah',
-      updatedAt: '2026-05-06T09:15:00.000Z'
-    })
+      updatedAt: '2026-05-06T09:15:00.000Z',
+    }),
   ],
-  notifications: []
+  notifications: [],
 };
 
 const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
@@ -135,7 +135,7 @@ const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
   { key: 'queued-prs', label: 'Queued PRs' },
   { key: 'team-prs-new', label: 'Team PRs: new' },
   { key: 'refresh-warning', label: 'Refresh warning' },
-  { key: 'mixed', label: 'Mixed' }
+  { key: 'mixed', label: 'Mixed' },
 ];
 
 const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
@@ -146,10 +146,10 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     warningState: {},
     notificationSeenAtState: {},
     teamPrTrackerState: {
-        snapshotKeys: [],
-        pendingNewKeys: [],
-        lastProcessedUpdatedAt: null,
-      }
+      snapshotKeys: [],
+      pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
+    },
   },
   'jira-auto-group': (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
@@ -164,7 +164,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         reviewStatus: 'approved',
         ciStatus: 'passing',
         mergeStateStatus: 'CLEAN',
-        updatedAt: '2026-05-06T09:48:00.000Z'
+        updatedAt: '2026-05-06T09:48:00.000Z',
       }),
       createPullRequest({
         id: 202,
@@ -177,7 +177,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         reviewStatus: 'open',
         ciStatus: 'pending',
         mergeStateStatus: 'CLEAN',
-        updatedAt: '2026-05-06T09:34:00.000Z'
+        updatedAt: '2026-05-06T09:34:00.000Z',
       }),
       createPullRequest({
         id: 203,
@@ -189,7 +189,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         reviewStatus: 'waiting-review',
         ciStatus: 'no-checks',
         mergeStateStatus: 'CLEAN',
-        updatedAt: '2026-05-06T09:18:00.000Z'
+        updatedAt: '2026-05-06T09:18:00.000Z',
       }),
       createPullRequest({
         id: 204,
@@ -201,15 +201,15 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         reviewStatus: 'approved',
         ciStatus: 'passing',
         mergeStateStatus: 'CLEAN',
-        updatedAt: '2026-05-06T08:58:00.000Z'
-      })
+        updatedAt: '2026-05-06T08:58:00.000Z',
+      }),
     ];
     dashboardData.openPrsCount = dashboardData.pullRequests.filter(
-      (pullRequest) => pullRequest.source === 'authored'
+      (pullRequest) => pullRequest.source === 'authored',
     ).length;
     dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
     dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
-      (pullRequest) => pullRequest.source === 'review-requested'
+      (pullRequest) => pullRequest.source === 'review-requested',
     ).length;
 
     return {
@@ -222,7 +222,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         snapshotKeys: [],
         pendingNewKeys: [],
         lastProcessedUpdatedAt: null,
-      }
+      },
     };
   })(),
   'ready-to-merge': {
@@ -232,35 +232,48 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       [getStateKey('acme/platform-web', 1533)]: {
         isReady: false,
         highlighted: false,
-        updatedAt: Date.now() - 10_000
+        updatedAt: Date.now() - 10_000,
       },
       [getStateKey('acme/chrome-home-page', 88)]: {
         isReady: false,
         highlighted: false,
-        updatedAt: Date.now() - 10_000
-      }
+        updatedAt: Date.now() - 10_000,
+      },
     },
     warningState: {},
     notificationSeenAtState: {},
     teamPrTrackerState: {
-        snapshotKeys: [],
-        pendingNewKeys: [],
-        lastProcessedUpdatedAt: null,
-      }
+      snapshotKeys: [],
+      pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
+    },
   },
-  'warning-conflict-new': createWarningScenario('warning-conflict-new', 'DIRTY', 'has-conflicts'),
-  'warning-build-failed-new': createWarningScenario('warning-build-failed-new', 'CLEAN', 'failed-checks'),
-  'warning-out-of-date-new': createWarningScenario('warning-out-of-date-new', 'BEHIND', 'out-of-date'),
+  'warning-conflict-new': createWarningScenario(
+    'warning-conflict-new',
+    'DIRTY',
+    'has-conflicts',
+  ),
+  'warning-build-failed-new': createWarningScenario(
+    'warning-build-failed-new',
+    'CLEAN',
+    'failed-checks',
+  ),
+  'warning-out-of-date-new': createWarningScenario(
+    'warning-out-of-date-new',
+    'BEHIND',
+    'out-of-date',
+  ),
   'warning-already-seen': (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
-    dashboardData.pullRequests = dashboardData.pullRequests.map((pullRequest) =>
-      pullRequest.pullNumber === 1533
-        ? {
-            ...pullRequest,
-            mergeStateStatus: 'DIRTY',
-            updatedAt: '2026-05-06T09:42:00.000Z'
-          }
-        : pullRequest
+    dashboardData.pullRequests = dashboardData.pullRequests.map(
+      (pullRequest) =>
+        pullRequest.pullNumber === 1533
+          ? {
+              ...pullRequest,
+              mergeStateStatus: 'DIRTY',
+              updatedAt: '2026-05-06T09:42:00.000Z',
+            }
+          : pullRequest,
     );
 
     return {
@@ -272,15 +285,15 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           activeCaseKeys: ['has-conflicts'],
           highlightedCaseKeys: [],
           highlighted: false,
-          updatedAt: Date.now() - 10_000
-        }
+          updatedAt: Date.now() - 10_000,
+        },
       },
       notificationSeenAtState: {},
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
         lastProcessedUpdatedAt: null,
-      }
+      },
     };
   })(),
   'queued-prs': (() => {
@@ -288,10 +301,11 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
     dashboardData.pullRequests = [
       createPullRequest({
         id: 301,
-        title: 'EAP-48: Use provision endpoints and gate Create Group by permission',
-        repositoryName: 'qsic-hq-admin/qsic-hq-admin',
-        owner: 'qsic-hq-admin',
-        repo: 'qsic-hq-admin',
+        title:
+          'EAP-48: Use provision endpoints and gate Create Group by permission',
+        repositoryName: 'pxyz-admin/pxyz-admin',
+        owner: 'pxyz-admin',
+        repo: 'pxyz-admin',
         pullNumber: 412,
         reviewStatus: 'approved',
         ciStatus: 'passing',
@@ -300,26 +314,26 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
           position: 1,
           state: 'QUEUED',
         },
-        updatedAt: '2026-05-06T09:48:00.000Z'
+        updatedAt: '2026-05-06T09:48:00.000Z',
       }),
       createPullRequest({
         id: 302,
         title: 'Refine access policy validation for venue sync',
-        repositoryName: 'qsic-hq-admin/qsic-hq-admin',
-        owner: 'qsic-hq-admin',
-        repo: 'qsic-hq-admin',
+        repositoryName: 'pxyz-admin/pxyz-admin',
+        owner: 'pxyz-admin',
+        repo: 'pxyz-admin',
         pullNumber: 413,
         reviewStatus: 'open',
         ciStatus: 'pending',
         mergeStateStatus: 'CLEAN',
-        updatedAt: '2026-05-06T09:20:00.000Z'
+        updatedAt: '2026-05-06T09:20:00.000Z',
       }),
     ];
     dashboardData.openPrsCount = dashboardData.pullRequests.filter(
-      (pullRequest) => pullRequest.source === 'authored'
+      (pullRequest) => pullRequest.source === 'authored',
     ).length;
     dashboardData.reviewRequestedCount = dashboardData.pullRequests.filter(
-      (pullRequest) => pullRequest.source === 'review-requested'
+      (pullRequest) => pullRequest.source === 'review-requested',
     ).length;
 
     return {
@@ -332,40 +346,42 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         snapshotKeys: [],
         pendingNewKeys: [],
         lastProcessedUpdatedAt: null,
-      }
+      },
     };
   })(),
   'comment-badges': (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
-    dashboardData.pullRequests = dashboardData.pullRequests.map((pullRequest) => {
-      if (pullRequest.pullNumber === 1533) {
-        return {
-          ...pullRequest,
-          title: 'PR with new comments',
-          totalCommentCount: 4,
-          updatedAt: '2026-05-06T09:48:00.000Z'
-        };
-      }
+    dashboardData.pullRequests = dashboardData.pullRequests.map(
+      (pullRequest) => {
+        if (pullRequest.pullNumber === 1533) {
+          return {
+            ...pullRequest,
+            title: 'PR with new comments',
+            totalCommentCount: 4,
+            updatedAt: '2026-05-06T09:48:00.000Z',
+          };
+        }
 
-      if (pullRequest.pullNumber === 1534) {
-        return {
-          ...pullRequest,
-          title: 'PR with comments already seen',
-          totalCommentCount: 2,
-          updatedAt: '2026-05-06T09:25:00.000Z'
-        };
-      }
+        if (pullRequest.pullNumber === 1534) {
+          return {
+            ...pullRequest,
+            title: 'PR with comments already seen',
+            totalCommentCount: 2,
+            updatedAt: '2026-05-06T09:25:00.000Z',
+          };
+        }
 
-      if (pullRequest.pullNumber === 88) {
-        return {
-          ...pullRequest,
-          title: 'PR with zero comments',
-          totalCommentCount: 0
-        };
-      }
+        if (pullRequest.pullNumber === 88) {
+          return {
+            ...pullRequest,
+            title: 'PR with zero comments',
+            totalCommentCount: 0,
+          };
+        }
 
-      return pullRequest;
-    });
+        return pullRequest;
+      },
+    );
     dashboardData.notifications = [
       createNotification({
         id: 'comment-new-1',
@@ -373,7 +389,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         pullNumber: 1533,
         title: 'PR with new comments',
         updatedAt: '2026-05-06T09:47:00.000Z',
-        authorLogin: 'reginald'
+        authorLogin: 'reginald',
       }),
       createNotification({
         id: 'comment-new-2',
@@ -381,7 +397,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         pullNumber: 1533,
         title: 'PR with new comments',
         updatedAt: '2026-05-06T09:46:00.000Z',
-        authorLogin: 'reginald'
+        authorLogin: 'reginald',
       }),
       createNotification({
         id: 'comment-seen-1',
@@ -389,8 +405,8 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         pullNumber: 1534,
         title: 'PR with comments already seen',
         updatedAt: '2026-05-06T09:20:00.000Z',
-        authorLogin: 'reginald'
-      })
+        authorLogin: 'reginald',
+      }),
     ];
     dashboardData.notificationsCount = dashboardData.notifications.length;
     dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
@@ -401,13 +417,15 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       readyState: {},
       warningState: {},
       notificationSeenAtState: {
-        [getStateKey('acme/platform-web', 1534)]: Date.parse('2026-05-06T09:30:00.000Z')
+        [getStateKey('acme/platform-web', 1534)]: Date.parse(
+          '2026-05-06T09:30:00.000Z',
+        ),
       },
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
         lastProcessedUpdatedAt: null,
-      }
+      },
     };
   })(),
   'team-prs-new': (() => {
@@ -416,36 +434,36 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       createPullRequest({
         id: 401,
         title: 'Add product attributes to campaign data',
-        repositoryName: 'qsic-data/qsic-data',
-        owner: 'qsic-data',
-        repo: 'qsic-data',
+        repositoryName: 'pxyz-data/pxyz-data',
+        owner: 'pxyz-data',
+        repo: 'pxyz-data',
         pullNumber: 287,
         reviewStatus: 'open',
         ciStatus: 'pending',
         mergeStateStatus: 'DIRTY',
         source: 'recent',
         authorLogin: 'noah-antoun',
-        updatedAt: '2026-05-06T09:52:00.000Z'
+        updatedAt: '2026-05-06T09:52:00.000Z',
       }),
       createPullRequest({
         id: 402,
         title: 'Normalize campaign export date handling',
-        repositoryName: 'qsic-data/qsic-data',
-        owner: 'qsic-data',
-        repo: 'qsic-data',
+        repositoryName: 'pxyz-data/pxyz-data',
+        owner: 'pxyz-data',
+        repo: 'pxyz-data',
         pullNumber: 286,
         reviewStatus: 'open',
         ciStatus: 'passing',
         mergeStateStatus: 'CLEAN',
         source: 'recent',
         authorLogin: 'ava',
-        updatedAt: '2026-05-06T09:18:00.000Z'
+        updatedAt: '2026-05-06T09:18:00.000Z',
       }),
       createPullRequest({
         id: 403,
         title: 'Refactor warehouse feed adapter',
-        repositoryName: 'qsic-data/ingestion',
-        owner: 'qsic-data',
+        repositoryName: 'pxyz-data/ingestion',
+        owner: 'pxyz-data',
         repo: 'ingestion',
         pullNumber: 143,
         reviewStatus: 'open',
@@ -453,16 +471,16 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         mergeStateStatus: 'CLEAN',
         source: 'recent',
         authorLogin: 'leo',
-        updatedAt: '2026-05-06T08:56:00.000Z'
-      })
+        updatedAt: '2026-05-06T08:56:00.000Z',
+      }),
     ];
     dashboardData.recentOpenPrsCount = dashboardData.recentPullRequests.length;
 
     const previousSnapshotKeys = [
-      getStateKey('qsic-data/qsic-data', 286),
-      getStateKey('qsic-data/ingestion', 143),
+      getStateKey('pxyz-data/pxyz-data', 286),
+      getStateKey('pxyz-data/ingestion', 143),
     ];
-    const pendingNewKeys = [getStateKey('qsic-data/qsic-data', 287)];
+    const pendingNewKeys = [getStateKey('pxyz-data/pxyz-data', 287)];
 
     return {
       key: 'team-prs-new',
@@ -474,7 +492,7 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         snapshotKeys: previousSnapshotKeys,
         pendingNewKeys,
         lastProcessedUpdatedAt: Date.now() - 60_000,
-      }
+      },
     };
   })(),
   'refresh-warning': {
@@ -488,31 +506,33 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       pendingNewKeys: [],
       lastProcessedUpdatedAt: null,
     },
-    showRefreshWarning: true
+    showRefreshWarning: true,
   },
   mixed: (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
-    dashboardData.pullRequests = dashboardData.pullRequests.map((pullRequest) => {
-      if (pullRequest.pullNumber === 1533) {
-        return {
-          ...pullRequest,
-          ciStatus: 'failing',
-          updatedAt: '2026-05-06T09:44:00.000Z'
-        };
-      }
+    dashboardData.pullRequests = dashboardData.pullRequests.map(
+      (pullRequest) => {
+        if (pullRequest.pullNumber === 1533) {
+          return {
+            ...pullRequest,
+            ciStatus: 'failing',
+            updatedAt: '2026-05-06T09:44:00.000Z',
+          };
+        }
 
-      if (pullRequest.pullNumber === 89) {
-        return {
-          ...pullRequest,
-          reviewStatus: 'approved',
-          ciStatus: 'passing',
-          mergeStateStatus: 'CLEAN',
-          updatedAt: '2026-05-06T09:28:00.000Z'
-        };
-      }
+        if (pullRequest.pullNumber === 89) {
+          return {
+            ...pullRequest,
+            reviewStatus: 'approved',
+            ciStatus: 'passing',
+            mergeStateStatus: 'CLEAN',
+            updatedAt: '2026-05-06T09:28:00.000Z',
+          };
+        }
 
-      return pullRequest;
-    });
+        return pullRequest;
+      },
+    );
 
     return {
       key: 'mixed',
@@ -521,25 +541,25 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
         [getStateKey('acme/chrome-home-page', 89)]: {
           isReady: false,
           highlighted: false,
-          updatedAt: Date.now() - 10_000
-        }
+          updatedAt: Date.now() - 10_000,
+        },
       },
       warningState: {
         [getStateKey('acme/platform-web', 1533)]: {
           activeCaseKeys: [],
           highlightedCaseKeys: [],
           highlighted: false,
-          updatedAt: Date.now() - 10_000
-        }
+          updatedAt: Date.now() - 10_000,
+        },
       },
       notificationSeenAtState: {},
       teamPrTrackerState: {
         snapshotKeys: [],
         pendingNewKeys: [],
         lastProcessedUpdatedAt: null,
-      }
+      },
     };
-  })()
+  })(),
 };
 
 export function getGitHubMockScenarioOptions() {
@@ -551,13 +571,15 @@ export function getGitHubMockScenarioByKey(mockKey: string | null | undefined) {
     return null;
   }
 
-  return MOCK_SCENARIOS[mockKey] ? cloneScenario(MOCK_SCENARIOS[mockKey]) : null;
+  return MOCK_SCENARIOS[mockKey]
+    ? cloneScenario(MOCK_SCENARIOS[mockKey])
+    : null;
 }
 
 function createWarningScenario(
   key: string,
   mergeStateStatus: GitHubPullRequestItem['mergeStateStatus'],
-  warningCaseKey: string
+  warningCaseKey: string,
 ): GitHubMockScenario {
   const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
   dashboardData.pullRequests = dashboardData.pullRequests.map((pullRequest) => {
@@ -567,9 +589,10 @@ function createWarningScenario(
 
     return {
       ...pullRequest,
-      ciStatus: warningCaseKey === 'failed-checks' ? 'failing' : pullRequest.ciStatus,
+      ciStatus:
+        warningCaseKey === 'failed-checks' ? 'failing' : pullRequest.ciStatus,
       mergeStateStatus,
-      updatedAt: '2026-05-06T09:41:00.000Z'
+      updatedAt: '2026-05-06T09:41:00.000Z',
     };
   });
 
@@ -582,15 +605,15 @@ function createWarningScenario(
         activeCaseKeys: [],
         highlightedCaseKeys: [],
         highlighted: false,
-        updatedAt: Date.now() - 10_000
-      }
+        updatedAt: Date.now() - 10_000,
+      },
     },
     notificationSeenAtState: {},
     teamPrTrackerState: {
-        snapshotKeys: [],
-        pendingNewKeys: [],
-        lastProcessedUpdatedAt: null,
-      }
+      snapshotKeys: [],
+      pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
+    },
   };
 }
 
@@ -608,7 +631,7 @@ function createPullRequest(
       | 'ciStatus'
       | 'mergeStateStatus'
       | 'updatedAt'
-    >
+    >,
 ): GitHubPullRequestItem {
   return {
     id: overrides.id,
@@ -627,13 +650,15 @@ function createPullRequest(
     isDraft: overrides.reviewStatus === 'draft',
     createdAt: overrides.createdAt ?? overrides.updatedAt,
     updatedAt: overrides.updatedAt,
-    url: overrides.url ?? `https://github.com/${overrides.owner}/${overrides.repo}/pull/${overrides.pullNumber}`,
+    url:
+      overrides.url ??
+      `https://github.com/${overrides.owner}/${overrides.repo}/pull/${overrides.pullNumber}`,
     source: overrides.source ?? 'authored',
     reviewStatus: overrides.reviewStatus,
     ciStatus: overrides.ciStatus,
     mergeStateStatus: overrides.mergeStateStatus,
     mergeQueueEntry: overrides.mergeQueueEntry ?? null,
-    detailsLoaded: overrides.detailsLoaded ?? true
+    detailsLoaded: overrides.detailsLoaded ?? true,
   };
 }
 
@@ -645,14 +670,14 @@ function cloneScenario(scenario: GitHubMockScenario): GitHubMockScenario {
     warningState: structuredClone(scenario.warningState),
     notificationSeenAtState: structuredClone(scenario.notificationSeenAtState),
     teamPrTrackerState: structuredClone(scenario.teamPrTrackerState),
-    showRefreshWarning: scenario.showRefreshWarning
+    showRefreshWarning: scenario.showRefreshWarning,
   };
 }
 
 function cloneDashboardData(data: GitHubDashboardData): GitHubDashboardData {
   return {
     ...structuredClone(data),
-    lastUpdatedAt: Date.now()
+    lastUpdatedAt: Date.now(),
   };
 }
 
@@ -666,7 +691,7 @@ function createNotification({
   pullNumber,
   title,
   updatedAt,
-  authorLogin
+  authorLogin,
 }: {
   id: string;
   repositoryName: string;
@@ -684,13 +709,13 @@ function createNotification({
     reason: 'comment',
     authorLogin,
     repository: {
-      full_name: repositoryName
+      full_name: repositoryName,
     },
     subject: {
       title,
       type: 'PullRequest',
       url: `https://api.github.com/repos/${owner}/${repo}/pulls/${pullNumber}`,
-      latest_comment_url: `https://api.github.com/repos/${owner}/${repo}/issues/comments/${pullNumber}`
-    }
+      latest_comment_url: `https://api.github.com/repos/${owner}/${repo}/issues/comments/${pullNumber}`,
+    },
   };
 }
