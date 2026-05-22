@@ -13,6 +13,7 @@ type HeaderMenuProps = {
   isGitHubLoading?: boolean;
   isJiraLoading?: boolean;
   isCheckingGitHubActivity?: boolean;
+  hasGitHubRefreshWarning?: boolean;
   lastGitHubUpdatedAt?: number | null;
   lastJiraUpdatedAt?: number | null;
   isMockMode?: boolean;
@@ -31,6 +32,7 @@ export function HeaderMenu({
   isGitHubLoading = false,
   isJiraLoading = false,
   isCheckingGitHubActivity = false,
+  hasGitHubRefreshWarning = false,
   lastGitHubUpdatedAt = null,
   lastJiraUpdatedAt = null,
   isMockMode = false,
@@ -101,6 +103,8 @@ export function HeaderMenu({
             : jiraConnectionStatus === 'error'
               ? 'API error'
               : 'Not connected';
+  const shouldShowGitHubRefreshWarning =
+    activeIntegration === 'github' && hasGitHubRefreshWarning;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -121,7 +125,13 @@ export function HeaderMenu({
 
       {isOpen ? (
         <div className="header-menu-panel absolute right-0 top-14 z-20 min-w-[280px] rounded-[26px] bg-panel p-4 shadow-glow">
-          <div className="header-menu-refresh">
+          <div
+            className={`header-menu-refresh ${
+              shouldShowGitHubRefreshWarning
+                ? 'header-menu-refresh--warning'
+                : ''
+            }`}
+          >
             <div className="header-menu-refresh__meta">
               <p className="header-menu-refresh__label">Last updated</p>
               <p className="header-menu-refresh__value">{statusText.replace('Updated ', '')}</p>

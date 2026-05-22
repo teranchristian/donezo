@@ -133,9 +133,30 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  border: 1px solid transparent;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.045);
   padding: 18px 16px;
+}
+
+.header-menu-refresh--warning {
+  border-color: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.header-menu-refresh--warning .header-menu-refresh__label,
+.header-menu-refresh--warning .header-menu-refresh__value {
+  color: #d6b56d;
+}
+
+.header-menu-refresh--warning .header-menu-refresh__button {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d6b56d;
+}
+
+.header-menu-refresh--warning .header-menu-refresh__button:hover {
+  background: rgba(245, 158, 11, 0.16);
+  color: #e2c47e;
 }
 
 .header-menu-refresh__meta {

@@ -211,6 +211,7 @@ export function DashboardPage({
             isGitHubLoading={isGitHubLoading}
             isJiraLoading={isJiraLoading}
             isCheckingGitHubActivity={isCheckingGitHubActivity}
+            hasGitHubRefreshWarning={Boolean(gitHubRefreshWarning)}
             lastGitHubUpdatedAt={gitHubData.lastUpdatedAt}
             lastJiraUpdatedAt={jiraData.lastUpdatedAt}
             isGitHubMockMode={isGitHubMockMode}
