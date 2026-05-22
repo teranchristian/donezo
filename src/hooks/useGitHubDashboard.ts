@@ -132,6 +132,13 @@ export function useGitHubDashboard({
     commitGitHubData(scenario.dashboardData);
     setGitHubSettingsTestStatus(scenario.dashboardData.connectionStatus);
     clearRefreshFailureState();
+    if (scenario.showRefreshWarning) {
+      setGitHubRefreshWarning(
+        `Unable to refresh GitHub. Showing data from ${formatGitHubRefreshWarningTime(
+          scenario.dashboardData.lastUpdatedAt ?? Date.now()
+        )}.`
+      );
+    }
     setIsGitHubInitialized(true);
     setIsGitHubMockReady(true);
   }, [clearRefreshFailureState, commitGitHubData]);

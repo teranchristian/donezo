@@ -124,20 +124,6 @@ body {
   min-width: 0;
 }
 
-.dashboard-refresh-warning {
-  max-width: min(360px, 100%);
-  margin: 0;
-  border: 1px solid rgba(251, 191, 36, 0.16);
-  border-radius: 999px;
-  background: rgba(251, 191, 36, 0.075);
-  padding: 8px 12px;
-  color: rgb(253, 230, 138);
-  font-size: 0.78rem;
-  font-weight: 500;
-  line-height: 1.35;
-  text-align: right;
-}
-
 .header-menu-panel {
   overflow: hidden;
 }
@@ -205,6 +191,47 @@ body {
 }
 
 .header-menu-refresh__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.card-top-bar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.github-card-refresh-warning {
+  display: inline-flex;
+  min-width: 0;
+  max-width: min(440px, 100%);
+  height: 38px;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.055);
+  padding: 0 14px;
+  color: rgba(251, 191, 36, 0.84);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.github-card-refresh-warning__icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: rgba(251, 191, 36, 0.8);
+}
+
+.github-card-refresh-warning__icon svg {
   width: 100%;
   height: 100%;
 }
@@ -347,9 +374,13 @@ body {
     justify-content: flex-start;
   }
 
-  .dashboard-refresh-warning {
-    border-radius: 14px;
-    text-align: left;
+  .card-top-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .github-card-refresh-warning {
+    max-width: 100%;
   }
 
   .summary-cards-grid {
