@@ -233,20 +233,22 @@ export function SettingsPage({
               />
             </label>
 
-            <label className="mt-5 flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
-              <div>
-                <span className="block text-sm text-stone-300">Enable dev mode</span>
-                <span className="mt-1 block text-sm leading-6 text-stone-400">
-                  Uses stored mock GitHub data for dashboard testing. Scenario selection stays in the header menu.
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={isGitHubDevModeEnabled}
-                onChange={(event) => void onSetGitHubDevMode(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-white/10 bg-black/20 text-accent focus:ring-accent/40"
-              />
-            </label>
+            {import.meta.env.VITE_ENABLE_DEV_MODE === 'true' ? (
+              <label className="mt-5 flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div>
+                  <span className="block text-sm text-stone-300">Enable dev mode</span>
+                  <span className="mt-1 block text-sm leading-6 text-stone-400">
+                    Uses stored mock GitHub data for dashboard testing. Scenario selection stays in the header menu.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={isGitHubDevModeEnabled}
+                  onChange={(event) => void onSetGitHubDevMode(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-white/10 bg-black/20 text-accent focus:ring-accent/40"
+                />
+              </label>
+            ) : null}
           </CardShell>
 
           <CardShell>

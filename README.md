@@ -249,10 +249,20 @@ Typical setup flow:
 npm install
 ```
 
-### Run the Vite dev server
+### Build the extension in dev mode
 
 ```bash
 npm run dev
+```
+
+This watches the source files and writes a development build to `dist/`. Load the
+`dist/` folder in Chrome to use the extension runtime with development-only
+mock data controls enabled.
+
+### Run the Vite dev server
+
+```bash
+npm run dev:server
 ```
 
 Important limitation:
@@ -343,7 +353,8 @@ Key files and modules:
 
 ## Scripts
 
-- `npm run dev` - run the Vite development server
+- `npm run dev` - watch and build the extension into `dist/` with development-only controls
+- `npm run dev:server` - run the Vite development server
 - `npm run build` - type-check and build the extension into `dist/`
 - `npm run preview` - preview the built Vite app locally
 

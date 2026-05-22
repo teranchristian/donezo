@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "VITE_ENABLE_DEV_MODE=true tsc --noEmit && VITE_ENABLE_DEV_MODE=true vite build --watch",
+    "dev:server": "VITE_ENABLE_DEV_MODE=true vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },

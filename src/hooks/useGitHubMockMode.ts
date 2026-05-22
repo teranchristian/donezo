@@ -12,6 +12,8 @@ import {
   type GitHubMockScenario
 } from '../mocks/github/scenarios';
 
+const isGitHubDevModeAvailable = import.meta.env.VITE_ENABLE_DEV_MODE === 'true';
+
 export function useGitHubMockMode() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGitHubMockMode, setIsGitHubMockMode] = useState(false);
@@ -19,13 +21,20 @@ export function useGitHubMockMode() {
 
   const gitHubMockScenario = useMemo<GitHubMockScenario | null>(
     () =>
-      isGitHubMockMode
+      isGitHubDevModeAvailable && isGitHubMockMode
         ? getGitHubMockScenarioByKey(gitHubMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY)
         : null,
     [gitHubMockScenarioKey, isGitHubMockMode]
   );
 
   useEffect(() => {
+    if (!isGitHubDevModeAvailable) {
+      setIsGitHubMockMode(false);
+      setGitHubMockScenarioKey(null);
+      setIsLoading(false);
+      return;
+    }
+
     let isActive = true;
 
     void (async () => {
@@ -49,6 +58,10 @@ export function useGitHubMockMode() {
   }, []);
 
   const applyMockScenario = useCallback(async (nextMockScenarioKey: string) => {
+    if (!isGitHubDevModeAvailable) {
+      return;
+    }
+
     await saveStoredGitHubDevMode(true);
     await saveStoredGitHubMockScenarioKey(nextMockScenarioKey);
 
@@ -66,6 +79,10 @@ export function useGitHubMockMode() {
 
   const setGitHubDevMode = useCallback(
     async (isEnabled: boolean) => {
+      if (!isGitHubDevModeAvailable) {
+        return;
+      }
+
       if (isEnabled) {
         await applyMockScenario(gitHubMockScenarioKey ?? DEFAULT_GITHUB_MOCK_SCENARIO_KEY);
         return;
