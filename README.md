@@ -1,6 +1,14 @@
 # Donezo
 
+<p align="center">
+  <img src="public/icons/icon-original-cropped.png" alt="Donezo icon" width="120" />
+</p>
+
 Donezo is a Chrome new tab extension for day-to-day engineering work. It replaces the default new tab page with a dashboard that combines GitHub, Jira, Today focus, and local notes into one workspace.
+
+<p align="center">
+  <img src="public/images/demo.png" alt="Donezo dashboard screenshot" width="860" />
+</p>
 
 The app is built with React, TypeScript, Vite, and Tailwind CSS. It is currently optimized for a personal workflow, but the codebase is structured around configurable local settings for GitHub and Jira.
 
