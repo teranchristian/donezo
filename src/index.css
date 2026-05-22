@@ -211,11 +211,11 @@ body {
   align-items: center;
   gap: 7px;
   margin: 0;
-  border: 1px solid rgba(251, 191, 36, 0.22);
+  border: 1px solid rgba(245, 158, 11, 0.22);
   border-radius: 999px;
-  background: rgba(251, 191, 36, 0.055);
+  background: rgba(245, 158, 11, 0.08);
   padding: 0 11px;
-  color: rgba(251, 191, 36, 0.84);
+  color: #d6b56d;
   font-size: 0.76rem;
   font-weight: 650;
   line-height: 1;
@@ -223,7 +223,7 @@ body {
 
 .github-card-refresh-warning__separator {
   flex: 0 0 auto;
-  color: rgba(251, 191, 36, 0.36);
+  color: rgba(214, 181, 109, 0.38);
 }
 
 .github-card-refresh-warning__retry {
@@ -231,7 +231,7 @@ body {
   border: 0;
   background: transparent;
   padding: 0;
-  color: rgba(251, 191, 36, 0.9);
+  color: #d6b56d;
   font: inherit;
   font-weight: 700;
   line-height: 1;
@@ -242,7 +242,7 @@ body {
 }
 
 .github-card-refresh-warning__retry:hover {
-  color: rgb(253, 230, 138);
+  color: #e2c47e;
 }
 
 .github-card-refresh-warning__icon {
@@ -252,7 +252,7 @@ body {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  color: rgba(251, 191, 36, 0.8);
+  color: rgba(214, 181, 109, 0.82);
 }
 
 .github-card-refresh-warning__icon svg {
