@@ -16,3 +16,4 @@ export const GITHUB_PR_NOTIFICATION_SEEN_AT_STORAGE_KEY = 'github-pr-notificatio
 export const GITHUB_TEAM_PR_TRACKER_STORAGE_KEY = 'github-team-pr-tracker';
 export const GITHUB_MOCK_SCENARIO_STORAGE_KEY = 'github-mock-scenario';
 export const GITHUB_DEV_MODE_STORAGE_KEY = 'github-dev-mode';
+export const GITHUB_REFRESH_STATUS_STORAGE_KEY = 'github-refresh-status';

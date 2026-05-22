@@ -13,12 +13,18 @@ import {
   saveStoredGitHubPrNotificationSeenAtState,
   saveStoredGitHubPrReadyState,
   saveStoredGitHubTeamPrTrackerState,
-  saveStoredGitHubPrWarningState
+  saveStoredGitHubPrWarningState,
+  GITHUB_REFRESH_STATUS_STORAGE_KEY
 } from '../lib/storage';
+import {
+  createGitHubCacheToken,
+  type GitHubRefreshStatus
+} from '../lib/githubRefreshStatus';
 import type { GitHubMockScenario } from '../mocks/github/scenarios';
 
 const GITHUB_DASHBOARD_CACHE_KEY = 'github-dashboard-cache';
 const GITHUB_REFRESH_DEBUG = false;
+const AUTOMATIC_REFRESH_FAILURE_WARNING_THRESHOLD = 3;
 
 let gitHubRefreshRequestSequence = 0;
 
@@ -53,17 +59,61 @@ export function useGitHubDashboard({
   const [isCheckingGitHubActivity, setIsCheckingGitHubActivity] = useState(false);
   const [lastGitHubActivityCheckAt, setLastGitHubActivityCheckAt] = useState<number | null>(null);
   const [gitHubOwnerOptions, setGitHubOwnerOptions] = useState<string[]>([]);
+  const [gitHubRefreshWarning, setGitHubRefreshWarning] = useState<number | null>(null);
   const [gitHubSettingsTestStatus, setGitHubSettingsTestStatus] =
     useState<GitHubConnectionStatus>('not-connected');
   const [isTestingGitHubSettings, setIsTestingGitHubSettings] = useState(false);
   const isMountedRef = useRef(true);
   const isGitHubRefreshInFlightRef = useRef(false);
+  const gitHubDataRef = useRef<GitHubDashboardData>(gitHubData);
+  const automaticRefreshFailureCountRef = useRef(0);
 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  const commitGitHubData = useCallback((data: GitHubDashboardData) => {
+    gitHubDataRef.current = data;
+    setGitHubData(data);
+  }, []);
+
+  const clearRefreshFailureState = useCallback(() => {
+    automaticRefreshFailureCountRef.current = 0;
+    setGitHubRefreshWarning(null);
+  }, []);
+
+  const showRefreshWarningForCurrentData = useCallback(() => {
+    const lastUpdatedAt = gitHubDataRef.current.lastUpdatedAt;
+    if (!lastUpdatedAt) {
+      return;
+    }
+
+    setGitHubRefreshWarning(lastUpdatedAt);
+  }, []);
+
+  const handleRefreshFailure = useCallback(
+    (options: { source: string; failureCount?: number }) => {
+      if (!gitHubDataRef.current.lastUpdatedAt) {
+        return;
+      }
+
+      if (options.source === 'manual-refresh') {
+        showRefreshWarningForCurrentData();
+        return;
+      }
+
+      const failureCount =
+        options.failureCount ?? automaticRefreshFailureCountRef.current + 1;
+      automaticRefreshFailureCountRef.current = failureCount;
+
+      if (failureCount >= AUTOMATIC_REFRESH_FAILURE_WARNING_THRESHOLD) {
+        showRefreshWarningForCurrentData();
+      }
+    },
+    [showRefreshWarningForCurrentData]
+  );
 
   const applyMockScenarioData = useCallback(async (scenario: GitHubMockScenario) => {
     setIsGitHubMockReady(false);
@@ -76,11 +126,15 @@ export function useGitHubDashboard({
       return;
     }
 
-    setGitHubData(scenario.dashboardData);
+    commitGitHubData(scenario.dashboardData);
     setGitHubSettingsTestStatus(scenario.dashboardData.connectionStatus);
+    clearRefreshFailureState();
+    if (scenario.showRefreshWarning) {
+      setGitHubRefreshWarning(scenario.dashboardData.lastUpdatedAt ?? Date.now());
+    }
     setIsGitHubInitialized(true);
     setIsGitHubMockReady(true);
-  }, []);
+  }, [clearRefreshFailureState, commitGitHubData]);
 
   const refreshGitHubData = useCallback(
     async (options: {
@@ -141,8 +195,18 @@ export function useGitHubDashboard({
           return;
         }
 
-        setGitHubData(data);
+        if (data.connectionStatus === 'error' && gitHubDataRef.current.lastUpdatedAt) {
+          handleRefreshFailure({ source: options.source });
+          setGitHubSettingsTestStatus(gitHubDataRef.current.connectionStatus);
+          setIsGitHubInitialized(true);
+          return;
+        }
+
+        commitGitHubData(data);
         setGitHubSettingsTestStatus(data.connectionStatus);
+        if (data.connectionStatus !== 'error') {
+          clearRefreshFailureState();
+        }
         setIsGitHubInitialized(true);
       } finally {
         isGitHubRefreshInFlightRef.current = false;
@@ -152,7 +216,7 @@ export function useGitHubDashboard({
         }
       }
     },
-    []
+    [clearRefreshFailureState, commitGitHubData, handleRefreshFailure]
   );
 
   useEffect(() => {
@@ -168,6 +232,7 @@ export function useGitHubDashboard({
     let isCancelled = false;
     setIsGitHubMockReady(true);
     setIsGitHubInitialized(false);
+    clearRefreshFailureState();
 
     void (async () => {
       const cachedData = await getLatestGitHubDashboardData({
@@ -181,7 +246,7 @@ export function useGitHubDashboard({
       }
 
       if (cachedData) {
-        setGitHubData(cachedData);
+        commitGitHubData(cachedData);
         setGitHubSettingsTestStatus(cachedData.connectionStatus);
         setIsGitHubInitialized(true);
       }
@@ -199,7 +264,7 @@ export function useGitHubDashboard({
     return () => {
       isCancelled = true;
     };
-  }, [applyMockScenarioData, gitHubMockScenario, isLoadingSettings, refreshGitHubData, settings.ownerFilter, settings.token, settings.username]);
+  }, [applyMockScenarioData, clearRefreshFailureState, commitGitHubData, gitHubMockScenario, isLoadingSettings, refreshGitHubData, settings.ownerFilter, settings.token, settings.username]);
 
   const loadOwnerOptions = useCallback(
     async (options: { token: string; username?: string }) => {
@@ -242,12 +307,36 @@ export function useGitHubDashboard({
         !isMountedRef.current ||
         isLoadingSettings ||
         gitHubMockScenario ||
-        !changes[GITHUB_DASHBOARD_CACHE_KEY]
+        !changes[GITHUB_DASHBOARD_CACHE_KEY] &&
+        !changes[GITHUB_REFRESH_STATUS_STORAGE_KEY]
       ) {
         return;
       }
 
       void (async () => {
+        const cacheToken = createGitHubCacheToken(
+          settings.username.trim(),
+          settings.token.trim(),
+          settings.ownerFilter.trim()
+        );
+        const refreshStatus = changes[GITHUB_REFRESH_STATUS_STORAGE_KEY]
+          ?.newValue as GitHubRefreshStatus | undefined;
+
+        if (refreshStatus?.cacheToken === cacheToken) {
+          if (refreshStatus.status === 'success') {
+            clearRefreshFailureState();
+          } else {
+            handleRefreshFailure({
+              source: 'background-refresh',
+              failureCount: refreshStatus.failureCount
+            });
+          }
+        }
+
+        if (!changes[GITHUB_DASHBOARD_CACHE_KEY]) {
+          return;
+        }
+
         const requestId = createGitHubRefreshRequestId('storage-cache-sync');
         logGitHubRefreshDebug('storage-cache-change', {
           requestId,
@@ -266,7 +355,7 @@ export function useGitHubDashboard({
 
         setIsCheckingGitHubActivity(false);
         setLastGitHubActivityCheckAt(Date.now());
-        setGitHubData(cachedData);
+        commitGitHubData(cachedData);
         setGitHubSettingsTestStatus(cachedData.connectionStatus);
       })();
     };
@@ -277,7 +366,7 @@ export function useGitHubDashboard({
       isCancelled = true;
       chrome.storage.onChanged.removeListener(handleStorageChanged);
     };
-  }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
+  }, [clearRefreshFailureState, commitGitHubData, gitHubMockScenario, handleRefreshFailure, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
 
   useEffect(() => {
     if (isLoadingSettings || gitHubMockScenario) {
@@ -302,7 +391,7 @@ export function useGitHubDashboard({
           return;
         }
 
-        setGitHubData(cachedData);
+        commitGitHubData(cachedData);
         setGitHubSettingsTestStatus(cachedData.connectionStatus);
       })();
     };
@@ -315,7 +404,7 @@ export function useGitHubDashboard({
       document.removeEventListener('visibilitychange', syncVisibleData);
       window.removeEventListener('focus', syncVisibleData);
     };
-  }, [gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
+  }, [commitGitHubData, gitHubMockScenario, isLoadingSettings, settings.ownerFilter, settings.token, settings.username]);
 
   const testConnectionStatus = useCallback(async (token: string) => {
     setIsTestingGitHubSettings(true);
@@ -356,6 +445,7 @@ export function useGitHubDashboard({
     isCheckingGitHubActivity,
     lastGitHubActivityCheckAt,
     gitHubOwnerOptions,
+    gitHubRefreshWarning,
     gitHubSettingsTestStatus,
     isTestingGitHubSettings,
     loadOwnerOptions,

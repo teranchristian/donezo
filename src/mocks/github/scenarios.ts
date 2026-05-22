@@ -18,6 +18,7 @@ export type GitHubMockScenario = {
   warningState: GitHubPrWarningState;
   notificationSeenAtState: GitHubPrNotificationSeenAtState;
   teamPrTrackerState: GitHubTeamPrTrackerState;
+  showRefreshWarning?: boolean;
 };
 
 export type GitHubMockScenarioOption = {
@@ -133,6 +134,7 @@ const MOCK_SCENARIO_OPTIONS: GitHubMockScenarioOption[] = [
   { key: 'comment-badges', label: 'Comment badges' },
   { key: 'queued-prs', label: 'Queued PRs' },
   { key: 'team-prs-new', label: 'Team PRs: new' },
+  { key: 'refresh-warning', label: 'Refresh warning' },
   { key: 'mixed', label: 'Mixed' }
 ];
 
@@ -475,6 +477,19 @@ const MOCK_SCENARIOS: Record<string, GitHubMockScenario> = {
       }
     };
   })(),
+  'refresh-warning': {
+    key: 'refresh-warning',
+    dashboardData: cloneDashboardData(BASE_DASHBOARD_DATA),
+    readyState: {},
+    warningState: {},
+    notificationSeenAtState: {},
+    teamPrTrackerState: {
+      snapshotKeys: [],
+      pendingNewKeys: [],
+      lastProcessedUpdatedAt: null,
+    },
+    showRefreshWarning: true
+  },
   mixed: (() => {
     const dashboardData = cloneDashboardData(BASE_DASHBOARD_DATA);
     dashboardData.pullRequests = dashboardData.pullRequests.map((pullRequest) => {
@@ -629,7 +644,8 @@ function cloneScenario(scenario: GitHubMockScenario): GitHubMockScenario {
     readyState: structuredClone(scenario.readyState),
     warningState: structuredClone(scenario.warningState),
     notificationSeenAtState: structuredClone(scenario.notificationSeenAtState),
-    teamPrTrackerState: structuredClone(scenario.teamPrTrackerState)
+    teamPrTrackerState: structuredClone(scenario.teamPrTrackerState),
+    showRefreshWarning: scenario.showRefreshWarning
   };
 }
 

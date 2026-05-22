@@ -16,6 +16,7 @@ type DashboardHeaderControlsProps = {
   isGitHubLoading: boolean;
   isJiraLoading: boolean;
   isCheckingGitHubActivity: boolean;
+  hasGitHubRefreshWarning: boolean;
   lastGitHubUpdatedAt: number | null;
   lastJiraUpdatedAt: number | null;
   isGitHubMockMode: boolean;
@@ -41,6 +42,7 @@ export function DashboardHeaderControls({
   isGitHubLoading,
   isJiraLoading,
   isCheckingGitHubActivity,
+  hasGitHubRefreshWarning,
   lastGitHubUpdatedAt,
   lastJiraUpdatedAt,
   isGitHubMockMode,
@@ -79,6 +81,7 @@ export function DashboardHeaderControls({
         isGitHubLoading={isGitHubLoading}
         isJiraLoading={isJiraLoading}
         isCheckingGitHubActivity={isCheckingGitHubActivity}
+        hasGitHubRefreshWarning={hasGitHubRefreshWarning}
         lastGitHubUpdatedAt={lastGitHubUpdatedAt}
         lastJiraUpdatedAt={lastJiraUpdatedAt}
         isMockMode={isGitHubMockMode}

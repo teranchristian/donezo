@@ -19,6 +19,7 @@ import { useTodayFocusState } from '../hooks/useTodayFocusState';
 import { type GitHubDashboardData } from '../lib/githubApi';
 import { getJiraIssueCounts, type JiraDashboardData } from '../lib/jiraApi';
 import { getDashboardAlerts } from '../lib/dashboardPageDomain';
+import { formatGitHubRefreshWarningTime } from '../lib/githubRefreshStatus';
 import type {
   ActiveGitHubView,
   ActiveIntegration,
@@ -40,6 +41,7 @@ type DashboardPageProps = {
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
+  gitHubRefreshWarning: number | null;
   onClearGitHubMockScenario: () => void;
   onApplyGitHubMockScenario: (mockScenarioKey: string) => void;
   onRefreshGitHub: () => void;
@@ -75,6 +77,7 @@ export function DashboardPage({
   isGitHubLoading,
   isCheckingGitHubActivity,
   lastGitHubActivityCheckAt,
+  gitHubRefreshWarning,
   onClearGitHubMockScenario,
   onApplyGitHubMockScenario,
   onRefreshGitHub,
@@ -208,6 +211,7 @@ export function DashboardPage({
             isGitHubLoading={isGitHubLoading}
             isJiraLoading={isJiraLoading}
             isCheckingGitHubActivity={isCheckingGitHubActivity}
+            hasGitHubRefreshWarning={Boolean(gitHubRefreshWarning)}
             lastGitHubUpdatedAt={gitHubData.lastUpdatedAt}
             lastJiraUpdatedAt={jiraData.lastUpdatedAt}
             isGitHubMockMode={isGitHubMockMode}
@@ -241,6 +245,7 @@ export function DashboardPage({
             isGitHubLoading={isGitHubLoading}
             isCheckingGitHubActivity={isCheckingGitHubActivity}
             lastGitHubActivityCheckAt={lastGitHubActivityCheckAt}
+            gitHubRefreshWarning={gitHubRefreshWarning}
             isJiraLoading={isJiraLoading}
             todayFocus={todayFocus}
             onRefreshGitHub={onRefreshGitHub}
@@ -272,6 +277,7 @@ function DashboardContent({
   isGitHubLoading,
   isCheckingGitHubActivity,
   lastGitHubActivityCheckAt,
+  gitHubRefreshWarning,
   isJiraLoading,
   todayFocus,
   onRefreshGitHub,
@@ -294,6 +300,7 @@ function DashboardContent({
   isGitHubLoading: boolean;
   isCheckingGitHubActivity: boolean;
   lastGitHubActivityCheckAt: number | null;
+  gitHubRefreshWarning: number | null;
   isJiraLoading: boolean;
   todayFocus: ReturnType<typeof useTodayFocusState>;
   onRefreshGitHub: () => void;
@@ -307,6 +314,13 @@ function DashboardContent({
   const todayFocusPullRequestRanks = useMemo(
     () => buildTodayFocusPullRequestRanks(todayFocus.todayFocusItems),
     [todayFocus.todayFocusItems],
+  );
+  const gitHubTopBar = (
+    <CardTopBar
+      left={integrationSwitcher}
+      warning={activeIntegration === 'github' ? gitHubRefreshWarning : null}
+      onRetry={onRefreshGitHub}
+    />
   );
 
   return (
@@ -340,7 +354,7 @@ function DashboardContent({
             aria-hidden={activeIntegration !== 'github'}
           >
             <GitHubCard
-              topBar={activeIntegration === 'github' ? integrationSwitcher : undefined}
+              topBar={activeIntegration === 'github' ? gitHubTopBar : undefined}
               data={gitHubData}
               todayFocusPullRequestRanks={todayFocusPullRequestRanks}
               username={settings.integrations.github.username}
@@ -361,7 +375,11 @@ function DashboardContent({
             aria-hidden={activeIntegration !== 'jira'}
           >
             <JiraCard
-              topBar={activeIntegration === 'jira' ? integrationSwitcher : undefined}
+              topBar={
+                activeIntegration === 'jira' ? (
+                  <CardTopBar left={integrationSwitcher} />
+                ) : undefined
+              }
               baseUrl={settings.integrations.jira.baseUrl}
               data={jiraData}
               todayFocusItemIds={todayFocus.todayFocusItemIds}
@@ -373,6 +391,53 @@ function DashboardContent({
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function CardTopBar({
+  left,
+  warning = null,
+  onRetry,
+}: {
+  left: ReactNode;
+  warning?: number | null;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="card-top-bar">
+      <div className="min-w-0">{left}</div>
+      {warning ? (
+        <p className="github-card-refresh-warning" role="status">
+          <span className="github-card-refresh-warning__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+              <path d="M12 8.2v4.6" strokeLinecap="round" />
+              <path d="M12 16.3h.01" strokeLinecap="round" />
+              <path
+                d="M10.3 4.6 2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.6a2 2 0 0 0-3.4 0Z"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <span className="min-w-0 truncate">
+            Cached {formatGitHubRefreshWarningTime(warning)}
+          </span>
+          {onRetry ? (
+            <>
+              <span className="github-card-refresh-warning__separator" aria-hidden="true">
+                •
+              </span>
+              <button
+                type="button"
+                className="github-card-refresh-warning__retry"
+                onClick={onRetry}
+              >
+                Retry
+              </button>
+            </>
+          ) : null}
+        </p>
+      ) : null}
     </div>
   );
 }
