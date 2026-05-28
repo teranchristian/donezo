@@ -19,7 +19,10 @@ import { type ActiveJiraView } from '../lib/storage';
 import { CardTabMenu } from './CardTabMenu';
 import { CardShell } from './CardShell';
 import { StatusBadge } from './StatusBadge';
-import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
+import {
+  TODAY_FOCUS_DRAG_MIME,
+  TODAY_FOCUS_JIRA_DRAG_MIME,
+} from './SummaryCard';
 import { TodayFocusIndicator } from './TodayFocusIndicator';
 
 type JiraCardProps = {
@@ -205,6 +208,7 @@ function IssueRow({
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'copy';
         event.dataTransfer.setData(TODAY_FOCUS_DRAG_MIME, JSON.stringify(mapJiraIssueToFocusItem(issue, baseUrl)));
+        event.dataTransfer.setData(TODAY_FOCUS_JIRA_DRAG_MIME, 'true');
         event.dataTransfer.setData('text/plain', issue.key);
       }}
     >

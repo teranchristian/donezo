@@ -18,6 +18,8 @@ import { getJiraBrowseUrl, normalizeJiraBaseUrl } from '../lib/jiraApi';
 
 export const TODAY_FOCUS_MAX_ITEMS = 3;
 export const TODAY_FOCUS_DRAG_MIME = 'application/x-dashboard-today-focus-item';
+export const TODAY_FOCUS_GITHUB_DRAG_MIME = 'application/x-dashboard-today-focus-github-item';
+export const TODAY_FOCUS_JIRA_DRAG_MIME = 'application/x-dashboard-today-focus-jira-item';
 export const TODAY_FOCUS_INTERNAL_DRAG_MIME = 'application/x-dashboard-today-focus-move';
 const MANUAL_TASK_ROUTE_PARAM = 'manualTask';
 
@@ -29,6 +31,11 @@ type FocusInternalDragPayload = {
 };
 
 type TopLevelDropIndicator = {
+  targetId: string;
+  position: 'before' | 'after';
+};
+
+type TodayFocusAddPlacement = {
   targetId: string;
   position: 'before' | 'after';
 };
@@ -58,7 +65,7 @@ type SummaryCardProps = {
   limit?: number;
   warning?: string | null;
   onRemoveItem: (itemId: string) => void;
-  onAddItem: (item: FocusItem) => void;
+  onAddItem: (item: FocusItem, placement?: TodayFocusAddPlacement) => void;
   onCreateManualTask: (title: string, note: string) => boolean;
   onUpdateManualTask: (itemId: string, title: string, note: string) => boolean;
   onToggleManualTask: (itemId: string) => void;
@@ -138,14 +145,16 @@ export function SummaryCard({
     };
   }, [manualTasks]);
 
-  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+  function handleDrop(event: React.DragEvent<HTMLElement>) {
+    if (event.defaultPrevented || visibleItems.length >= limit) {
+      return;
+    }
+
     event.preventDefault();
     setIsDropTargetActive(false);
 
     const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
-    if (internalDrag?.source === 'top-level') {
-      setActiveInternalDrag(null);
-      setActiveTopLevelDropIndicator(null);
+    if (internalDrag) {
       return;
     }
 
@@ -155,20 +164,27 @@ export function SummaryCard({
     }
 
     onAddItem(normalizeDroppedItem(externalDrag));
+    setActiveTopLevelDropIndicator(null);
     setActiveInternalDrag(null);
   }
 
-  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    if (!isValidRootDrop(event.dataTransfer, activeInternalDrag)) {
+  function handleDragOver(event: React.DragEvent<HTMLElement>) {
+    if (
+      visibleItems.length >= limit ||
+      !isValidRootDrop(event.dataTransfer, activeInternalDrag)
+    ) {
       return;
     }
 
     event.preventDefault();
-    event.dataTransfer.dropEffect = activeInternalDrag ? 'move' : 'copy';
+    event.dataTransfer.dropEffect = 'copy';
   }
 
-  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
-    if (!isValidRootDrop(event.dataTransfer, activeInternalDrag)) {
+  function handleDragEnter(event: React.DragEvent<HTMLElement>) {
+    if (
+      visibleItems.length >= limit ||
+      !isValidRootDrop(event.dataTransfer, activeInternalDrag)
+    ) {
       return;
     }
 
@@ -176,13 +192,13 @@ export function SummaryCard({
     setIsDropTargetActive(true);
   }
 
-  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+  function handleDragLeave(event: React.DragEvent<HTMLElement>) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setIsDropTargetActive(false);
     }
   }
 
-  function handleBlur(event: FocusEvent<HTMLDivElement>) {
+  function handleBlur(event: FocusEvent<HTMLElement>) {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setIsDropTargetActive(false);
     }
@@ -199,15 +215,32 @@ export function SummaryCard({
     targetId: string,
   ) {
     const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
-    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+    if (
+      event.defaultPrevented &&
+      (!dragPayload ||
+        (dragPayload.source === 'top-level' && dragPayload.itemSource === 'github'))
+    ) {
       return;
     }
 
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+    const isExternalRootDrop =
+      visibleItems.length < limit && isValidRootDrop(event.dataTransfer, activeInternalDrag);
 
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
+    if (dragPayload) {
+      if (dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+        return;
+      }
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    } else if (isExternalRootDrop) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    } else {
+      return;
+    }
+
+    const position = getTopLevelDropPosition(event);
     setActiveTopLevelDropIndicator((current) =>
       current?.targetId === targetId && current.position === position
         ? current
@@ -224,26 +257,52 @@ export function SummaryCard({
   }
 
   function handleTopLevelCardDrop(event: React.DragEvent<HTMLDivElement>, targetId: string) {
-    event.preventDefault();
-
-    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
-    if (!dragPayload || dragPayload.source !== 'top-level' || dragPayload.itemId === targetId) {
+    if (event.defaultPrevented) {
       setActiveTopLevelDropIndicator(null);
       return;
     }
 
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
-    applyTopLevelDrop({
-      dragItemId: dragPayload.itemId,
+    const dragPayload = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
+    if (dragPayload && (dragPayload.source !== 'top-level' || dragPayload.itemId === targetId)) {
+      setActiveTopLevelDropIndicator(null);
+      return;
+    }
+
+    if (dragPayload) {
+      event.preventDefault();
+
+      const position = getTopLevelDropPosition(event);
+      applyTopLevelDrop({
+        dragItemId: dragPayload.itemId,
+        targetId,
+        position,
+        visibleItems,
+        onReorderTopLevelItem,
+        onMoveTopLevelItemToEnd
+      });
+      setActiveTopLevelDropIndicator(null);
+      setActiveInternalDrag(null);
+      return;
+    }
+
+    if (visibleItems.length >= limit || !isValidRootDrop(event.dataTransfer, activeInternalDrag)) {
+      setActiveTopLevelDropIndicator(null);
+      return;
+    }
+
+    const externalDrag = readExternalFocusItem(event.dataTransfer);
+    if (!externalDrag) {
+      setActiveTopLevelDropIndicator(null);
+      return;
+    }
+
+    event.preventDefault();
+    onAddItem(normalizeDroppedItem(externalDrag), {
       targetId,
-      position,
-      visibleItems,
-      onReorderTopLevelItem,
-      onMoveTopLevelItemToEnd
+      position: getTopLevelDropPosition(event),
     });
+    setIsDropTargetActive(false);
     setActiveTopLevelDropIndicator(null);
-    setActiveInternalDrag(null);
   }
 
   function handleToggleManualTaskNoteCheckbox(itemId: string, lineIndex: number) {
@@ -261,7 +320,16 @@ export function SummaryCard({
   }
 
   return (
-    <CardShell>
+    <CardShell
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onBlur={handleBlur}
+      className={`transition ${
+        isDropTargetActive ? 'border-violet-400/40 bg-violet-500/[0.08]' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
@@ -341,11 +409,6 @@ export function SummaryCard({
         ))}
 
         <div
-          onDrop={visibleItems.length < limit ? handleDrop : undefined}
-          onDragOver={visibleItems.length < limit ? handleDragOver : undefined}
-          onDragEnter={visibleItems.length < limit ? handleDragEnter : undefined}
-          onDragLeave={visibleItems.length < limit ? handleDragLeave : undefined}
-          onBlur={visibleItems.length < limit ? handleBlur : undefined}
           className={`rounded-[16px] border px-3 shadow-[inset_0_0_0_1px_rgba(139,92,246,0.08)] transition ${
             visibleItems.length > 0 ? 'py-2.5' : 'py-3'
           } ${
@@ -803,12 +866,12 @@ function FocusJiraCard({
   }
 
   function handleNestDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
     setIsNestTargetActive(false);
     expandedByDragHoverRef.current = false;
 
     const internalDrag = activeInternalDrag ?? readInternalDragPayload(event.dataTransfer);
     if (internalDrag && internalDrag.source === 'top-level' && internalDrag.itemSource === 'github') {
+      event.preventDefault();
       onNestExistingPullRequest(item.id, internalDrag.itemId);
       setIsExpanded(true);
       onInternalDragEnd();
@@ -817,6 +880,7 @@ function FocusJiraCard({
 
     const externalDrag = readExternalFocusItem(event.dataTransfer);
     if (externalDrag?.source === 'github') {
+      event.preventDefault();
       onNestNewPullRequest(item.id, externalDrag);
       setIsExpanded(true);
     }
@@ -1223,6 +1287,11 @@ function applyTopLevelDrop({
   }
 
   onReorderTopLevelItem(dragItemId, nextItem.id);
+}
+
+function getTopLevelDropPosition(event: React.DragEvent<HTMLDivElement>) {
+  const bounds = event.currentTarget.getBoundingClientRect();
+  return event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after';
 }
 
 function TopLevelInsertionIndicator({
@@ -2031,7 +2100,7 @@ function isValidJiraNestTarget(dataTransfer: DataTransfer, activeInternalDrag: F
     return internalDrag.source === 'top-level' && internalDrag.itemSource === 'github';
   }
 
-  return dataTransfer.types.includes(TODAY_FOCUS_DRAG_MIME);
+  return dataTransfer.types.includes(TODAY_FOCUS_GITHUB_DRAG_MIME);
 }
 
 function readExternalFocusItem(dataTransfer: DataTransfer): FocusItem | null {

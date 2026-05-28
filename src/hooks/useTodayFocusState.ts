@@ -26,6 +26,11 @@ import {
 
 const TODAY_FOCUS_DEBUG = false;
 
+type TodayFocusAddPlacement = {
+  targetId: string;
+  position: 'before' | 'after';
+};
+
 type UseTodayFocusStateOptions = {
   jiraIssues: JiraIssue[];
   gitHubPullRequests: GitHubPullRequestItem[];
@@ -243,13 +248,14 @@ export function useTodayFocusState({
     }
   }
 
-  function handleAddTodayFocusItem(item: FocusItem) {
+  function handleAddTodayFocusItem(item: FocusItem, placement?: TodayFocusAddPlacement) {
     setTodayFocusWarning(null);
 
     const addResult = addTodayFocusItem(
       todayFocusItemsRef.current,
       item,
       gitHubPullRequests,
+      placement,
     );
     if (addResult.warning) {
       setTodayFocusWarning(addResult.warning);
@@ -425,6 +431,7 @@ function addTodayFocusItem(
   items: FocusItem[],
   item: FocusItem,
   pullRequests: GitHubPullRequestItem[],
+  placement?: TodayFocusAddPlacement,
 ) {
   if (hasTodayFocusItem(items, item.id)) {
     return { items, warning: 'That item is already in Today focus.' };
@@ -464,8 +471,8 @@ function addTodayFocusItem(
     }
 
     return {
-      items: [
-        ...items.filter(
+      items: insertTodayFocusItem(
+        items.filter(
           (focusItem) =>
             !(
               focusItem.source === 'github' &&
@@ -476,15 +483,44 @@ function addTodayFocusItem(
           ...normalizedItem,
           children: Array.from(nextChildrenById.values()),
         },
-      ],
+        placement,
+      ),
       warning: null,
     };
   }
 
   return {
-    items: [...items, normalizeTopLevelTodayFocusItem(item)],
+    items: insertTodayFocusItem(
+      items,
+      normalizeTopLevelTodayFocusItem(item),
+      placement,
+    ),
     warning: null,
   };
+}
+
+function insertTodayFocusItem(
+  items: FocusItem[],
+  item: FocusItem,
+  placement?: TodayFocusAddPlacement,
+) {
+  if (!placement) {
+    return [...items, item];
+  }
+
+  const targetIndex = items.findIndex((focusItem) => focusItem.id === placement.targetId);
+  if (targetIndex < 0) {
+    return [...items, item];
+  }
+
+  const insertIndex =
+    placement.position === 'before' ? targetIndex : targetIndex + 1;
+
+  return [
+    ...items.slice(0, insertIndex),
+    item,
+    ...items.slice(insertIndex),
+  ];
 }
 
 function createManualTodayFocusTask(
