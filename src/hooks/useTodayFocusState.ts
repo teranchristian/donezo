@@ -25,6 +25,7 @@ import {
 } from '../lib/todayFocusSync';
 
 const TODAY_FOCUS_DEBUG = false;
+const TODAY_FOCUS_WARNING_TIMEOUT_MS = 5_000;
 
 type TodayFocusAddPlacement = {
   targetId: string;
@@ -56,6 +57,20 @@ export function useTodayFocusState({
   useEffect(() => {
     todayFocusItemsRef.current = todayFocusItems;
   }, [todayFocusItems]);
+
+  useEffect(() => {
+    if (!todayFocusWarning) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setTodayFocusWarning(null);
+    }, TODAY_FOCUS_WARNING_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [todayFocusWarning]);
 
   useEffect(() => {
     let isMounted = true;
