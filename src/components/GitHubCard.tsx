@@ -44,7 +44,10 @@ import { HideRepositoryIcon } from './HideRepositoryIcon';
 import { PullRequestCommentBadge } from './PullRequestCommentBadge';
 import { PullRequestList } from './PullRequestList';
 import { StatusBadge } from './StatusBadge';
-import { TODAY_FOCUS_DRAG_MIME } from './SummaryCard';
+import {
+  TODAY_FOCUS_DRAG_MIME,
+  TODAY_FOCUS_GITHUB_DRAG_MIME,
+} from './SummaryCard';
 import { TodayFocusIndicator } from './TodayFocusIndicator';
 
 type GitHubCardProps = {
@@ -454,6 +457,7 @@ function PullRequestRow({
           TODAY_FOCUS_DRAG_MIME,
           JSON.stringify(mapPullRequestToFocusItem(pullRequest)),
         );
+        event.dataTransfer.setData(TODAY_FOCUS_GITHUB_DRAG_MIME, 'true');
         event.dataTransfer.setData(
           'text/plain',
           `${pullRequest.repositoryName}#${pullRequest.pullNumber}`,

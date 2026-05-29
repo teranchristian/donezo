@@ -25,6 +25,12 @@ import {
 } from '../lib/todayFocusSync';
 
 const TODAY_FOCUS_DEBUG = false;
+const TODAY_FOCUS_WARNING_TIMEOUT_MS = 5_000;
+
+type TodayFocusAddPlacement = {
+  targetId: string;
+  position: 'before' | 'after';
+};
 
 type UseTodayFocusStateOptions = {
   jiraIssues: JiraIssue[];
@@ -51,6 +57,20 @@ export function useTodayFocusState({
   useEffect(() => {
     todayFocusItemsRef.current = todayFocusItems;
   }, [todayFocusItems]);
+
+  useEffect(() => {
+    if (!todayFocusWarning) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setTodayFocusWarning(null);
+    }, TODAY_FOCUS_WARNING_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [todayFocusWarning]);
 
   useEffect(() => {
     let isMounted = true;
@@ -243,13 +263,14 @@ export function useTodayFocusState({
     }
   }
 
-  function handleAddTodayFocusItem(item: FocusItem) {
+  function handleAddTodayFocusItem(item: FocusItem, placement?: TodayFocusAddPlacement) {
     setTodayFocusWarning(null);
 
     const addResult = addTodayFocusItem(
       todayFocusItemsRef.current,
       item,
       gitHubPullRequests,
+      placement,
     );
     if (addResult.warning) {
       setTodayFocusWarning(addResult.warning);
@@ -425,6 +446,7 @@ function addTodayFocusItem(
   items: FocusItem[],
   item: FocusItem,
   pullRequests: GitHubPullRequestItem[],
+  placement?: TodayFocusAddPlacement,
 ) {
   if (hasTodayFocusItem(items, item.id)) {
     return { items, warning: 'That item is already in Today focus.' };
@@ -464,8 +486,8 @@ function addTodayFocusItem(
     }
 
     return {
-      items: [
-        ...items.filter(
+      items: insertTodayFocusItem(
+        items.filter(
           (focusItem) =>
             !(
               focusItem.source === 'github' &&
@@ -476,15 +498,44 @@ function addTodayFocusItem(
           ...normalizedItem,
           children: Array.from(nextChildrenById.values()),
         },
-      ],
+        placement,
+      ),
       warning: null,
     };
   }
 
   return {
-    items: [...items, normalizeTopLevelTodayFocusItem(item)],
+    items: insertTodayFocusItem(
+      items,
+      normalizeTopLevelTodayFocusItem(item),
+      placement,
+    ),
     warning: null,
   };
+}
+
+function insertTodayFocusItem(
+  items: FocusItem[],
+  item: FocusItem,
+  placement?: TodayFocusAddPlacement,
+) {
+  if (!placement) {
+    return [...items, item];
+  }
+
+  const targetIndex = items.findIndex((focusItem) => focusItem.id === placement.targetId);
+  if (targetIndex < 0) {
+    return [...items, item];
+  }
+
+  const insertIndex =
+    placement.position === 'before' ? targetIndex : targetIndex + 1;
+
+  return [
+    ...items.slice(0, insertIndex),
+    item,
+    ...items.slice(insertIndex),
+  ];
 }
 
 function createManualTodayFocusTask(
