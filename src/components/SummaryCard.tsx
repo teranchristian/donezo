@@ -1847,6 +1847,25 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
       continue;
     }
 
+    if (/^\[[ xX]\]\s+/.test(line)) {
+      const taskItems: Array<{ text: string; checked: boolean; lineIndex: number }> = [];
+      while (index < lines.length) {
+        const currentLineIndex = index;
+        const taskMatch = lines[index].trim().match(/^\[([ xX])\]\s+(.*)$/);
+        if (!taskMatch) {
+          break;
+        }
+        taskItems.push({
+          checked: taskMatch[1].toLowerCase() === 'x',
+          lineIndex: currentLineIndex,
+          text: taskMatch[2].trim(),
+        });
+        index += 1;
+      }
+      blocks.push({ type: 'task-list', items: taskItems });
+      continue;
+    }
+
     if (/^[-*]\s+/.test(line)) {
       const taskItems: Array<{ text: string; checked: boolean; lineIndex: number }> = [];
       const listItems: string[] = [];
@@ -1895,6 +1914,7 @@ function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
         !nextLine ||
         nextLine.startsWith('```') ||
         /^#{1,3}\s+/.test(nextLine) ||
+        /^\[[ xX]\]\s+/.test(nextLine) ||
         /^[-*]\s+/.test(nextLine)
       ) {
         break;
@@ -2020,6 +2040,7 @@ function getManualTaskPreview(note: string) {
   return note
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/^[-*]\s+\[[ xX]\]\s+/gm, '')
+    .replace(/^\[[ xX]\]\s+/gm, '')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*]\s+/gm, '')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
@@ -2040,8 +2061,18 @@ function toggleMarkdownTaskListLine(note: string, lineIndex: number) {
     return lines.join('\n');
   }
 
+  if (/^(\s*)\[\s\](\s+)/.test(line)) {
+    lines[lineIndex] = line.replace(/^(\s*)\[\s\](\s+)/, '$1[x]$2');
+    return lines.join('\n');
+  }
+
   if (/^(\s*[-*]\s+)\[[xX]\](\s+)/.test(line)) {
     lines[lineIndex] = line.replace(/^(\s*[-*]\s+)\[[xX]\](\s+)/, '$1[ ]$2');
+    return lines.join('\n');
+  }
+
+  if (/^(\s*)\[[xX]\](\s+)/.test(line)) {
+    lines[lineIndex] = line.replace(/^(\s*)\[[xX]\](\s+)/, '$1[ ]$2');
     return lines.join('\n');
   }
 
