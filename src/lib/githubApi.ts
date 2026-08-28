@@ -1,86 +1,22 @@
+import { sendBackgroundMessage } from './backgroundBridge';
+import type {
+  GitHubConnectionStatus,
+  GitHubDashboardData,
+  GitHubNotification,
+  GitHubPullRequestItem,
+  GitHubPullRequestState,
+  GitHubRepository,
+} from './backgroundMessages';
 import { getStoredJsonValue } from './storage/backend';
 
-export type GitHubConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
-export type GitHubPullRequestState = 'open' | 'merged' | 'closed' | 'not-found';
-
-export type GitHubNotification = {
-  id: string;
-  unread: boolean;
-  last_read_at?: string | null;
-  updated_at: string;
-  reason: string;
-  authorLogin?: string;
-  pullRequestState?: GitHubPullRequestState;
-  repository: {
-    full_name: string;
-  };
-  subject: {
-    title: string;
-    type: string;
-    url: string | null;
-    latest_comment_url?: string | null;
-  };
-};
-
-export type GitHubPullRequestItem = {
-  id: number;
-  title: string;
-  headRefName: string;
-  repositoryId: number;
-  repositoryName: string;
-  repositoryUrl: string;
-  owner: string;
-  repo: string;
-  pullNumber: number;
-  totalCommentCount: number;
-  authorLogin: string;
-  isDraft: boolean;
-  createdAt: string;
-  updatedAt: string;
-  url: string;
-  source: 'authored' | 'review-requested' | 'recent';
-  reviewStatus: 'approved' | 'changes-requested' | 'waiting-review' | 'draft' | 'open';
-  ciStatus: 'passing' | 'failing' | 'pending' | 'no-checks';
-  mergeStateStatus:
-    | 'BEHIND'
-    | 'BLOCKED'
-    | 'CLEAN'
-    | 'DIRTY'
-    | 'DRAFT'
-    | 'HAS_HOOKS'
-    | 'UNKNOWN'
-    | 'UNSTABLE';
-  mergeQueueEntry: {
-    position: number;
-    state: 'AWAITING_CHECKS' | 'LOCKED' | 'MERGEABLE' | 'QUEUED' | 'UNMERGEABLE';
-  } | null;
-  detailsLoaded: boolean;
-};
-
-export type GitHubDashboardData = {
-  connectionStatus: GitHubConnectionStatus;
-  notificationsCount: number;
-  openPrsCount: number;
-  recentOpenPrsCount: number;
-  reviewRequestedCount: number;
-  notifications: GitHubNotification[];
-  pullRequests: GitHubPullRequestItem[];
-  recentPullRequests: GitHubPullRequestItem[];
-  errorMessage: string | null;
-  missingUsername: boolean;
-  lastUpdatedAt: number | null;
-};
-
-export type GitHubRepository = {
-  id: number;
-  name: string;
-  fullName: string;
-  owner: string;
-  url: string;
-  isPrivate: boolean;
-  updatedAt: string;
-  description: string;
-};
+export type {
+  GitHubConnectionStatus,
+  GitHubDashboardData,
+  GitHubNotification,
+  GitHubPullRequestItem,
+  GitHubPullRequestState,
+  GitHubRepository,
+} from './backgroundMessages';
 
 type CachedGitHubDashboardData = {
   cacheToken: string;
@@ -92,50 +28,6 @@ type CachedGitHubRepoIndex = {
   cacheToken: string;
   fetchedAt: number;
   data: GitHubRepository[];
-};
-
-type GitHubDashboardResponse = {
-  success: boolean;
-  data?: GitHubDashboardData;
-  error?: string;
-};
-
-type GitHubConnectionResponse = {
-  success: boolean;
-  status?: GitHubConnectionStatus;
-  error?: string;
-};
-
-type GitHubOwnerOptionsResponse = {
-  success: boolean;
-  owners?: string[];
-  error?: string;
-};
-
-type GitHubNotificationActivityResponse = {
-  success: boolean;
-  hasChanges?: boolean;
-  data?: GitHubDashboardData;
-  changedNotificationIds?: string[];
-  error?: string;
-};
-
-type GitHubPullRequestStateResponse = {
-  success: boolean;
-  state?: GitHubPullRequestState;
-  error?: string;
-};
-
-type GitHubPullRequestStatesResponse = {
-  success: boolean;
-  states?: Record<string, GitHubPullRequestState>;
-  error?: string;
-};
-
-type GitHubRepoIndexResponse = {
-  success: boolean;
-  repos?: GitHubRepository[];
-  error?: string;
 };
 
 const CACHE_KEY = 'github-dashboard-cache';
@@ -212,7 +104,7 @@ export async function testGitHubConnection(token: string): Promise<GitHubConnect
   }
 
   try {
-    const response = await sendMessage<GitHubConnectionResponse>({
+    const response = await sendBackgroundMessage({
       type: 'TEST_GITHUB_CONNECTION',
       payload: {
         token: trimmedToken
@@ -240,7 +132,7 @@ export async function fetchGitHubOwnerOptions(options: {
   }
 
   try {
-    const response = await sendMessage<GitHubOwnerOptionsResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_GITHUB_OWNER_OPTIONS',
       payload: {
         token: trimmedToken,
@@ -312,7 +204,7 @@ export async function loadGitHubDashboardData(options: {
   }
 
   try {
-    const response = await sendMessage<GitHubDashboardResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_GITHUB_DASHBOARD',
       payload: {
         username,
@@ -324,13 +216,13 @@ export async function loadGitHubDashboardData(options: {
       }
     });
 
-    if (response?.success && response.data) {
+    if (response.success) {
       return normalizeGitHubDashboardData(response.data) ?? getEmptyGitHubDashboardData('error');
     }
 
     return {
       ...getEmptyGitHubDashboardData('error'),
-      errorMessage: response?.error ?? 'GitHub data could not be loaded right now.'
+      errorMessage: response.error ?? 'GitHub data could not be loaded right now.'
     };
   } catch (error) {
     return {
@@ -359,7 +251,7 @@ export async function loadGitHubRepoIndex(options: {
   }
 
   try {
-    const response = await sendMessage<GitHubRepoIndexResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_GITHUB_REPO_INDEX',
       payload: {
         username,
@@ -401,7 +293,7 @@ export async function pollGitHubNotificationActivity(options: {
   }
 
   try {
-    const response = await sendMessage<GitHubNotificationActivityResponse>({
+    const response = await sendBackgroundMessage({
       type: 'POLL_GITHUB_ACTIVITY',
       payload: {
         username,
@@ -440,7 +332,7 @@ export async function getGitHubPullRequestState(options: {
   }
 
   try {
-    const response = await sendMessage<GitHubPullRequestStateResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_GITHUB_PULL_REQUEST_STATE',
       payload: {
         owner: options.owner,
@@ -475,7 +367,7 @@ export async function getGitHubPullRequestStates(options: {
   }
 
   try {
-    const response = await sendMessage<GitHubPullRequestStatesResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_GITHUB_PULL_REQUEST_STATES',
       payload: {
         token,
@@ -534,17 +426,4 @@ function createCacheToken(username: string, token: string, ownerFilter = '') {
   }
 
   return `${username}:${(hash >>> 0).toString(16)}`;
-}
-
-function sendMessage<TResponse>(message: unknown) {
-  return new Promise<TResponse>((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-
-      resolve(response as TResponse);
-    });
-  });
 }

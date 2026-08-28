@@ -1,3 +1,9 @@
+import { sendBackgroundMessage } from './backgroundBridge';
+import type {
+  JiraIssue,
+  JiraLinkedIssue,
+  JiraProfile,
+} from './backgroundMessages';
 import {
   getJiraIssueFocusTone,
   isJiraIssueHighPriority,
@@ -6,73 +12,11 @@ import {
 
 export type JiraConnectionStatus = 'not-connected' | 'testing' | 'connected' | 'invalid' | 'error';
 
-export type JiraProfile = {
-  accountId: string;
-  displayName: string;
-  emailAddress?: string;
-};
-
-export type JiraIssue = {
-  id: string;
-  key: string;
-  summary: string;
-  updated: string;
-  project?: {
-    key?: string;
-    name?: string;
-  };
-  blockingCount: number;
-  blockingIssues: JiraLinkedIssue[];
-  blockedByIssues: JiraLinkedIssue[];
-  status: {
-    name: string;
-    statusCategory?: {
-      key?: string;
-      name?: string;
-    };
-  };
-  priority?: {
-    name?: string;
-  };
-  issuelinks?: Array<{
-    type?: {
-      name?: string;
-      inward?: string;
-      outward?: string;
-    };
-    inwardIssue?: {
-      key?: string;
-      fields?: {
-        summary?: string;
-        status?: {
-          name?: string;
-        };
-        assignee?: {
-          displayName?: string;
-        };
-      };
-    };
-    outwardIssue?: {
-      key?: string;
-      fields?: {
-        summary?: string;
-        status?: {
-          name?: string;
-        };
-        assignee?: {
-          displayName?: string;
-        };
-      };
-    };
-  }>;
-};
-
-export type JiraLinkedIssue = {
-  key: string;
-  summary?: string;
-  status?: string;
-  assignee?: string;
-};
+export type {
+  JiraIssue,
+  JiraLinkedIssue,
+  JiraProfile,
+} from './backgroundMessages';
 
 type JiraIssueLike = JiraIssue & {
   fields?: {
@@ -168,7 +112,7 @@ export async function testJiraConnection(
   }
 
   try {
-    const response = await sendMessage<BackgroundJiraConnectionResponse>({
+    const response = await sendBackgroundMessage({
       type: 'TEST_JIRA_CONNECTION',
       payload: {
         jiraBaseUrl: trimmedBaseUrl,
@@ -214,7 +158,7 @@ export async function loadJiraDashboardData(options: {
   }
 
   try {
-    const response = await sendMessage<BackgroundJiraIssuesResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_JIRA_ISSUES',
       payload: {
         jiraBaseUrl: trimmedBaseUrl,
@@ -274,7 +218,7 @@ export async function loadJiraIssuesByKeys(options: {
   }
 
   try {
-    const response = await sendMessage<BackgroundJiraIssuesResponse>({
+    const response = await sendBackgroundMessage({
       type: 'FETCH_JIRA_ISSUES_BY_KEYS',
       payload: {
         jiraBaseUrl: trimmedBaseUrl,
@@ -325,14 +269,6 @@ export function normalizeJiraBaseUrl(baseUrl: string) {
 export const JIRA_ACTIVE_ISSUES_JQL =
   'assignee = currentUser() AND statusCategory != Done ORDER BY priority DESC, updated DESC';
 
-type BackgroundJiraConnectionResponse =
-  | { success: true; user: JiraProfile }
-  | { success: false; status?: number; error?: string };
-
-type BackgroundJiraIssuesResponse =
-  | { success: true; issues: JiraIssue[] }
-  | { success: false; status?: number; error?: string };
-
 function getBlockingCount(issue: JiraIssueLike) {
   return getBlockingIssues(issue).length;
 }
@@ -361,20 +297,6 @@ function normalizeJiraIssue(issue: JiraIssueLike): JiraIssue {
     priority: issue?.priority ?? issue?.fields?.priority,
     issuelinks: issue?.issuelinks ?? issue?.fields?.issuelinks
   };
-}
-
-function sendMessage<ResponseType>(message: Record<string, unknown>) {
-  return new Promise<ResponseType>((resolve, reject) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      const runtimeError = chrome.runtime.lastError;
-      if (runtimeError) {
-        reject(new Error(runtimeError.message));
-        return;
-      }
-
-      resolve(response as ResponseType);
-    });
-  });
 }
 
 function getBlockingIssues(issue: JiraIssueLike) {

@@ -43,6 +43,9 @@ This version reflects the codebase as it exists now. Earlier extractions and the
   - `src/lib/dashboardRouting.ts`
   - `src/lib/githubDomain.ts`
   - `src/lib/todayFocusSync.ts`
+- Chrome background requests and responses now share a typed protocol in
+  `src/lib/backgroundMessages.ts` and a single message bridge in
+  `src/lib/backgroundBridge.ts`.
 - `README.md` documents the local test workflow.
 
 ### Still Missing
@@ -85,32 +88,26 @@ The hook should ideally keep:
 
 It currently mixes:
 
-- exported domain-facing types
-- Chrome message bridge calls
+- domain-facing integration calls
 - cache lookup behavior
 - cache token creation
-- bridge transport plumbing
 
 Worth extracting later:
 
-- a small GitHub bridge module for `chrome.runtime.sendMessage(...)`
 - cache helpers
-- shared request/response types if they keep growing
+- integration-specific request builders if they keep growing
 
 #### `src/lib/jiraApi.ts`
 
 It currently mixes:
 
-- exported Jira types
 - connection and dashboard loading
 - URL and query helpers
 - issue normalization
 - linked-issue relationship interpretation
-- bridge transport plumbing
 
 Worth extracting later:
 
-- a Jira bridge module
 - Jira normalization/link parsing helpers
 - Jira URL/query helpers
 
