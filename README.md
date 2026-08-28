@@ -293,6 +293,15 @@ npm run build
 
 This outputs the packaged extension to `dist/`.
 
+### Run the test suite
+
+```bash
+npm test
+```
+
+Use `npm run test:watch` while developing. Pull requests and pushes to `main`
+also run the type-check, unit tests, and production build in GitHub Actions.
+
 ### Preview the built app
 
 ```bash
@@ -364,13 +373,17 @@ Key files and modules:
 - `npm run dev` - watch and build the extension into `dist/` with development-only controls
 - `npm run dev:server` - run the Vite development server
 - `npm run build` - type-check and build the extension into `dist/`
+- `npm run typecheck` - type-check the TypeScript source
+- `npm test` - run the unit test suite once
+- `npm run test:watch` - run the unit test suite in watch mode
 - `npm run preview` - preview the built Vite app locally
 
 ## Current Limitations
 
 - the app is primarily shaped around one personal workflow
 - full GitHub and Jira behavior depends on the extension runtime
-- there is currently no automated test harness configured in the repo
+- automated coverage currently focuses on pure domain modules; hooks,
+  components, and the background worker are not covered yet
 
 ## Extension Permissions
 
