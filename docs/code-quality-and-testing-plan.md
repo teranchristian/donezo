@@ -4,7 +4,7 @@
 
 Keep improving maintainability and add meaningful regression protection without disrupting current behavior.
 
-This version reflects the codebase as it exists now. Earlier extractions have already landed, so the remaining work is no longer a broad structural rewrite. The priority is to finish a smaller set of refactors, add the test harness, and start unit coverage where the boundaries are already clean.
+This version reflects the codebase as it exists now. Earlier extractions and the initial test harness have landed, so the remaining work is no longer a broad structural rewrite. The priority is to extend meaningful regression coverage while finishing a smaller set of refactors.
 
 ## Current State
 
@@ -36,12 +36,20 @@ This version reflects the codebase as it exists now. Earlier extractions have al
   - `src/lib/storage/defaults.ts`
   - `src/lib/storage/keys.ts`
   - `src/lib/storage/types.ts`
+- Vitest is configured with `test` and `test:watch` scripts.
+- GitHub Actions runs the type-check, unit tests, and production build for pull
+  requests and pushes to `main`.
+- Initial unit coverage protects:
+  - `src/lib/dashboardRouting.ts`
+  - `src/lib/githubDomain.ts`
+  - `src/lib/todayFocusSync.ts`
+- `README.md` documents the local test workflow.
 
 ### Still Missing
 
-- There is still no unit test harness in the repo.
-- `package.json` has no `test` script and no Vitest or Testing Library dependencies.
-- `README.md` does not document any test workflow.
+- Hook, component, and background-worker behavior is not covered yet.
+- Testing Library, a DOM test environment, and a shared browser-test setup are
+  not configured because the current tests only exercise pure modules.
 - Several large files still mix orchestration, UI behavior, and pure helpers in ways that make them expensive to reason about and test.
 
 ## What Needs Refactor
@@ -168,56 +176,23 @@ This is in better shape now that alert derivation lives in `src/lib/dashboardPag
 
 ## Testing Setup
 
-This work has not started yet.
+The pure-module test foundation is in place:
 
-### Missing foundation
+- Vitest runs in its default Node environment.
+- `npm test` runs the suite once.
+- `npm run test:watch` runs it in watch mode.
+- CI verifies type-checking, tests, and the production build.
 
-- `vitest`
-- `@testing-library/react`
-- `@testing-library/jest-dom`
-- `jsdom`
-- `test` and `test:watch` scripts in `package.json`
-- a shared test setup file
-- README documentation for running tests
+Add Testing Library, `@testing-library/jest-dom`, `jsdom`, and a shared setup
+file only when component or hook tests become a concrete next target.
 
-### Expected first setup deliverables
+## Next Unit Tests To Add
 
-- add the test dependencies
-- add `test` and `test:watch` scripts
-- add a shared setup file for Vitest and DOM assertions
-- document the local test workflow in `README.md`
+The initial suite now covers dashboard routing, GitHub attention rules, Jira-key
+mapping, and Today Focus Jira/GitHub reconciliation.
 
-## First Unit Tests To Add
+Good next targets are:
 
-These modules are already clean enough to start with and should come before hook or component-heavy tests.
-
-### Best first targets
-
-#### 1. `src/lib/dashboardRouting.ts`
-
-This is one of the safest and highest-value first test targets.
-
-Add tests for:
-
-- parsing valid hash states
-- rejecting invalid hash states
-- building route hashes correctly
-- preserving defaults when params are missing
-
-#### 2. `src/lib/githubDomain.ts`
-
-This is also ready now and has clear business rules that should be protected.
-
-Add tests for:
-
-- ready-to-merge rules
-- warning-state transitions
-- focus status labels and tones
-- Jira key extraction from PR titles
-
-### Good next targets after that
-
-- `src/lib/todayFocusSync.ts`
 - `src/lib/jiraDomain.ts`
 - storage normalization helpers in `src/lib/storage/*`
 - `src/lib/githubCardDomain.ts`
@@ -225,20 +200,19 @@ Add tests for:
 
 ## Recommended Order
 
-1. Add the test harness.
-2. Add unit tests for `src/lib/dashboardRouting.ts`.
-3. Add unit tests for `src/lib/githubDomain.ts`.
-4. Extract pure Today focus mutation helpers out of `src/hooks/useTodayFocusState.ts`.
-5. Split `src/lib/githubApi.ts` and `src/lib/jiraApi.ts` by concern.
-6. Reassess whether hook and component-level tests are worth adding after those extractions.
+1. Extract pure Today focus mutation helpers out of `src/hooks/useTodayFocusState.ts`.
+2. Add unit coverage for the extracted mutations.
+3. Split `src/lib/githubApi.ts` and `src/lib/jiraApi.ts` by concern.
+4. Add coverage for storage normalization and the remaining pure domain modules.
+5. Reassess whether hook and component-level tests are worth adding after those extractions.
 
 ## Definition Of Done For This Plan
 
-This plan is in good shape when:
+The test-foundation phase is complete because local unit tests are part of
+normal development, CI runs them automatically, the workflow is documented,
+and the first domain modules are covered. The broader plan is in good shape
+when:
 
-- local unit tests are part of normal development
-- the repo has a documented test workflow
-- `dashboardRouting` and `githubDomain` are covered first
 - additional pure modules follow with regression coverage
 - `useTodayFocusState` no longer owns most of the Today focus mutation rules
 - `githubApi.ts` and `jiraApi.ts` no longer mix transport, normalization, and helper concerns in one file
